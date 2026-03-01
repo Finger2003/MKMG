@@ -1,0 +1,8 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="MathLib/MathLib.vcxproj" Id="82e20199-5418-4cbb-9fc6-7c7e86c6d7de" />
+  <Project Path="MathLibTest/MathLibTest.vcxproj" />
+</Solution>
