@@ -155,5 +155,55 @@ namespace MathLib
 
 			return result;
 		}
+
+		bool Inverse(Mat4d& outInverse, double epsilon = 1e-12) const
+		{
+			// Sub-determinants for the top two rows
+			double s0 = m[0][0] * m[1][1] - m[0][1] * m[1][0];
+			double s1 = m[0][0] * m[1][2] - m[0][2] * m[1][0];
+			double s2 = m[0][0] * m[1][3] - m[0][3] * m[1][0];
+			double s3 = m[0][1] * m[1][2] - m[0][2] * m[1][1];
+			double s4 = m[0][1] * m[1][3] - m[0][3] * m[1][1];
+			double s5 = m[0][2] * m[1][3] - m[0][3] * m[1][2];
+
+			// Sub-determinants for the bottom two rows
+			double c5 = m[2][2] * m[3][3] - m[2][3] * m[3][2];
+			double c4 = m[2][1] * m[3][3] - m[2][3] * m[3][1];
+			double c3 = m[2][1] * m[3][2] - m[2][2] * m[3][1];
+			double c2 = m[2][0] * m[3][3] - m[2][3] * m[3][0];
+			double c1 = m[2][0] * m[3][2] - m[2][2] * m[3][0];
+			double c0 = m[2][0] * m[3][1] - m[2][1] * m[3][0];
+
+			// Overall determinant
+			double det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
+
+			//The matrix is singular and cannot be inverted.
+			if (std::abs(det) < epsilon)
+				return false;
+			
+			double invDet = 1.0 / det;
+
+			outInverse.m[0][0] = (m[1][1] * c5 - m[1][2] * c4 + m[1][3] * c3) * invDet;
+			outInverse.m[0][1] = (-m[0][1] * c5 + m[0][2] * c4 - m[0][3] * c3) * invDet;
+			outInverse.m[0][2] = (m[3][1] * s5 - m[3][2] * s4 + m[3][3] * s3) * invDet;
+			outInverse.m[0][3] = (-m[2][1] * s5 + m[2][2] * s4 - m[2][3] * s3) * invDet;
+
+			outInverse.m[1][0] = (-m[1][0] * c5 + m[1][2] * c2 - m[1][3] * c1) * invDet;
+			outInverse.m[1][1] = (m[0][0] * c5 - m[0][2] * c2 + m[0][3] * c1) * invDet;
+			outInverse.m[1][2] = (-m[3][0] * s5 + m[3][2] * s2 - m[3][3] * s1) * invDet;
+			outInverse.m[1][3] = (m[2][0] * s5 - m[2][2] * s2 + m[2][3] * s1) * invDet;
+
+			outInverse.m[2][0] = (m[1][0] * c4 - m[1][1] * c2 + m[1][3] * c0) * invDet;
+			outInverse.m[2][1] = (-m[0][0] * c4 + m[0][1] * c2 - m[0][3] * c0) * invDet;
+			outInverse.m[2][2] = (m[3][0] * s4 - m[3][1] * s2 + m[3][3] * s0) * invDet;
+			outInverse.m[2][3] = (-m[2][0] * s4 + m[2][1] * s2 - m[2][3] * s0) * invDet;
+
+			outInverse.m[3][0] = (-m[1][0] * c3 + m[1][1] * c1 - m[1][2] * c0) * invDet;
+			outInverse.m[3][1] = (m[0][0] * c3 - m[0][1] * c1 + m[0][2] * c0) * invDet;
+			outInverse.m[3][2] = (-m[3][0] * s3 + m[3][1] * s1 - m[3][2] * s0) * invDet;
+			outInverse.m[3][3] = (m[2][0] * s3 - m[2][1] * s1 + m[2][2] * s0) * invDet;
+
+			return true;
+		}
 	};
 }

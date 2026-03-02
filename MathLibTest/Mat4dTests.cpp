@@ -184,5 +184,73 @@ namespace MathLibTest
 			Assert::AreEqual(4.0, result.z);
 			Assert::AreEqual(1.0, result.w);
 		}
+
+		TEST_METHOD(InverseSingularMatTest)
+		{
+			Mat4d mat(
+				Vec4d(1.0, 2.0, 3.0, 4.0),
+				Vec4d(5.0, 6.0, 7.0, 8.0),
+				Vec4d(9.0, 10.0, 11.0, 12.0),
+				Vec4d(13.0, 14.0, 15.0, 16.0)
+			);
+			Mat4d inverse;
+			bool success = mat.Inverse(inverse);
+			Assert::IsFalse(success);						
+		}
+
+		TEST_METHOD(InversePascalMatTest)
+		{
+			Mat4d mat(
+				Vec4d(1.0, 0.0, 0.0, 0.0),
+				Vec4d(1.0, 1.0, 0.0, 0.0),
+				Vec4d(1.0, 2.0, 1.0, 0.0),
+				Vec4d(1.0, 3.0, 3.0, 1.0)
+			);
+			Mat4d expectedInverse(
+				Vec4d(1.0, 0.0, 0.0, 0.0),
+				Vec4d(-1.0, 1.0, 0.0, 0.0),
+				Vec4d(1.0, -2.0, 1.0, 0.0),
+				Vec4d(-1.0, 3.0, -3.0, 1.0)
+			);
+
+			Mat4d inverse;
+			bool success = mat.Inverse(inverse);
+			Assert::IsTrue(success);
+			for (int i = 0; i < 4; i++)
+			{
+				for (int j = 0; j < 4; j++)
+				{
+					Assert::AreEqual(expectedInverse.m[i][j], inverse.m[i][j], epsilon);
+				}
+			}
+		}
+
+		TEST_METHOD(InverseOrthogonalMatTest)
+		{
+			Mat4d mat(
+				Vec4d(0.0, 1.0, 0.0, 0.0),
+				Vec4d(-1.0, 0.0, 0.0, 0.0),
+				Vec4d(0.0, 0.0, 1.0, 0.0),
+				Vec4d(0.0, 0.0, 0.0, 1.0)
+			);
+
+			Mat4d expectedInverse(
+				Vec4d(0.0, -1.0, 0.0, 0.0),
+				Vec4d(1.0, 0.0, 0.0, 0.0),
+				Vec4d(0.0, 0.0, 1.0, 0.0),
+				Vec4d(0.0, 0.0, 0.0, 1.0)
+			);
+
+			Mat4d inverse;
+			bool success = mat.Inverse(inverse);
+			Assert::IsTrue(success);
+			for (int i = 0; i < 4; i++)
+			{
+				for (int j = 0; j < 4; j++)
+				{
+					Assert::AreEqual(expectedInverse.m[i][j], inverse.m[i][j], epsilon);
+				}
+			}
+		}
 	};
 }
