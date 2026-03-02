@@ -8,6 +8,7 @@ using namespace MathLib;
 
 namespace MathLibTest
 {
+	constexpr double epsilon = 1e-10;
 	TEST_CLASS(Mat4dTest)
 	{
 	public:
@@ -104,6 +105,84 @@ namespace MathLibTest
 					Assert::AreEqual(mat.m[i][j], result2.m[i][j]);
 				}
 			}
+		}
+
+		TEST_METHOD(TranspositionTest)
+		{
+			Mat4d mat(
+				Vec4d(1.0, 2.0, 3.0, 4.0),
+				Vec4d(5.0, 6.0, 7.0, 8.0),
+				Vec4d(9.0, 10.0, 11.0, 12.0),
+				Vec4d(13.0, 14.0, 15.0, 16.0)
+			);
+
+			Mat4d transposed = mat.Transpose();
+
+			for (int i = 0; i < 4; i++)
+			{
+				for (int j = 0; j < 4; j++)
+				{
+					Assert::AreEqual(mat.m[i][j], transposed.m[j][i]);
+				}
+			}
+		}
+
+		TEST_METHOD(TranslationTest)
+		{
+			Mat4d translation = Mat4d::Translation(1.0, 2.0, 3.0);
+			Vec4d point(1.0, 1.0, 1.0, 1.0);
+			Vec4d result = translation * point;
+			Assert::AreEqual(2.0, result.x);
+			Assert::AreEqual(3.0, result.y);
+			Assert::AreEqual(4.0, result.z);
+			Assert::AreEqual(1.0, result.w);
+		}
+
+		TEST_METHOD(RotationXTest)
+		{
+			double angle = std::numbers::pi / 2; // 90 degrees
+			Mat4d rotation = Mat4d::RotationX(angle);
+			Vec4d point(0.0, 1.0, 0.0, 1.0);
+			Vec4d result = rotation * point;
+			Assert::AreEqual(0.0, result.x, epsilon);
+			Assert::AreEqual(0.0, result.y, epsilon);
+			Assert::AreEqual(1.0, result.z, epsilon);
+			Assert::AreEqual(1.0, result.w, epsilon);
+		}
+
+		TEST_METHOD(RotationYTest)
+		{
+			double angle = std::numbers::pi / 2; // 90 degrees
+			Mat4d rotation = Mat4d::RotationY(angle);
+			Vec4d point(1.0, 0.0, 0.0, 1.0);
+			Vec4d result = rotation * point;
+			Assert::AreEqual(0.0, result.x, epsilon);
+			Assert::AreEqual(0.0, result.y, epsilon);
+			Assert::AreEqual(-1.0, result.z, epsilon);
+			Assert::AreEqual(1.0, result.w, epsilon);
+		}
+
+		TEST_METHOD(RotationZTest)
+		{
+			double angle = std::numbers::pi / 2; // 90 degrees
+			Mat4d rotation = Mat4d::RotationZ(angle);
+			Vec4d point(1.0, 0.0, 0.0, 1.0);
+			Vec4d result = rotation * point;
+			Assert::AreEqual(0.0, result.x, epsilon);
+			Assert::AreEqual(1.0, result.y, epsilon);
+			Assert::AreEqual(0.0, result.z, epsilon);
+			Assert::AreEqual(1.0, result.w, epsilon);
+		}
+
+		TEST_METHOD(ScalingTest)
+		{
+			Mat4d scaling = Mat4d::Scaling(2.0, 3.0, 4.0);
+			Vec4d point(1.0, 1.0, 1.0, 1.0);
+			Vec4d result = scaling * point;
+			Assert::AreEqual(2.0, result.x);
+			Assert::AreEqual(3.0, result.y);
+			Assert::AreEqual(4.0, result.z);
+			Assert::AreEqual(1.0, result.w);
 		}
 	};
 }
