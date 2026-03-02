@@ -15,41 +15,19 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="framework.h">
-      <Filter>Pliki nagłówkowe</Filter>
-    </ClInclude>
-    <ClInclude Include="targetver.h">
-      <Filter>Pliki nagłówkowe</Filter>
-    </ClInclude>
-    <ClInclude Include="Resource.h">
-      <Filter>Pliki nagłówkowe</Filter>
-    </ClInclude>
-    <ClInclude Include="Elipsoid.h">
-      <Filter>Pliki nagłówkowe</Filter>
-    </ClInclude>
     <ClInclude Include="pch.h">
       <Filter>Pliki nagłówkowe</Filter>
     </ClInclude>
+    <ClInclude Include="framework.h">
+      <Filter>Pliki nagłówkowe</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Elipsoid.cpp">
-      <Filter>Pliki źródłowe</Filter>
-    </ClCompile>
     <ClCompile Include="pch.cpp">
       <Filter>Pliki źródłowe</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="Elipsoid.rc">
-      <Filter>Pliki zasobów</Filter>
-    </ResourceCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="small.ico">
-      <Filter>Pliki zasobów</Filter>
-    </Image>
-    <Image Include="Elipsoid.ico">
-      <Filter>Pliki zasobów</Filter>
-    </Image>
+    <ClCompile Include="main.cpp">
+      <Filter>Pliki źródłowe</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
