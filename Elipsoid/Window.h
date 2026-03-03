@@ -30,6 +30,7 @@ public:
 */
 class Window
 {
+public:
 	static constexpr int m_defaultWindowWidth = 1280;
 	static constexpr int m_defaultWindowHeight = 720;
 
