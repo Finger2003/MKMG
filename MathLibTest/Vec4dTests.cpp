@@ -13,6 +13,7 @@ namespace MathLibTest
 		TEST_METHOD(ValuesConstructorTest)
 		{
 			Vec4d v(1.0, 2.0, 3.0, 4.0);
+
 			Assert::AreEqual(1.0, v.x);
 			Assert::AreEqual(2.0, v.y);
 			Assert::AreEqual(3.0, v.z);
