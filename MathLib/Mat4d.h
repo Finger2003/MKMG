@@ -1,5 +1,6 @@
 #pragma once
 #include "Vec4d.h"
+#include "Vec3d.h"
 
 namespace MathLib
 {
@@ -204,6 +205,16 @@ namespace MathLib
 			outInverse.m[3][3] = (m[2][0] * s3 - m[2][1] * s1 + m[2][2] * s0) * invDet;
 
 			return true;
+		}
+
+		static Mat4d CreateInverseTRS(const Vec3d& translation, const Vec3d& rotation, const Vec3d& scale)
+		{
+			Mat4d invScale = Mat4d::Scaling(1.0 / scale.x, 1.0 / scale.y, 1.0 / scale.z);
+			Mat4d invRotX = Mat4d::RotationX(-rotation.x);
+			Mat4d invRotY = Mat4d::RotationY(-rotation.y);
+			Mat4d invRotZ = Mat4d::RotationZ(-rotation.z);
+			Mat4d invTranslation = Mat4d::Translation(-translation.x, -translation.y, -translation.z);
+			return invScale * (invRotZ * (invRotY * (invRotX * invTranslation)));
 		}
 	};
 }

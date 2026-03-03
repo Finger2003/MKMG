@@ -3,7 +3,9 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="Elipsoid/Elipsoid.vcxproj" Id="13e2c167-105f-4e3c-bb04-518faf92b471" />
+  <Project Path="Ellipsoid/Ellipsoid.vcxproj" Id="6d46fe3d-1942-45e5-ab2e-ff97888b7c69">
+    <BuildDependency Project="MathLib/MathLib.vcxproj" />
+  </Project>
   <Project Path="MathLib/MathLib.vcxproj" Id="82e20199-5418-4cbb-9fc6-7c7e86c6d7de" />
   <Project Path="MathLibTest/MathLibTest.vcxproj" />
 </Solution>

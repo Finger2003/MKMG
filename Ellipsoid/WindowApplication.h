@@ -23,7 +23,7 @@ public:
 	explicit WindowApplication(HINSTANCE hInstance,
 		int wndWidth = Window::m_defaultWindowWidth,
 		int wndHeight = Window::m_defaultWindowHeight,
-		std::wstring wndTitle = L"Elipsoid");
+		std::wstring wndTitle = L"WindowApp");
 
 	/**
 	 * @brief Destroys the window and frees application resources.
