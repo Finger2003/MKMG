@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClInclude Include="framework.h" />
     <ClInclude Include="Mat4d.h" />
+    <ClInclude Include="MathLib.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Vec3d.h" />
     <ClInclude Include="Vec4d.h" />

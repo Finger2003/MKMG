@@ -37,6 +37,12 @@ namespace MathLib
 			return vec * scalar;
 		}
 
+		friend Vec3d& operator*=(Vec3d& vec, double scalar)
+		{
+			vec = vec * scalar;
+			return vec;
+		}
+
 		friend Vec3d operator/(const Vec3d& vec, double scalar)
 		{
 			return _mm256_div_pd(vec.v, _mm256_set1_pd(scalar));

@@ -8,7 +8,7 @@ using namespace MathLib;
 
 namespace MathLibTest
 {
-	constexpr double epsilon = 1e-10;
+	constexpr double epsilon = 1e-12;
 	TEST_CLASS(Mat4dTest)
 	{
 	public:
