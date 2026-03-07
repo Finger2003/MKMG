@@ -155,6 +155,11 @@
     <ClInclude Include="Window.h" />
     <ClInclude Include="WindowApplication.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MathLib\MathLib.vcxproj">
+      <Project>{82e20199-5418-4cbb-9fc6-7c7e86c6d7de}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

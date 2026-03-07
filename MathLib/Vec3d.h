@@ -67,5 +67,13 @@ namespace MathLib
 		{
 			return std::sqrt(length_sqr());
 		}
+
+		Vec3d normalize() const
+		{
+			double len = length();
+			if (len < 1e-12)
+				return Vec3d(0.0, 0.0, 0.0);
+			return *this / len;
+		}
 	};
 }

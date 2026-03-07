@@ -214,7 +214,7 @@ namespace MathLib
 			Mat4d invRotY = Mat4d::RotationY(-rotation.y);
 			Mat4d invRotZ = Mat4d::RotationZ(-rotation.z);
 			Mat4d invTranslation = Mat4d::Translation(-translation.x, -translation.y, -translation.z);
-			return invScale * (invRotZ * (invRotY * (invRotX * invTranslation)));
+			return invScale * (invRotX * (invRotY * (invRotZ * invTranslation)));
 		}
 	};
 }

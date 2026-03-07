@@ -14,17 +14,19 @@
 //};
 struct Ellipsoid
 {
-	MathLib::Vec3d radii{ 1.0, 1.0, 1.0 }; // Radii along x, y and z axes.
+	MathLib::Vec3d radii{ 1.5, 1.0, 1.25 }; // Radii along x, y and z axes.
 	MathLib::Vec3d position{}; // Position of the center of the elipsoid.
-	MathLib::Vec3d rotation{}; // Rotation angles around x, y and z axes.
+	//MathLib::Vec3d rotation{}; // Rotation angles around x, y and z axes.
+
+	MathLib::Mat4d rotationMatrix = MathLib::Mat4d::Identity();
 	MathLib::Vec3d scale{ 1.0, 1.0, 1.0 };
 
 	static MathLib::Vec3d color; // Elipsoid color.
 
-	MathLib::Mat4d invertedTransformMatrix;
+	MathLib::Mat4d DMprim;
 	bool needsUpdate = true;
 
-	void UpdateInvertedTransformMatrix();
+	void UpdateDMprimMatrix();
 };
 
 enum class InteractionMode 
@@ -76,10 +78,17 @@ protected:
 	 * @return Application exit code.
 	 */
 	int MainLoop() override;
+
+	void Render(); // Renders the elipsoid to the window.
 private:
-	int minStep = 16;
-	int step = minStep;
-	Ellipsoid ellipsoid;
-	InteractionMode interactionMode = InteractionMode::None;
+	int minStep = 1;
+	int m_step = minStep;
+	POINT m_lastMousePos{};
+	Ellipsoid m_ellipsoid;
+	InteractionMode m_interactionMode = InteractionMode::None;
+	int m_specularExponent = 2;
+
+	std::vector<uint32_t> m_pixelData;
+	BITMAPINFO m_bitmapInfo{};
 };
 

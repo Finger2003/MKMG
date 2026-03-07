@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "WindowApplication.h"
+#include "EllipsoidApplication.h"
 #include "exceptions.h"
 
 using namespace std;
@@ -9,7 +9,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	auto exitCode = EXIT_FAILURE;
 	try
 	{
-		WindowApplication app(hInstance);
+		EllipsoidApplication app(hInstance);
 		exitCode = app.Run(nCmdShow);
 	}
 	catch (Exception& e)
