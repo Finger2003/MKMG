@@ -1,5 +1,5 @@
 #pragma once
-#include "WindowApplication.h"
+#include "DxApplication.h"
 #include "../MathLib/Vec3d.h"
 #include "../MathLib/Mat4d.h"
 #include "dxDevice.h"
@@ -37,7 +37,7 @@ enum class InteractionMode
 	Translating,
 };
 
-class EllipsoidApplication : public WindowApplication
+class EllipsoidApplication : public DxApplication
 {
 public:
 	/**
@@ -78,9 +78,9 @@ protected:
 	 *
 	 * @return Application exit code.
 	 */
-	int MainLoop() override;
+	//int MainLoop() override;
 
-	void Render(); // Renders the elipsoid to the window.
+	void Render() override; // Renders the elipsoid to the window.
 private:
 	int minStep = 1;
 	int m_step = minStep;
@@ -93,8 +93,8 @@ private:
 	BITMAPINFO m_bitmapInfo{};
 
 
-	DxDevice m_device;
-	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_backBuffer;
+	//DxDevice m_device;
+	//Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_backBuffer;
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> m_cpuTexture;
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_cpuTextureView;
 

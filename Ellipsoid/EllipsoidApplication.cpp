@@ -40,12 +40,12 @@ void Ellipsoid::UpdateDMprimMatrix()
 
 
 EllipsoidApplication::EllipsoidApplication(HINSTANCE hInstance, int wndWidth, int wndHeight, std::wstring wndTitle)
-	: WindowApplication(hInstance, wndWidth, wndHeight, wndTitle), m_device(m_window)
+	: DxApplication(hInstance, wndWidth, wndHeight, wndTitle)
 {
-	ID3D11Texture2D* tempTexture = nullptr;
-	m_device.getSwapChain()->GetBuffer(0, IID_PPV_ARGS(&tempTexture));
-	const ComPtr<ID3D11Texture2D> backTexture(tempTexture);
-	m_backBuffer = m_device.CreateRenderTargetView(backTexture);
+	//ID3D11Texture2D* tempTexture = nullptr;
+	//m_device.getSwapChain()->GetBuffer(0, IID_PPV_ARGS(&tempTexture));
+	//const ComPtr<ID3D11Texture2D> backTexture(tempTexture);
+	//m_backBuffer = m_device.CreateRenderTargetView(backTexture);
 
 	SIZE wndSize = m_window.getClientSize();
 	Texture2DDescription cpuTextureDesc(wndSize);
@@ -133,6 +133,7 @@ bool EllipsoidApplication::ProcessMessage(WindowMessage& msg)
 				//m_ellipsoid.rotation.y += dx * 0.01; // Rotate around y-axis.
 				//m_ellipsoid.rotation.x += dy * 0.01; // Rotate around x-axis.
 				m_ellipsoid.rotationMatrix = rotY * rotX * m_ellipsoid.rotationMatrix;
+				m_ellipsoid.rotationMatrix.Orthonormalize3x3(); // Keep the rotation matrix orthonormal to prevent distortion.
 			}
 			else if (m_interactionMode == InteractionMode::Translating)
 			{
@@ -157,6 +158,7 @@ bool EllipsoidApplication::ProcessMessage(WindowMessage& msg)
 			//m_ellipsoid.rotation.z += (zDelta > 0) ? 0.1 : -0.1;
 			Mat4d rotZ = Mat4d::RotationZ((zDelta > 0) ? 0.1 : -0.1);
 			m_ellipsoid.rotationMatrix = rotZ * m_ellipsoid.rotationMatrix;
+			m_ellipsoid.rotationMatrix.Orthonormalize3x3(); // Keep the rotation matrix orthonormal to prevent distortion.
 		}
 		else
 		{
@@ -172,24 +174,24 @@ bool EllipsoidApplication::ProcessMessage(WindowMessage& msg)
 	return WindowApplication::ProcessMessage(msg);
 }
 
-int EllipsoidApplication::MainLoop()
-{
-	MSG msg{};
-	do
-	{
-		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-		else
-		{
-			Render();
-			m_device.getSwapChain()->Present(0, 0);
-		}
-	} while (msg.message != WM_QUIT);
-	return msg.wParam;
-}
+//int EllipsoidApplication::MainLoop()
+//{
+//	MSG msg{};
+//	do
+//	{
+//		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+//		{
+//			TranslateMessage(&msg);
+//			DispatchMessage(&msg);
+//		}
+//		else
+//		{
+//			Render();
+//			m_device.getSwapChain()->Present(0, 0);
+//		}
+//	} while (msg.message != WM_QUIT);
+//	return msg.wParam;
+//}
 
 void EllipsoidApplication::Render()
 {
@@ -204,12 +206,7 @@ void EllipsoidApplication::Render()
 	double aspectRatio = static_cast<double>(width) / height;
 
 	size_t requiredSize = static_cast<size_t>(width * height);
-	if (m_pixelData.size() != requiredSize)
-	{
-		m_pixelData.resize(requiredSize, 0xFF000000); // Initialize with opaque black.
-		//m_bitmapInfo.bmiHeader.biWidth = width;
-		//m_bitmapInfo.bmiHeader.biHeight = height; // Negative height for top-down bitmap.
-	}
+	m_pixelData.resize(requiredSize, 0xFF000000);	
 
 
 	for (LONG i = 0; i < drawWidth; i += m_step)

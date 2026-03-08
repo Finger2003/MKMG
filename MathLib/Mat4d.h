@@ -216,5 +216,18 @@ namespace MathLib
 			Mat4d invTranslation = Mat4d::Translation(-translation.x, -translation.y, -translation.z);
 			return invScale * (invRotX * (invRotY * (invRotZ * invTranslation)));
 		}
+
+		void Orthonormalize3x3()
+		{
+			Vec3d x = Vec3d(rows[0].x, rows[0].y, rows[0].z);
+			Vec3d y = Vec3d(rows[1].x, rows[1].y, rows[1].z);
+			Vec3d z = Vec3d(rows[2].x, rows[2].y, rows[2].z);
+			x = x.normalize();
+			y = (y - x * Vec3d::dot(x, y)).normalize();
+			z = (z - x * Vec3d::dot(x, z) - y * Vec3d::dot(y, z)).normalize();
+			rows[0] = Vec4d(x.x, x.y, x.z, rows[0].w);
+			rows[1] = Vec4d(y.x, y.y, y.z, rows[1].w);
+			rows[2] = Vec4d(z.x, z.y, z.z, rows[2].w);
+		}
 	};
 }

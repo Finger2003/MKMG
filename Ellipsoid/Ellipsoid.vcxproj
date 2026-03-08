@@ -139,6 +139,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DxApplication.cpp" />
     <ClCompile Include="DxDevice.cpp" />
     <ClCompile Include="DxStructures.cpp" />
     <ClCompile Include="EllipsoidApplication.cpp" />
@@ -154,6 +155,7 @@
     <ClCompile Include="WindowApplication.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DxApplication.h" />
     <ClInclude Include="DxDevice.h" />
     <ClInclude Include="DxStructures.h" />
     <ClInclude Include="EllipsoidApplication.h" />
