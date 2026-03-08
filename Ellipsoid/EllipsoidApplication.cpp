@@ -1,9 +1,17 @@
 #include "pch.h"
 #include "EllipsoidApplication.h"
+#include "DxStructures.h"
 #include "../MathLib/MathLib.h"
+#include "../ImGuiLib/imgui.h"
+#include "../ImGuiLib/imgui_impl_win32.h"
+#include "../ImGuiLib/imgui_impl_dx11.h"
+
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 using namespace std;
 using namespace MathLib;
+using Microsoft::WRL::ComPtr;
+
 pair<double, double> CalculateCoordsFromPixel(int x, int y, int width, int height);
 double CalculateCoordFromPixel(int pixel, int maxPixel);
 
@@ -32,16 +40,62 @@ void Ellipsoid::UpdateDMprimMatrix()
 
 
 EllipsoidApplication::EllipsoidApplication(HINSTANCE hInstance, int wndWidth, int wndHeight, std::wstring wndTitle)
-	: WindowApplication(hInstance, wndWidth, wndHeight, wndTitle)
+	: WindowApplication(hInstance, wndWidth, wndHeight, wndTitle), m_device(m_window)
 {
-	m_bitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-	m_bitmapInfo.bmiHeader.biPlanes = 1;
-	m_bitmapInfo.bmiHeader.biBitCount = 32;
-	m_bitmapInfo.bmiHeader.biCompression = BI_RGB;
+	ID3D11Texture2D* tempTexture = nullptr;
+	m_device.getSwapChain()->GetBuffer(0, IID_PPV_ARGS(&tempTexture));
+	const ComPtr<ID3D11Texture2D> backTexture(tempTexture);
+	m_backBuffer = m_device.CreateRenderTargetView(backTexture);
+
+	SIZE wndSize = m_window.getClientSize();
+	Texture2DDescription cpuTextureDesc(wndSize);
+	m_cpuTexture = m_device.CreateTexture2D(cpuTextureDesc);
+	m_cpuTextureView = m_device.CreateShaderResourceView(m_cpuTexture);
+	
+
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO();
+
+	ImGui_ImplWin32_Init(m_window.getHandle());
+	ImGui_ImplDX11_Init(m_device.get(), m_device.getContext().Get());
+
+	//unsigned char* pixels = nullptr;
+	//int width, height;
+	//io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+
+
+	//m_bitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+	//m_bitmapInfo.bmiHeader.biPlanes = 1;
+	//m_bitmapInfo.bmiHeader.biBitCount = 32;
+	//m_bitmapInfo.bmiHeader.biCompression = BI_RGB;
+}
+
+EllipsoidApplication::~EllipsoidApplication()
+{
+	ImGui_ImplDX11_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
 }
 
 bool EllipsoidApplication::ProcessMessage(WindowMessage& msg)
 {
+	if (ImGui::GetCurrentContext() == nullptr)
+		return WindowApplication::ProcessMessage(msg);
+
+	if (ImGui_ImplWin32_WndProcHandler(m_window.getHandle(), msg.message, msg.wParam, msg.lParam))
+		return true;
+
+	ImGuiIO& io = ImGui::GetIO();
+	if (io.WantCaptureMouse)
+	{
+		if (msg.message == WM_LBUTTONDOWN || msg.message == WM_RBUTTONDOWN ||
+			msg.message == WM_MOUSEMOVE || msg.message == WM_MOUSEWHEEL)
+		{
+			return true;
+		}
+	}
+
 	int xPos = (int)(short)LOWORD(msg.lParam);
 	int yPos = (int)(short)HIWORD(msg.lParam);
 
@@ -131,6 +185,7 @@ int EllipsoidApplication::MainLoop()
 		else
 		{
 			Render();
+			m_device.getSwapChain()->Present(0, 0);
 		}
 	} while (msg.message != WM_QUIT);
 	return msg.wParam;
@@ -140,28 +195,33 @@ void EllipsoidApplication::Render()
 {
 	m_ellipsoid.UpdateDMprimMatrix();
 	SIZE clientSize = m_window.getClientSize();
+
+	constexpr LONG menuWidth = 300;
 	LONG width = clientSize.cx;
 	LONG height = clientSize.cy;
 
+	LONG drawWidth = width - menuWidth;
 	double aspectRatio = static_cast<double>(width) / height;
 
 	size_t requiredSize = static_cast<size_t>(width * height);
 	if (m_pixelData.size() != requiredSize)
 	{
 		m_pixelData.resize(requiredSize, 0xFF000000); // Initialize with opaque black.
-		m_bitmapInfo.bmiHeader.biWidth = width;
-		m_bitmapInfo.bmiHeader.biHeight = height; // Negative height for top-down bitmap.
+		//m_bitmapInfo.bmiHeader.biWidth = width;
+		//m_bitmapInfo.bmiHeader.biHeight = height; // Negative height for top-down bitmap.
 	}
 
 
-	for (LONG i = 0; i < width; i += m_step)
+	for (LONG i = 0; i < drawWidth; i += m_step)
 	{
 		for (LONG j = 0; j < height; j += m_step)
 		{
-			uint32_t finalPixelColor = 0;
+			uint32_t finalPixelColor = 0xFF000000;
 
-			double x = CalculateCoordFromPixel(i, width) * aspectRatio; // Adjust x coordinate for aspect ratio.
-			double y = CalculateCoordFromPixel(j, height);
+			//double x = CalculateCoordFromPixel(i, drawWidth) * aspectRatio; // Adjust x coordinate for aspect ratio.
+			//double y = CalculateCoordFromPixel(j, height);
+			auto [x, y] = CalculateCoordsFromPixel(i, j, drawWidth, height);
+			x *= aspectRatio; // Adjust x coordinate for aspect ratio.
 
 			// w = z*k + p
 			Vec4d k = Vec4d(0.0, 0.0, 1.0, 0.0);
@@ -188,11 +248,11 @@ void EllipsoidApplication::Render()
 				uint32_t green = static_cast<uint32_t>(std::min(1.0, color.y) * 255.0);
 				uint32_t blue = static_cast<uint32_t>(std::min(1.0, color.z) * 255.0);
 
-				finalPixelColor = (0xFF << 24) | (red << 16) | (green << 8) | blue; // ARGB format.
+				finalPixelColor = red | (green << 8) | (blue << 16) | (0xFF << 24); // RGBA format.
 			}
 			for (LONG blockY = 0; blockY < m_step && (j + blockY) < height; blockY++)
 			{
-				for (LONG blockX = 0; blockX < m_step && (i + blockX) < width; blockX++)
+				for (LONG blockX = 0; blockX < m_step && (i + blockX) < drawWidth; blockX++)
 				{
 					m_pixelData[(j + blockY) * width + (i + blockX)] = finalPixelColor;
 				}
@@ -200,19 +260,61 @@ void EllipsoidApplication::Render()
 		}
 	}
 
-	HWND hWnd = m_window.getHandle();
-	HDC hdc = GetDC(hWnd);
-	SetDIBitsToDevice(hdc, 0, 0, width, height, 0, 0, 0, height, m_pixelData.data(), &m_bitmapInfo, DIB_RGB_COLORS);
-	ReleaseDC(hWnd, hdc);
+	D3D11_MAPPED_SUBRESOURCE mappedResource;
+	m_device.getContext()->Map(m_cpuTexture.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+
+	uint8_t* dest = static_cast<uint8_t*>(mappedResource.pData);
+	uint8_t* src = reinterpret_cast<uint8_t*>(m_pixelData.data());
+	memcpy(dest, src, m_pixelData.size() * sizeof(uint32_t));
+
+	m_device.getContext()->Unmap(m_cpuTexture.Get(), 0);
+
+	//HWND hWnd = m_window.getHandle();
+	//HDC hdc = GetDC(hWnd);
+	//SetDIBitsToDevice(hdc, 0, 0, drawWidth, height, 0, 0, 0, height, m_pixelData.data(), &m_bitmapInfo, DIB_RGB_COLORS);
+	//ReleaseDC(hWnd, hdc);
 
 	m_step = std::max(m_step / 2, 1);
+
+	ImGui_ImplDX11_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+
+	float uv_x_max = static_cast<float>(drawWidth) / width;
+	ImGui::GetBackgroundDrawList()->AddImage(
+		(ImTextureID)m_cpuTextureView.Get(),
+		ImVec2(0, 0),
+		ImVec2(drawWidth, height),
+		ImVec2(0, 0),
+		ImVec2(uv_x_max, 1.0f)
+	);
+
+	ImGui::SetNextWindowPos(ImVec2(static_cast<float>(drawWidth), 0.0f));
+	ImGui::SetNextWindowSize(ImVec2(static_cast<float>(menuWidth), static_cast<float>(height)));
+
+	// Use flags to make it act like a fixed side-panel
+	ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoTitleBar;
+
+	ImGui::Begin("Settings", nullptr, windowFlags);
+	ImGui::Text("Ellipsoid Settings");
+	ImGui::End();
+	ImGui::Render();
+
+	const float clear_color_with_alpha[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	m_device.getContext()->ClearRenderTargetView(m_backBuffer.Get(), clear_color_with_alpha);
+	m_device.getContext()->OMSetRenderTargets(1, m_backBuffer.GetAddressOf(), nullptr);
+
+	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
 
 pair<double, double> CalculateCoordsFromPixel(int x, int y, int width, int height)
 {
 	double xCoord = (x / (double)width) * 2.0 - 1.0; // Map to [-1, 1]
-	double yCoord = (y / (double)height) * 2.0 - 1.0; // Map to [-1, 1]
-	//double yCoord = 1.0 - (y / (double)height) * 2.0; // Map to [1, -1] (inverted y-axis)
+	//double yCoord = (y / (double)height) * 2.0 - 1.0; // Map to [-1, 1]
+	double yCoord = 1.0 - (y / (double)height) * 2.0; // Map to [1, -1] (inverted y-axis)
 	return { xCoord, yCoord };
 }
 

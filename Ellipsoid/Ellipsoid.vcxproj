@@ -83,6 +83,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -100,6 +101,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -115,6 +117,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -132,9 +135,12 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DxDevice.cpp" />
+    <ClCompile Include="DxStructures.cpp" />
     <ClCompile Include="EllipsoidApplication.cpp" />
     <ClCompile Include="exceptions.cpp" />
     <ClCompile Include="main.cpp" />
@@ -148,6 +154,8 @@
     <ClCompile Include="WindowApplication.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DxDevice.h" />
+    <ClInclude Include="DxStructures.h" />
     <ClInclude Include="EllipsoidApplication.h" />
     <ClInclude Include="exceptions.h" />
     <ClInclude Include="framework.h" />
@@ -156,6 +164,9 @@
     <ClInclude Include="WindowApplication.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ImGuiLib\ImGuiLib.vcxproj">
+      <Project>{6681e94c-42d5-4f61-9610-c3ed6769f0e9}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\MathLib\MathLib.vcxproj">
       <Project>{82e20199-5418-4cbb-9fc6-7c7e86c6d7de}</Project>
     </ProjectReference>
