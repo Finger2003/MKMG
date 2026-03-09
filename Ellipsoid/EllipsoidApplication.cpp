@@ -45,7 +45,7 @@ EllipsoidApplication::EllipsoidApplication(HINSTANCE hInstance, int wndWidth, in
 	Texture2DDescription cpuTextureDesc(wndSize);
 	m_cpuTexture = m_device.CreateTexture2D(cpuTextureDesc);
 	m_cpuTextureView = m_device.CreateShaderResourceView(m_cpuTexture);
-	
+
 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -177,7 +177,7 @@ void EllipsoidApplication::Render()
 
 	if (width == 0 || height == 0)
 		return;
-	
+
 	DrawEllipsoid();
 	DrawMenu(width, height);
 
@@ -213,11 +213,11 @@ void EllipsoidApplication::DrawEllipsoid()
 
 	int width = static_cast<int>(m_viewport.width);
 	int height = static_cast<int>(m_viewport.height);
-	#pragma omp parallel for
-	for (int i = 0; i < width; i += m_currentStep)
+#pragma omp parallel for
+	for (int j = 0; j < height; j += m_currentStep)
 	{
-		#pragma omp parallel for
-		for (int j = 0; j < height; j += m_currentStep)
+#pragma omp parallel for
+		for (int i = 0; i < width; i += m_currentStep)
 		{
 			uint32_t finalPixelColor = ImGui::ColorConvertFloat4ToU32(*reinterpret_cast<ImVec4*>(m_backgroundColor));
 			double sampleX = i + m_currentStep / 2.0; // Sample at the center of the block for better visual results.
@@ -252,12 +252,12 @@ void EllipsoidApplication::DrawEllipsoid()
 				finalPixelColor = red | (green << 8) | (blue << 16) | (0xFF << 24); // RGBA format.
 			}
 
-			for (int blockY = 0; blockY < m_currentStep && (j + blockY) < height; blockY++)
+			for (size_t blockY = 0; blockY < m_currentStep && (j + blockY) < height; blockY++)
 			{
-				for (int blockX = 0; blockX < m_currentStep && (i + blockX) < width; blockX++)
+				size_t rowOffset = (j + blockY) * width;
+				for (size_t blockX = 0; blockX < m_currentStep && (i + blockX) < width; blockX++)
 				{
-					//m_pixelData[(j + blockY) * totalWidth + (i + blockX)] = finalPixelColor;
-					m_pixelData[(j + blockY) * width + (i + blockX)] = finalPixelColor;
+					m_pixelData[rowOffset + (i + blockX)] = finalPixelColor;
 				}
 			}
 		}
