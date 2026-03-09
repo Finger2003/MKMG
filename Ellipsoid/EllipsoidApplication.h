@@ -84,7 +84,8 @@ protected:
 
 	void Render() override; // Renders the elipsoid to the window.
 private:
-	int minStep = 16;
+	static constexpr int cMaxStep = 32;
+	int minStep = 8;
 	int m_step = minStep;
 	POINT m_lastMousePos{};
 	Ellipsoid m_ellipsoid;
@@ -92,25 +93,10 @@ private:
 	int m_specularExponent = 2;
 
 	std::vector<uint32_t> m_pixelData;
-	BITMAPINFO m_bitmapInfo{};
 
-
-	//DxDevice m_device;
-	//Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_backBuffer;
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> m_cpuTexture;
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_cpuTextureView;
 
 	float m_backgroundColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-	// DirectX
-	//ID3D11Device* m_pd3dDevice = nullptr;
-	//ID3D11DeviceContext* m_pd3dDeviceContext = nullptr;
-	//IDXGISwapChain* m_pSwapChain = nullptr;
-	//ID3D11RenderTargetView* m_mainRenderTargetView = nullptr;
-
-	//// GPU Texture for CPU rendering
-	//ID3D11Texture2D* m_pCpuTexture = nullptr;
-	//ID3D11ShaderResourceView* m_pCpuTextureView = nullptr;
-
-
 };
 

@@ -213,12 +213,12 @@ void EllipsoidApplication::Render()
 	{
 		for (LONG j = 0; j < height; j += m_step)
 		{
+			uint32_t finalPixelColor = ImGui::ColorConvertFloat4ToU32(*reinterpret_cast<ImVec4*>(m_backgroundColor));
 			//uint32_t finalPixelColor = 0xFF000000;
-			uint32_t finalPixelColor = ImGui::ColorConvertFloat4ToU32(*(ImVec4*)m_backgroundColor);
-
-			//double x = CalculateCoordFromPixel(i, drawWidth) * aspectRatio; // Adjust x coordinate for aspect ratio.
-			//double y = CalculateCoordFromPixel(j, height);
-			auto [x, y] = CalculateCoordsFromPixel(i, j, drawWidth, height);
+			double sampleX = i + m_step / 2.0; // Sample at the center of the block for better visual results.
+			double sampleY = j + m_step / 2.0;
+			//auto [x, y] = CalculateCoordsFromPixel(i, j, drawWidth, height);
+			auto [x, y] = CalculateCoordsFromPixel(sampleX, sampleY, drawWidth, height);
 			x *= aspectRatio; // Adjust x coordinate for aspect ratio.
 
 			// w = z*k + p
@@ -270,15 +270,8 @@ void EllipsoidApplication::Render()
 		dest += mappedResource.RowPitch;
 		src += srcRowBytes;		
 	}
-	//memcpy(dest, src, m_pixelData.size() * sizeof(uint32_t));
 
 	m_device.getContext()->Unmap(m_cpuTexture.Get(), 0);
-
-	//HWND hWnd = m_window.getHandle();
-	//HDC hdc = GetDC(hWnd);
-	//SetDIBitsToDevice(hdc, 0, 0, drawWidth, height, 0, 0, 0, height, m_pixelData.data(), &m_bitmapInfo, DIB_RGB_COLORS);
-	//ReleaseDC(hWnd, hdc);
-
 	
 
 	ImGui_ImplDX11_NewFrame();
@@ -326,7 +319,7 @@ void EllipsoidApplication::Render()
 
 	ImGui::Separator();
 	ImGui::Text("Rendering Performance");
-	if (ImGui::SliderInt("Min Step", &minStep, 1, 32, "Step: %d"))
+	if (ImGui::SliderInt("Min Step", &minStep, 1, cMaxStep, "Step: %d"))
 	{
 		//if (m_step < minStep)
 		//	m_step = minStep;
