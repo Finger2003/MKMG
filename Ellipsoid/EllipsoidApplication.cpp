@@ -144,9 +144,17 @@ bool EllipsoidApplication::ProcessMessage(WindowMessage& msg)
 			}
 			else if (m_interactionMode == InteractionMode::Translating)
 			{
-				// Translate the elipsoid based on mouse movement.
-				m_ellipsoid.position.x += dx * 0.001; // Move along x-axis.
-				m_ellipsoid.position.y -= dy * 0.001; // Move along y-axis (inverted).
+				SIZE clientSize = m_window.getClientSize();
+				constexpr LONG menuWidth = 400;
+				double drawWidth = static_cast<double>(clientSize.cx - menuWidth);
+				double height = static_cast<double>(clientSize.cy);
+
+				double aspectRatio = drawWidth / height;
+				double worldUnitsPerPixelX = (2.0 * aspectRatio) / drawWidth; // Assuming the view volume is from -aspectRatio to aspectRatio in x.
+				double worldUnitsPerPixelY = 2.0 / height; // Assuming the view volume is from -1 to 1 in y.
+				m_ellipsoid.position.x += dx * worldUnitsPerPixelX; // Move along x-axis.
+				m_ellipsoid.position.y -= dy * worldUnitsPerPixelY; // Move along y-axis (inverted).
+
 			}
 			m_lastMousePos = { xPos, yPos };
 			m_ellipsoid.needsUpdate = true;
