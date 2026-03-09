@@ -150,7 +150,7 @@ bool EllipsoidApplication::ProcessMessage(WindowMessage& msg)
 			}
 			m_lastMousePos = { xPos, yPos };
 			m_ellipsoid.needsUpdate = true;
-			m_step = minStep;
+			m_currentStep = m_initialStep;
 			return true;
 		}
 		break;
@@ -173,7 +173,7 @@ bool EllipsoidApplication::ProcessMessage(WindowMessage& msg)
 			m_ellipsoid.scale *= scaleFactor;
 		}
 		m_ellipsoid.needsUpdate = true;
-		m_step = minStep;
+		m_currentStep = m_initialStep;
 		return true;
 	}
 	}
@@ -213,25 +213,25 @@ void EllipsoidApplication::UpdateResources(int width, int height)
 	size_t requiredSize = static_cast<size_t>(width * height);
 	m_pixelData.assign(requiredSize, 0xFF000000);
 
-	m_step = minStep;
+	m_currentStep = m_initialStep;
 }
 
 void EllipsoidApplication::DrawEllipsoid(int drawWidth, int height, int totalWidth)
 {
-	if (m_step < 1)
+	if (m_currentStep < 1)
 		return;
 
 	double aspectRatio = static_cast<double>(drawWidth) / height;
 
 	#pragma omp parallel for
-	for (LONG i = 0; i < drawWidth; i += m_step)
+	for (LONG i = 0; i < drawWidth; i += m_currentStep)
 	{
 		#pragma omp parallel for
-		for (LONG j = 0; j < height; j += m_step)
+		for (LONG j = 0; j < height; j += m_currentStep)
 		{
 			uint32_t finalPixelColor = ImGui::ColorConvertFloat4ToU32(*reinterpret_cast<ImVec4*>(m_backgroundColor));
-			double sampleX = i + m_step / 2.0; // Sample at the center of the block for better visual results.
-			double sampleY = j + m_step / 2.0;
+			double sampleX = i + m_currentStep / 2.0; // Sample at the center of the block for better visual results.
+			double sampleY = j + m_currentStep / 2.0;
 			auto [x, y] = CalculateCoordsFromPixel(sampleX, sampleY, drawWidth, height);
 			x *= aspectRatio; // Adjust x coordinate for aspect ratio.
 
@@ -261,9 +261,9 @@ void EllipsoidApplication::DrawEllipsoid(int drawWidth, int height, int totalWid
 				uint32_t blue = static_cast<uint32_t>(std::min(1.0, color.z) * 255.0);
 				finalPixelColor = red | (green << 8) | (blue << 16) | (0xFF << 24); // RGBA format.
 			}
-			for (LONG blockY = 0; blockY < m_step && (j + blockY) < height; blockY++)
+			for (LONG blockY = 0; blockY < m_currentStep && (j + blockY) < height; blockY++)
 			{
-				for (LONG blockX = 0; blockX < m_step && (i + blockX) < drawWidth; blockX++)
+				for (LONG blockX = 0; blockX < m_currentStep && (i + blockX) < drawWidth; blockX++)
 				{
 					m_pixelData[(j + blockY) * totalWidth + (i + blockX)] = finalPixelColor;
 				}
@@ -285,7 +285,7 @@ void EllipsoidApplication::DrawEllipsoid(int drawWidth, int height, int totalWid
 	}
 
 	m_device.getContext()->Unmap(m_cpuTexture.Get(), 0);
-	m_step /= 2;
+	m_currentStep /= 2;
 }
 
 void EllipsoidApplication::DrawMenu(int drawWidth, int height, int menuWidth)
@@ -320,30 +320,30 @@ void EllipsoidApplication::DrawMenu(int drawWidth, int height, int menuWidth)
 	{
 		m_ellipsoid.radii = Vec3d(tempRadii[0], tempRadii[1], tempRadii[2]);
 		m_ellipsoid.needsUpdate = true;
-		m_step = minStep;
+		m_currentStep = m_initialStep;
 	}
 	if (ImGui::SliderInt("Specular Exponent", &m_specularExponent, 1, 128))
 	{
-		m_step = minStep;
+		m_currentStep = m_initialStep;
 	}
 
 	ImGui::Separator();
 	ImGui::Text("Appearance");
 	if (ImGui::ColorEdit3("Background Color", m_backgroundColor))
-		m_step = minStep;
+		m_currentStep = m_initialStep;
 
 
 	ImGui::Separator();
 	ImGui::Text("Rendering Performance");
-	static int exponent = 3;
+	static int exponent = cInitialStepExponent;
 	char sliderLabel[32];
-	sprintf_s(sliderLabel, "Step: %d", minStep);
-	if (ImGui::SliderInt("Min Step Exponent", &exponent, 0, cMaxExponent, sliderLabel))
+	sprintf_s(sliderLabel, "Step: %d", m_initialStep);
+	if (ImGui::SliderInt("Initial Step", &exponent, 0, cMaxStepExponent, sliderLabel))
 	{
-		minStep = 1 << exponent; // 2^exponent
+		m_initialStep = 1 << exponent; // 2^exponent
 	}
 
-	ImGui::Text("Current Step: %d", m_step * 2);
+	ImGui::Text("Current Step: %d", m_currentStep * 2);
 
 	ImGui::End();
 	ImGui::Render();

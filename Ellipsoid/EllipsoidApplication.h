@@ -92,9 +92,10 @@ protected:
 	 */
 	void UpdateResources(int width, int height) override;
 private:
-	static constexpr int cMaxExponent = 6;
-	int minStep = 8;
-	int m_step = minStep;
+	static constexpr int cMaxStepExponent = 6;
+	static constexpr int cInitialStepExponent = 3;
+	int m_initialStep = 8;
+	int m_currentStep = m_initialStep;
 	POINT m_lastMousePos{};
 	Ellipsoid m_ellipsoid;
 	InteractionMode m_interactionMode = InteractionMode::None;
