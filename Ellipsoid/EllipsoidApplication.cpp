@@ -203,7 +203,7 @@ void EllipsoidApplication::Render()
 	LONG height = clientSize.cy;
 
 	LONG drawWidth = width - menuWidth;
-	double aspectRatio = static_cast<double>(width) / height;
+	double aspectRatio = static_cast<double>(drawWidth) / height;
 
 	size_t requiredSize = static_cast<size_t>(width * height);
 	m_pixelData.resize(requiredSize, 0xFF000000);	
@@ -213,7 +213,8 @@ void EllipsoidApplication::Render()
 	{
 		for (LONG j = 0; j < height; j += m_step)
 		{
-			uint32_t finalPixelColor = 0xFF000000;
+			//uint32_t finalPixelColor = 0xFF000000;
+			uint32_t finalPixelColor = ImGui::ColorConvertFloat4ToU32(*(ImVec4*)m_backgroundColor);
 
 			//double x = CalculateCoordFromPixel(i, drawWidth) * aspectRatio; // Adjust x coordinate for aspect ratio.
 			//double y = CalculateCoordFromPixel(j, height);
@@ -262,7 +263,14 @@ void EllipsoidApplication::Render()
 
 	uint8_t* dest = static_cast<uint8_t*>(mappedResource.pData);
 	uint8_t* src = reinterpret_cast<uint8_t*>(m_pixelData.data());
-	memcpy(dest, src, m_pixelData.size() * sizeof(uint32_t));
+	size_t srcRowBytes = width * sizeof(uint32_t);
+	for (LONG row = 0; row < height; row++)
+	{	
+		memcpy(dest, src, srcRowBytes);
+		dest += mappedResource.RowPitch;
+		src += srcRowBytes;		
+	}
+	//memcpy(dest, src, m_pixelData.size() * sizeof(uint32_t));
 
 	m_device.getContext()->Unmap(m_cpuTexture.Get(), 0);
 
@@ -271,7 +279,7 @@ void EllipsoidApplication::Render()
 	//SetDIBitsToDevice(hdc, 0, 0, drawWidth, height, 0, 0, 0, height, m_pixelData.data(), &m_bitmapInfo, DIB_RGB_COLORS);
 	//ReleaseDC(hWnd, hdc);
 
-	m_step = std::max(m_step / 2, 1);
+	
 
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
@@ -297,6 +305,35 @@ void EllipsoidApplication::Render()
 
 	ImGui::Begin("Settings", nullptr, windowFlags);
 	ImGui::Text("Ellipsoid Settings");
+	ImGui::Separator();
+	float tempRadii[3] = { static_cast<float>(m_ellipsoid.radii.x), static_cast<float>(m_ellipsoid.radii.y), static_cast<float>(m_ellipsoid.radii.z) };
+	if (ImGui::DragFloat3("Radii", tempRadii, 0.1f, 0.1f, 100.0f))
+	{
+		m_ellipsoid.radii = Vec3d(tempRadii[0], tempRadii[1], tempRadii[2]);
+		m_ellipsoid.needsUpdate = true;
+		m_step = minStep;
+	}
+	if (ImGui::SliderInt("Specular Exponent", &m_specularExponent, 1, 128))
+	{
+		m_step = minStep;
+	}
+
+	ImGui::Separator();
+	ImGui::Text("Appearance");
+	if (ImGui::ColorEdit3("Background Color", m_backgroundColor))
+		m_step = minStep;
+
+
+	ImGui::Separator();
+	ImGui::Text("Rendering Performance");
+	if (ImGui::SliderInt("Min Step", &minStep, 1, 32, "Step: %d"))
+	{
+		//if (m_step < minStep)
+		//	m_step = minStep;
+	}
+
+	ImGui::Text("Current Step: %d", m_step);
+
 	ImGui::End();
 	ImGui::Render();
 
@@ -305,6 +342,8 @@ void EllipsoidApplication::Render()
 	m_device.getContext()->OMSetRenderTargets(1, m_backBuffer.GetAddressOf(), nullptr);
 
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+	m_step = std::max(m_step / 2, 1);
 }
 
 pair<double, double> CalculateCoordsFromPixel(int x, int y, int width, int height)

@@ -15,12 +15,14 @@
 //};
 struct Ellipsoid
 {
-	MathLib::Vec3d radii{ 1.5, 1.0, 1.25 }; // Radii along x, y and z axes.
+	//MathLib::Vec3d radii{ 1.5, 1.0, 1.25 }; // Radii along x, y and z axes.
+	MathLib::Vec3d radii{ 1.5, 1.0, 1.0 }; // Radii along x, y and z axes.
 	MathLib::Vec3d position{}; // Position of the center of the elipsoid.
 	//MathLib::Vec3d rotation{}; // Rotation angles around x, y and z axes.
 
 	MathLib::Mat4d rotationMatrix = MathLib::Mat4d::Identity();
-	MathLib::Vec3d scale{ 1.0, 1.0, 1.0 };
+	//MathLib::Vec3d scale{ 1.0, 1.0, 1.0 };
+	MathLib::Vec3d scale{ 0.7, 0.7, 0.7 };
 
 	static MathLib::Vec3d color; // Elipsoid color.
 
@@ -82,7 +84,7 @@ protected:
 
 	void Render() override; // Renders the elipsoid to the window.
 private:
-	int minStep = 1;
+	int minStep = 16;
 	int m_step = minStep;
 	POINT m_lastMousePos{};
 	Ellipsoid m_ellipsoid;
@@ -98,6 +100,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> m_cpuTexture;
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_cpuTextureView;
 
+	float m_backgroundColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 	// DirectX
 	//ID3D11Device* m_pd3dDevice = nullptr;
 	//ID3D11DeviceContext* m_pd3dDeviceContext = nullptr;
