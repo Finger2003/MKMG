@@ -13,6 +13,14 @@
 //
 //	static constexpr MathLib::Vec3d color = MathLib::Vec3d(1.0, 1.0, 0.0);
 //};
+
+struct ViewPort
+{
+	double width;
+	double height;
+	double aspectRatio;
+};
+
 struct Ellipsoid
 {
 	//MathLib::Vec3d radii{ 1.5, 1.0, 1.25 }; // Radii along x, y and z axes.
@@ -92,6 +100,7 @@ protected:
 	 */
 	void UpdateResources(int width, int height) override;
 private:
+	static constexpr LONG menuWidth = 400;
 	static constexpr int cMaxStepExponent = 6;
 	static constexpr int cInitialStepExponent = 3;
 	int m_initialStep = 8;
@@ -111,7 +120,10 @@ private:
 	static constexpr int m_minWidth = 500;
 	static constexpr int m_minHeight = 500;
 
-	void DrawEllipsoid(int drawWidth, int height, int totalWidth);
-	void DrawMenu(int drawWidth, int height, int menuWidth);
+	void DrawEllipsoid();
+	void DrawMenu(int drawWidth, int height);
+	void UpdateViewport(int width, int height);
+
+	ViewPort m_viewport{};
 };
 
