@@ -9,4 +9,5 @@ struct SwapChainDescription : DXGI_SWAP_CHAIN_DESC
 struct Texture2DDescription : D3D11_TEXTURE2D_DESC
 {
 	Texture2DDescription(SIZE size);
+	Texture2DDescription(UINT width, UINT height);
 };

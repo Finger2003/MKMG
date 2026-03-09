@@ -83,8 +83,16 @@ protected:
 	//int MainLoop() override;
 
 	void Render() override; // Renders the elipsoid to the window.
+
+	/**
+	 * @brief Updates application resources that depend on the size of the window.
+	 *
+	 * @param [in] width New width of the window's client area.
+	 * @param [in] height New height of the window's client area.
+	 */
+	void UpdateResources(int width, int height) override;
 private:
-	static constexpr int cMaxStep = 32;
+	static constexpr int cMaxExponent = 6;
 	int minStep = 8;
 	int m_step = minStep;
 	POINT m_lastMousePos{};
@@ -98,5 +106,11 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_cpuTextureView;
 
 	float m_backgroundColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+	static constexpr int m_minWidth = 500;
+	static constexpr int m_minHeight = 500;
+
+	void DrawEllipsoid(int drawWidth, int height, int totalWidth);
+	void DrawMenu(int drawWidth, int height, int menuWidth);
 };
 

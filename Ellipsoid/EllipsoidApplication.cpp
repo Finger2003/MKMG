@@ -12,8 +12,7 @@ using namespace std;
 using namespace MathLib;
 using Microsoft::WRL::ComPtr;
 
-pair<double, double> CalculateCoordsFromPixel(int x, int y, int width, int height);
-double CalculateCoordFromPixel(int pixel, int maxPixel);
+pair<double, double> CalculateCoordsFromPixel(double x, double y, int width, int height);
 
 Vec3d Ellipsoid::color = MathLib::Vec3d(1.0, 1.0, 0.0); // Yellow color for the elipsoid.
 
@@ -101,6 +100,14 @@ bool EllipsoidApplication::ProcessMessage(WindowMessage& msg)
 
 	switch (msg.message)
 	{
+	case WM_GETMINMAXINFO:
+	{
+		MINMAXINFO* mmi = reinterpret_cast<MINMAXINFO*>(msg.lParam);
+		mmi->ptMinTrackSize.x = m_minWidth;
+		mmi->ptMinTrackSize.y = m_minHeight;
+		msg.result = 0;
+		return true;
+	}
 	case WM_ERASEBKGND:
 		msg.result = 1;
 		return true; // Prevent flickering by not erasing the background.
@@ -171,53 +178,60 @@ bool EllipsoidApplication::ProcessMessage(WindowMessage& msg)
 	}
 	}
 
-	return WindowApplication::ProcessMessage(msg);
+	return DxApplication::ProcessMessage(msg);
 }
-
-//int EllipsoidApplication::MainLoop()
-//{
-//	MSG msg{};
-//	do
-//	{
-//		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
-//		{
-//			TranslateMessage(&msg);
-//			DispatchMessage(&msg);
-//		}
-//		else
-//		{
-//			Render();
-//			m_device.getSwapChain()->Present(0, 0);
-//		}
-//	} while (msg.message != WM_QUIT);
-//	return msg.wParam;
-//}
 
 void EllipsoidApplication::Render()
 {
 	m_ellipsoid.UpdateDMprimMatrix();
 	SIZE clientSize = m_window.getClientSize();
 
-	constexpr LONG menuWidth = 300;
+	constexpr LONG menuWidth = 400;
 	LONG width = clientSize.cx;
 	LONG height = clientSize.cy;
 
+	if (width == 0 || height == 0)
+		return;
+
 	LONG drawWidth = width - menuWidth;
+	DrawEllipsoid(drawWidth, height, width);
+	DrawMenu(drawWidth, height, menuWidth);
+
+	const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	m_device.getContext()->ClearRenderTargetView(m_backBuffer.Get(), clear_color);
+	m_device.getContext()->OMSetRenderTargets(1, m_backBuffer.GetAddressOf(), nullptr);
+	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+}
+
+void EllipsoidApplication::UpdateResources(int width, int height)
+{
+	Texture2DDescription cpuTextureDesc(width, height);
+	m_cpuTexture = m_device.CreateTexture2D(cpuTextureDesc);
+	m_cpuTextureView = m_device.CreateShaderResourceView(m_cpuTexture);
+
+	// Resize buffer used for CPU rendering
+	size_t requiredSize = static_cast<size_t>(width * height);
+	m_pixelData.assign(requiredSize, 0xFF000000);
+
+	m_step = minStep;
+}
+
+void EllipsoidApplication::DrawEllipsoid(int drawWidth, int height, int totalWidth)
+{
+	if (m_step < 1)
+		return;
+
 	double aspectRatio = static_cast<double>(drawWidth) / height;
 
-	size_t requiredSize = static_cast<size_t>(width * height);
-	m_pixelData.resize(requiredSize, 0xFF000000);	
-
-
+	#pragma omp parallel for
 	for (LONG i = 0; i < drawWidth; i += m_step)
 	{
+		#pragma omp parallel for
 		for (LONG j = 0; j < height; j += m_step)
 		{
 			uint32_t finalPixelColor = ImGui::ColorConvertFloat4ToU32(*reinterpret_cast<ImVec4*>(m_backgroundColor));
-			//uint32_t finalPixelColor = 0xFF000000;
 			double sampleX = i + m_step / 2.0; // Sample at the center of the block for better visual results.
 			double sampleY = j + m_step / 2.0;
-			//auto [x, y] = CalculateCoordsFromPixel(i, j, drawWidth, height);
 			auto [x, y] = CalculateCoordsFromPixel(sampleX, sampleY, drawWidth, height);
 			x *= aspectRatio; // Adjust x coordinate for aspect ratio.
 
@@ -245,14 +259,13 @@ void EllipsoidApplication::Render()
 				uint32_t red = static_cast<uint32_t>(std::min(1.0, color.x) * 255.0);
 				uint32_t green = static_cast<uint32_t>(std::min(1.0, color.y) * 255.0);
 				uint32_t blue = static_cast<uint32_t>(std::min(1.0, color.z) * 255.0);
-
 				finalPixelColor = red | (green << 8) | (blue << 16) | (0xFF << 24); // RGBA format.
 			}
 			for (LONG blockY = 0; blockY < m_step && (j + blockY) < height; blockY++)
 			{
 				for (LONG blockX = 0; blockX < m_step && (i + blockX) < drawWidth; blockX++)
 				{
-					m_pixelData[(j + blockY) * width + (i + blockX)] = finalPixelColor;
+					m_pixelData[(j + blockY) * totalWidth + (i + blockX)] = finalPixelColor;
 				}
 			}
 		}
@@ -263,22 +276,25 @@ void EllipsoidApplication::Render()
 
 	uint8_t* dest = static_cast<uint8_t*>(mappedResource.pData);
 	uint8_t* src = reinterpret_cast<uint8_t*>(m_pixelData.data());
-	size_t srcRowBytes = width * sizeof(uint32_t);
+	size_t srcRowBytes = totalWidth * sizeof(uint32_t);
 	for (LONG row = 0; row < height; row++)
-	{	
+	{
 		memcpy(dest, src, srcRowBytes);
 		dest += mappedResource.RowPitch;
-		src += srcRowBytes;		
+		src += srcRowBytes;
 	}
 
 	m_device.getContext()->Unmap(m_cpuTexture.Get(), 0);
-	
+	m_step /= 2;
+}
 
+void EllipsoidApplication::DrawMenu(int drawWidth, int height, int menuWidth)
+{
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
-	float uv_x_max = static_cast<float>(drawWidth) / width;
+	float uv_x_max = static_cast<float>(drawWidth) / (drawWidth + menuWidth);
 	ImGui::GetBackgroundDrawList()->AddImage(
 		(ImTextureID)m_cpuTextureView.Get(),
 		ImVec2(0, 0),
@@ -319,35 +335,23 @@ void EllipsoidApplication::Render()
 
 	ImGui::Separator();
 	ImGui::Text("Rendering Performance");
-	if (ImGui::SliderInt("Min Step", &minStep, 1, cMaxStep, "Step: %d"))
+	static int exponent = 3;
+	char sliderLabel[32];
+	sprintf_s(sliderLabel, "Step: %d", minStep);
+	if (ImGui::SliderInt("Min Step Exponent", &exponent, 0, cMaxExponent, sliderLabel))
 	{
-		//if (m_step < minStep)
-		//	m_step = minStep;
+		minStep = 1 << exponent; // 2^exponent
 	}
 
-	ImGui::Text("Current Step: %d", m_step);
+	ImGui::Text("Current Step: %d", m_step * 2);
 
 	ImGui::End();
 	ImGui::Render();
-
-	const float clear_color_with_alpha[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-	m_device.getContext()->ClearRenderTargetView(m_backBuffer.Get(), clear_color_with_alpha);
-	m_device.getContext()->OMSetRenderTargets(1, m_backBuffer.GetAddressOf(), nullptr);
-
-	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-
-	m_step = std::max(m_step / 2, 1);
 }
 
-pair<double, double> CalculateCoordsFromPixel(int x, int y, int width, int height)
+pair<double, double> CalculateCoordsFromPixel(double x, double y, int width, int height)
 {
-	double xCoord = (x / (double)width) * 2.0 - 1.0; // Map to [-1, 1]
-	//double yCoord = (y / (double)height) * 2.0 - 1.0; // Map to [-1, 1]
-	double yCoord = 1.0 - (y / (double)height) * 2.0; // Map to [1, -1] (inverted y-axis)
+	double xCoord = (x / width) * 2.0 - 1.0; // Map to [-1, 1]
+	double yCoord = 1.0 - (y / height) * 2.0; // Map to [1, -1] (inverted y-axis)
 	return { xCoord, yCoord };
-}
-
-double CalculateCoordFromPixel(int pixel, int maxPixel)
-{
-	return (pixel / (double)maxPixel) * 2.0 - 1.0; // Map to [-1, 1]
 }

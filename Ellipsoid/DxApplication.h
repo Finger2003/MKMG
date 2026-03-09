@@ -34,6 +34,32 @@ protected:
 
 	virtual void Render() = 0; // Renders the scene to the window.
 
+
+	/**
+	 * @brief Handles system messages received by the window.
+	 *
+	 * @param [in, out] msg contains message ID and its parameters.
+	 * @return true if the message is processed and should not be passed
+	 * to the default window procedure, false otherwise.
+	 */
+	bool ProcessMessage(WindowMessage& msg) override;
+
+	/**
+	 * @brief Called when the window is resized.
+	 * 
+	 * @param [in] width New width of the window's client area.
+	 * @param [in] height New height of the window's client area.
+	 */
+	void OnResize(int width, int height);
+
+	/**
+	 * @brief Updates application resources that depend on the size of the window.
+	 * 
+	 * @param [in] width New width of the window's client area.
+	 * @param [in] height New height of the window's client area.
+	 */
+	virtual void UpdateResources(int width, int height) = 0;
+
 	DxDevice m_device;
 	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_backBuffer;
 };

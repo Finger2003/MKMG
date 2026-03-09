@@ -16,10 +16,14 @@ SwapChainDescription::SwapChainDescription(HWND wndHwnd, SIZE wndSize)
 }
 
 Texture2DDescription::Texture2DDescription(SIZE size)
+	: Texture2DDescription(size.cx, size.cy)
+{}
+
+Texture2DDescription::Texture2DDescription(UINT width, UINT height)
 {
 	ZeroMemory(this, sizeof(Texture2DDescription));
-	Width = size.cx;
-	Height = size.cy;
+	Width = width;
+	Height = height;
 	MipLevels = 1;
 	ArraySize = 1;
 	Format = DXGI_FORMAT_R8G8B8A8_UNORM;

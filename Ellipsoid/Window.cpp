@@ -147,7 +147,8 @@ void Window::CreateWindowHandle(int width, int height, const std::wstring& windo
 		RegisterWindowClass(m_hInstance);
 
 	RECT rect = { 0, 0, width, height };
-	DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+	//DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+	DWORD style = WS_OVERLAPPEDWINDOW;
 	if (!AdjustWindowRect(&rect, style, FALSE))
 		THROW_WINAPI;
 
