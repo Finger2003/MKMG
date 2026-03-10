@@ -243,7 +243,7 @@ void EllipsoidApplication::DrawEllipsoid()
 				double z = solution->max_root();
 
 				Vec4d w = Vec4d(x, y, z, 1.0);
-				Vec4d grad = 2.0 * (m_ellipsoid.DMprim * w);
+				Vec4d grad = (m_ellipsoid.DMprim * w); // * 2.0 is not needed since we only care about the direction of the normal, not its magnitude.
 				Vec3d normal = Vec3d(grad.x, grad.y, grad.z).normalize();
 
 				double lightIntensity = std::max(0.0, Vec3d::dot(normal, Vec3d(0.0, 0.0, 1.0)));
@@ -256,14 +256,21 @@ void EllipsoidApplication::DrawEllipsoid()
 				finalPixelColor = red | (green << 8) | (blue << 16) | (0xFF << 24); // RGBA format.
 			}
 
-			for (size_t blockY = 0; blockY < m_currentStep && (j + blockY) < height; blockY++)
+			size_t blockLimitY = min(m_currentStep, height - j);
+			size_t blockLimitX = min(m_currentStep, width - i);
+			for (size_t blockY = 0; blockY < blockLimitY; blockY++)
 			{
-				size_t rowOffset = (j + blockY) * width;
-				for (size_t blockX = 0; blockX < m_currentStep && (i + blockX) < width; blockX++)
-				{
-					m_pixelData[rowOffset + (i + blockX)] = finalPixelColor;
+				size_t pixelIndex = (j + blockY) * width + i;
+				fill_n(&m_pixelData[pixelIndex], blockLimitX, finalPixelColor);
 				}
-			}
+			//for (size_t blockY = 0; blockY < m_currentStep && (j + blockY) < height; blockY++)
+			//{
+			//	size_t rowOffset = (j + blockY) * width;
+			//	for (size_t blockX = 0; blockX < m_currentStep && (i + blockX) < width; blockX++)
+			//	{
+			//		m_pixelData[rowOffset + (i + blockX)] = finalPixelColor;
+			//	}
+			//}
 		}
 	}
 
