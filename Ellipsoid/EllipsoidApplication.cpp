@@ -145,7 +145,11 @@ bool EllipsoidApplication::ProcessMessage(WindowMessage& msg)
 		short zDelta = (short)HIWORD(msg.wParam);
 		WORD fwKeys = LOWORD(msg.wParam);
 
-		if (fwKeys & MK_SHIFT)
+		if (fwKeys & MK_CONTROL)
+		{
+			m_ellipsoid.position.z += (zDelta > 0) ? 0.1 : -0.1; // Move along z-axis.
+		}
+		else if (fwKeys & MK_SHIFT)
 		{
 			// Rotate around z-axis.
 			//m_ellipsoid.rotation.z += (zDelta > 0) ? 0.1 : -0.1;
