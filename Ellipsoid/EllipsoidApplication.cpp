@@ -217,10 +217,9 @@ void EllipsoidApplication::DrawEllipsoid()
 
 	int width = static_cast<int>(m_viewport.width);
 	int height = static_cast<int>(m_viewport.height);
-#pragma omp parallel for
+#pragma omp parallel for collapse(2)
 	for (int j = 0; j < height; j += m_currentStep)
 	{
-#pragma omp parallel for
 		for (int i = 0; i < width; i += m_currentStep)
 		{
 			uint32_t finalPixelColor = ImGui::ColorConvertFloat4ToU32(*reinterpret_cast<ImVec4*>(m_backgroundColor));
@@ -262,7 +261,7 @@ void EllipsoidApplication::DrawEllipsoid()
 			{
 				size_t pixelIndex = (j + blockY) * width + i;
 				fill_n(&m_pixelData[pixelIndex], blockLimitX, finalPixelColor);
-				}
+			}
 			//for (size_t blockY = 0; blockY < m_currentStep && (j + blockY) < height; blockY++)
 			//{
 			//	size_t rowOffset = (j + blockY) * width;
