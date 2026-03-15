@@ -3,6 +3,7 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
+  <Project Path="CAD/CAD.vcxproj" Id="141a1207-48e4-4619-b1f5-74b7be5e295b" />
   <Project Path="Ellipsoid/Ellipsoid.vcxproj" Id="6d46fe3d-1942-45e5-ab2e-ff97888b7c69">
     <BuildDependency Project="MathLib/MathLib.vcxproj" />
   </Project>
