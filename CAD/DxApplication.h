@@ -32,7 +32,7 @@ protected:
 	 */
 	int MainLoop() override;
 
-	virtual void Render() = 0; // Renders the scene to the window.
+	virtual void Render() {} // Renders the scene to the window.
 
 
 	/**
@@ -58,7 +58,7 @@ protected:
 	 * @param [in] width New width of the window's client area.
 	 * @param [in] height New height of the window's client area.
 	 */
-	virtual void UpdateResources(int width, int height) = 0;
+	virtual void UpdateResources(int width, int height) {}
 
 	DxDevice m_device;
 	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_backBuffer;

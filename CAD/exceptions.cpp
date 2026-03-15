@@ -28,4 +28,22 @@ wstring WinAPIException::getMessage() const
 	{
 	}
 	return message;
-} 
+}
+
+
+CustomException::CustomException(const wchar_t* location, const std::wstring& message)
+	: Exception(location), m_message(message)
+{
+
+}
+
+CustomException::CustomException(const wchar_t* location, std::wstring&& message)
+	: Exception(location), m_message(move(message))
+{
+
+}
+
+std::wstring CustomException::getMessage() const
+{
+	return m_message + L"\nLocation: " + getErrorLocation();
+}

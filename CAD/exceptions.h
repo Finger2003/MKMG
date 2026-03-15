@@ -78,4 +78,44 @@ private:
 
 
 
+/**
+ * @brief Exception class for storing error location and custom error message.
+ */
+class CustomException : public Exception
+{
+public:
+	/**
+	 * @brief Creates a new exception with the given location and custom error message.
+	 *
+	 * @param location Wide C string describing location of the error.
+	 * @param message Wide string custom error message describing the error.
+	 */
+	CustomException(const wchar_t* location, const std::wstring& message);
+
+	/**
+	 * @brief Creates a new exception with the given location and custom error message.
+	 *
+	 * @param location Wide C string describing location of the error.
+	 * @param message Wide string custom error message describing the error.
+	 */
+	CustomException(const wchar_t* location, std::wstring&& message);
+
+	/**
+	 * @brief Gets the error code associated with this exception.
+	 *
+	 * @return Code number of this exception. Since this is a custom exception, it returns -1 to indicate that there is no specific error code.
+	 */
+	int getExitCode() const override { return -1; }
+
+	/**
+	 * @brief Gets the error message associated with this exception.
+	 *
+	 * @return A wide string describing the error and its location.
+	 */
+	std::wstring getMessage() const override;
+
+private:
+	std::wstring m_message; // Custom error message
+};
 #define THROW_WINAPI throw WinAPIException(__AT__)
+#define THROW(msg) throw CustomException(__AT__, msg)

@@ -3,8 +3,10 @@
 #include "DxStructures.h"
 #include "Window.h"
 #include "exceptions.h"
+#include <fstream>
 
 using Microsoft::WRL::ComPtr;
+using namespace std;
 
 DxDevice::DxDevice(const Window& window)
 {
@@ -22,10 +24,10 @@ DxDevice::DxDevice(const Window& window)
 		0,
 		D3D11_SDK_VERSION,
 		&desc,
-		m_swapChain.ReleaseAndGetAddressOf(),
-		m_device.ReleaseAndGetAddressOf(),
+		m_swapChain.GetAddressOf(),
+		m_device.GetAddressOf(),
 		nullptr,
-		m_context.ReleaseAndGetAddressOf()
+		m_context.GetAddressOf()
 	);
 	if (FAILED(hr))
 		THROW_WINAPI;
@@ -56,4 +58,78 @@ Microsoft::WRL::ComPtr<ID3D11Texture2D> DxDevice::CreateTexture2D(const D3D11_TE
 	if (FAILED(hr))	
 		THROW_WINAPI;
 	return texture;
+}
+
+Microsoft::WRL::ComPtr<ID3D11Buffer> DxDevice::CreateBuffer(const D3D11_BUFFER_DESC& desc, const void* data) const
+{
+	D3D11_SUBRESOURCE_DATA sdata{};
+	sdata.pSysMem = data;
+
+	ComPtr<ID3D11Buffer> buffer;
+	auto hr = m_device->CreateBuffer(&desc, data ? &sdata : nullptr, buffer.GetAddressOf());
+	if (FAILED(hr))
+		THROW_WINAPI;
+	return buffer;
+}
+
+Microsoft::WRL::ComPtr<ID3D11DepthStencilView> DxDevice::CreateDepthStencilView(const Microsoft::WRL::ComPtr<ID3D11Texture2D>& texture) const
+{
+	ComPtr<ID3D11DepthStencilView> dsv;
+	auto hr = m_device->CreateDepthStencilView(texture.Get(), nullptr, dsv.GetAddressOf());
+	if (FAILED(hr))
+		THROW_WINAPI;
+	return dsv;
+}
+
+Microsoft::WRL::ComPtr<ID3D11DepthStencilView> DxDevice::CreateDepthStencilView(SIZE size) const
+{
+	auto textureDesc = Texture2DDescription::DepthStencilDescription(size.cx, size.cy);
+	ComPtr<ID3D11Texture2D> depthStencilTexture = CreateTexture2D(textureDesc);
+	return CreateDepthStencilView(depthStencilTexture);
+}
+
+std::vector<BYTE> DxDevice::LoadByteCode(const std::wstring& filename)
+{
+	ifstream sIn(filename, ios::in | ios::binary);
+	if (!sIn)
+		THROW(L"Unable to open shader bytecode file: " + filename);
+
+	sIn.seekg(0, ios::end);
+	auto bytecodeSize = sIn.tellg();
+	sIn.seekg(0, ios::beg);
+
+	vector<BYTE> bytecode(static_cast<unsigned int>(bytecodeSize));
+
+	if (!sIn.read(reinterpret_cast<char*>(bytecode.data()), bytecodeSize))
+		THROW(L"Failed to read shader bytecode from file: " + filename);
+
+	sIn.close();
+	return bytecode;
+}
+
+Microsoft::WRL::ComPtr<ID3D11VertexShader> DxDevice::CreateVertexShader(const std::vector<BYTE>& bytecode) const
+{
+	ComPtr<ID3D11VertexShader> vertexShader;
+	auto hr = m_device->CreateVertexShader(bytecode.data(), bytecode.size(), nullptr, vertexShader.GetAddressOf());
+	if (FAILED(hr))
+		THROW_WINAPI;
+	return vertexShader;
+}
+
+Microsoft::WRL::ComPtr<ID3D11PixelShader> DxDevice::CreatePixelShader(const std::vector<BYTE>& bytecode) const
+{
+	ComPtr<ID3D11PixelShader> pixelShader;
+	auto hr = m_device->CreatePixelShader(bytecode.data(), bytecode.size(), nullptr, pixelShader.GetAddressOf());
+	if (FAILED(hr))
+		THROW_WINAPI;
+	return pixelShader;
+}
+
+Microsoft::WRL::ComPtr<ID3D11InputLayout> DxDevice::CreateInputLayout(const std::vector<D3D11_INPUT_ELEMENT_DESC>& elements, const std::vector<BYTE>& vsCode) const
+{
+	ComPtr<ID3D11InputLayout> inputLayout;
+	auto hr = m_device->CreateInputLayout(elements.data(), static_cast<UINT>(elements.size()), reinterpret_cast<const void*>(vsCode.data()), vsCode.size(), inputLayout.GetAddressOf());
+	if (FAILED(hr))
+		THROW_WINAPI;
+	return inputLayout;
 }
