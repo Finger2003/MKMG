@@ -4,10 +4,6 @@
 
 class CadApplication : public DxApplication
 {
-	struct VertexPosition
-	{
-		float x, y, z;
-	};
 
 	/**
 	 * @brief Creates application instance.
@@ -25,9 +21,13 @@ public:
 		int wndHeight = Window::m_defaultWindowHeight,
 		std::wstring wndTitle = L"CADApp");
 
-	virtual ~CadApplication() = default;
+	void InitImGui();
+
+	virtual ~CadApplication();
 
 protected:
+	void Render() override; // Renders the scene to the window.
+
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_depthBuffer;
 	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_vertexShader;
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_pixelShader;
@@ -37,3 +37,27 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbMVP;
 };
 
+struct VertexPosition
+{
+	float x, y, z;
+};
+
+struct Torus
+{
+	float majorRadius = 0.5f;
+	float minorRadius = 0.2f;
+	int majorSegments = 20;
+	int minorSegments = 10;
+	std::vector<VertexPosition> vertices;
+	std::vector<unsigned int> indices;
+	void GenerateMesh();
+
+	static constexpr int cMinMajorSegments = 3;
+	static constexpr int cMaxMajorSegments = 1000;
+	static constexpr int cMinMinorSegments = 3;
+	static constexpr int cMaxMinorSegments = 1000;
+
+private:
+	void GenerateVertices();
+	void GenerateIndices();
+};
