@@ -122,6 +122,8 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 				{
 					Mat4f rot = Mat4f::RotationAxis(rotationAxis.normalize(), angle);
 					m_torus.m_rotationMatrix = rot * m_torus.m_baseRotationMatrix;
+					Vec3f euler = Mat4f::ExtractEulerAngles(m_torus.m_rotationMatrix);
+					m_torus.m_eulerAngles = { euler.x, euler.y, euler.z };
 				}
 
 				//float sensitivity = 0.01f;
@@ -295,16 +297,44 @@ void CadApplication::DrawMenu(int width, int height)
 	int tempSegs[2] = { m_torus.GetMajorSegments(), m_torus.GetMinorSegments() };
 
 	ImGui::Text("Torus Settings");
-	//if (ImGui::SliderFloat("Major Radius", &tempMajor, m_torus.GetMinorRadius(), Torus::cMaxMajorRadius))
-	//	m_torus.SetMajorRadius(tempMajor);
-	//if (ImGui::SliderFloat("Minor Radius", &tempMinor, Torus::cMinMinorRadius, m_torus.GetMajorRadius()))
-	//	m_torus.SetMinorRadius(tempMinor);
 	if (ImGui::SliderFloat("Major Radius", &tempMajor, Torus::cMinMajorRadius, Torus::cMaxMajorRadius))
 		m_torus.SetMajorRadius(tempMajor);
 	if (ImGui::SliderFloat("Minor Radius", &tempMinor, Torus::cMinMinorRadius, Torus::cMaxMinorRadius))
 		m_torus.SetMinorRadius(tempMinor);
 	if (ImGui::SliderInt2("Segments (Major, Minor)", tempSegs, Torus::cMinMajorSegments, Torus::cMaxMajorSegments))
 		m_torus.SetSegments(tempSegs[0], tempSegs[1]);
+
+	ImGui::Separator();
+	ImGui::Text("Transformations");
+	bool transformChanged = false;
+
+	if (ImGui::DragFloat3("Position", &m_torus.m_position.x, 0.01f))
+		transformChanged = true;
+	if (ImGui::DragFloat3("Rotation (Euler angles)", &m_torus.m_eulerAngles.x, 0.01f))
+	{
+		Mat4f rotX = Mat4f::RotationX(m_torus.m_eulerAngles.x);
+		Mat4f rotY = Mat4f::RotationY(m_torus.m_eulerAngles.y);
+		Mat4f rotZ = Mat4f::RotationZ(m_torus.m_eulerAngles.z);
+		m_torus.m_rotationMatrix = rotY * rotX * rotZ;
+		transformChanged = true;
+	}
+	if (ImGui::Button("Reset Rotation"))
+	{
+		m_torus.m_eulerAngles = { 0, 0, 0 };
+		m_torus.m_rotationMatrix = Mat4f::Identity();
+		m_torus.m_baseRotationMatrix = Mat4f::Identity();
+		transformChanged = true;
+	}
+
+	if (ImGui::DragFloat("Scale", &m_torus.m_scale, 0.01f, 0.1f, 100.0f))
+		transformChanged = true;
+
+	if (transformChanged)
+	{
+		Mat4f translation = Mat4f::Translation(m_torus.m_position.x, m_torus.m_position.y, m_torus.m_position.z);
+		Mat4f scaling = Mat4f::Scaling(m_torus.m_scale);
+		m_torus.m_modelMatrix = translation * m_torus.m_rotationMatrix * scaling;
+	}
 
 	ImGui::End();
 	ImGui::Render();

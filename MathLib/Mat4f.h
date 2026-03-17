@@ -171,5 +171,29 @@ namespace MathLib
 				Vec4f(0.0f, 0.0f, 0.0f, 1.0f)
 			);
 		}
+
+		static Vec3f ExtractEulerAngles(const MathLib::Mat4f& mat)
+		{
+			float sy = std::sqrt(mat.m[0][0] * mat.m[0][0] + mat.m[1][0] * mat.m[1][0]);
+
+			bool singular = sy < 1e-6; // Check for Gimbal lock
+
+			float x, y, z;
+			if (!singular)
+			{
+				x = std::atan2(mat.m[2][1], mat.m[2][2]);
+				y = std::atan2(-mat.m[2][0], sy);
+				z = std::atan2(mat.m[1][0], mat.m[0][0]);
+			}
+			else
+			{
+				// In Gimbal lock, we can set Z to 0 and calculate X
+				x = std::atan2(-mat.m[1][2], mat.m[1][1]);
+				y = std::atan2(-mat.m[2][0], sy);
+				z = 0;
+			}
+
+			return { x, y, z };
+		}
 	};
 }
