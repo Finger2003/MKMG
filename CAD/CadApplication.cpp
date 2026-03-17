@@ -68,6 +68,20 @@ MathLib::Vec3f CadApplication::ScreenToArcballVector(int x, int y, int width, in
 	return p;
 }
 
+void CadApplication::UpdateProjectionMatrix(int width, int height)
+{
+	float aspect = static_cast<float>(width) / height;
+	float fovY = m_fovY * (std::numbers::pi_v<float> / 180.0f);
+	m_projMatrix = Mat4f::Perspective(fovY, aspect, m_nearPlane, m_farPlane);
+
+	if (m_cbPerPass)
+	{
+		PerPassBuffer perPassData;
+		perPassData.viewProj = m_projMatrix * m_viewMatrix;
+		m_device.UpdateBuffer(m_cbPerPass, perPassData);
+	}
+}
+
 bool CadApplication::ProcessMessage(WindowMessage& msg)
 {
 	if (ImGui::GetCurrentContext() == nullptr)
@@ -125,31 +139,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 					Vec3f euler = Mat4f::ExtractEulerAngles(m_torus.m_rotationMatrix);
 					m_torus.m_eulerAngles = { euler.x, euler.y, euler.z };
 				}
-
-				//float sensitivity = 0.01f;
-				//m_torus.m_eulerAngles.x += dy * sensitivity;
-				//m_torus.m_eulerAngles.y += dx * sensitivity;
-
-				//// Rebuild the matrix exactly as we do in the UI
-				//Mat4f rotX = Mat4f::RotationX(m_torus.m_eulerAngles.x);
-				//Mat4f rotY = Mat4f::RotationY(m_torus.m_eulerAngles.y);
-				//Mat4f rotZ = Mat4f::RotationZ(m_torus.m_eulerAngles.z);
-
-				//m_torus.m_rotationMatrix = rotY * rotX * rotZ;
-
-	
-
-				//int totalDx = xPos - m_startMousePos.x;
-				//int totalDy = yPos - m_startMousePos.y;
-				//float sensitivity = 0.01f;
-				//float angleX = totalDy * sensitivity;
-				//float angleY = totalDx * sensitivity;
-
-				//Mat4f rotX = Mat4f::RotationX(angleX);
-				//Mat4f rotY = Mat4f::RotationY(angleY);
-
-				//m_torus.m_rotationMatrix = rotY * rotX * m_torus.m_baseRotationMatrix;
-				
 			}
 			else if (m_interactionMode == InteractionMode::Translating)
 			{
@@ -157,7 +146,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 				float width = static_cast<float>(wndSize.cx);
 				float height = static_cast<float>(wndSize.cy);
 
-				float fovY = 60.0f * (std::numbers::pi_v<float> / 180.0f);
+				float fovY = m_fovY * (std::numbers::pi_v<float> / 180.0f);
 				float distanceZ = std::abs(m_torus.m_position.z);
 
 				float frustumHeight = 2.0f * distanceZ * std::tan(fovY / 2.0f);
@@ -169,8 +158,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 
 				m_torus.m_position.x += dx * worldUnitsPerPixelX;
 				m_torus.m_position.y -= dy * worldUnitsPerPixelY;
-
-				//m_torus.m_modelMatrix = Mat4f::Translation(m_torus.m_position.x, m_torus.m_position.y, m_torus.m_position.z);
 			}
 			Mat4f translation = Mat4f::Translation(m_torus.m_position.x, m_torus.m_position.y, m_torus.m_position.z);
 			Mat4f scaling = Mat4f::Scaling(m_torus.m_scale);
@@ -198,7 +185,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		else
 		{
 			float scaleFactor = (zDelta > 0) ? 1.1f : 0.9f;
-			m_torus.m_scale *= scaleFactor;
+			m_torus.SetScale(m_torus.GetScale() * scaleFactor);
 		}
 		Mat4f translation = Mat4f::Translation(m_torus.m_position.x, m_torus.m_position.y, m_torus.m_position.z);
 		Mat4f scaling = Mat4f::Scaling(m_torus.m_scale);
@@ -224,9 +211,8 @@ void CadApplication::UpdateResources(int width, int height)
 	Viewport viewport{ SIZE{ width, height } };
 	m_device.getContext()->RSSetViewports(1, &viewport);
 
-	float aspect = static_cast<float>(width) / height;
-	float fovY = 60.0f * (std::numbers::pi_v<float> / 180.0f);
-	m_projMatrix = Mat4f::Perspective(fovY, aspect, 0.1f, 100.0f);
+
+	UpdateProjectionMatrix(width, height);
 	m_viewMatrix = Mat4f::Identity();
 	if (m_cbPerPass)
 	{
@@ -326,7 +312,7 @@ void CadApplication::DrawMenu(int width, int height)
 		transformChanged = true;
 	}
 
-	if (ImGui::DragFloat("Scale", &m_torus.m_scale, 0.01f, 0.1f, 100.0f))
+	if (ImGui::DragFloat("Scale", &m_torus.m_scale, 0.01f, Torus::cMinScale, Torus::cMaxScale))
 		transformChanged = true;
 
 	if (transformChanged)
@@ -335,6 +321,19 @@ void CadApplication::DrawMenu(int width, int height)
 		Mat4f scaling = Mat4f::Scaling(m_torus.m_scale);
 		m_torus.m_modelMatrix = translation * m_torus.m_rotationMatrix * scaling;
 	}
+
+	ImGui::Separator();
+	ImGui::Text("Camera Settings");
+	bool cameraChanged = false;
+	if (ImGui::SliderFloat("FOV", &m_fovY, 30.0f, 120.0f))
+		cameraChanged = true;
+	if (ImGui::DragFloat("Near Plane", &m_nearPlane, 0.01f, 0.001f, 10.0f))
+		cameraChanged = true;
+	if (ImGui::DragFloat("Far Plane", &m_farPlane, 0.1f, 10.0f, 1000.0f))
+		cameraChanged = true;
+
+	if(cameraChanged)
+		UpdateProjectionMatrix(width, height);
 
 	ImGui::End();
 	ImGui::Render();

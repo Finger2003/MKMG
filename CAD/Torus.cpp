@@ -35,6 +35,16 @@ void Torus::SetSegments(int major, int minor)
 	}
 }
 
+void Torus::SetScale(float scale)
+{
+	float s = std::clamp(scale, cMinScale, cMaxScale);
+	if (s != m_scale)
+	{
+		m_scale = s;
+		dirty = true;
+	}
+}
+
 void Torus::UpdateMesh(const DxDevice& device)
 {
 	if (dirty)

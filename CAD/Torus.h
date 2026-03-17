@@ -19,17 +19,21 @@ struct Torus
 	std::vector<unsigned int> indices;
 
 	static constexpr float cMinMajorRadius = 0.1f;
-	static constexpr float cMaxMajorRadius = 100.0f;
+	static constexpr float cMaxMajorRadius = 1.0f;
 	static constexpr float cMinMinorRadius = 0.1f;
-	static constexpr float cMaxMinorRadius = 100.0f;
+	static constexpr float cMaxMinorRadius = 1.0f;
 	static constexpr int cMinMajorSegments = 3;
 	static constexpr int cMaxMajorSegments = 100;
 	static constexpr int cMinMinorSegments = 3;
 	static constexpr int cMaxMinorSegments = 100;
+	static constexpr float cMinScale = 0.1f;
+	static constexpr float cMaxScale = 100.0f;
 
 	void SetMajorRadius(float radius);
 	void SetMinorRadius(float radius);
 	void SetSegments(int major, int minor);
+	void SetScale(float scale);
+
 	bool IsDirty() const { return dirty; }
 	void UpdateMesh(const DxDevice& device);
 
@@ -37,6 +41,7 @@ struct Torus
 	float GetMinorRadius() const { return minorRadius; }
 	int GetMajorSegments() const { return majorSegments; }
 	int GetMinorSegments() const { return minorSegments; }
+	float GetScale() const { return m_scale; }
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> GetVertexBuffer() const { return m_vertexBuffer; }
 	Microsoft::WRL::ComPtr<ID3D11Buffer> GetIndexBuffer() const { return m_indexBuffer; }
