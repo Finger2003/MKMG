@@ -53,6 +53,7 @@ struct Torus
 	MathLib::Mat4f m_baseRotationMatrix = MathLib::Mat4f::Identity();
 	MathLib::Mat4f m_modelMatrix = MathLib::Mat4f::Translation(m_position.x, m_position.y, m_position.z);
 
+	void UpdateModelMatrix();
 private:
 	void GenerateMesh();
 	void GenerateVertices();

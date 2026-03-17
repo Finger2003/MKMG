@@ -2,7 +2,7 @@
 #include "Torus.h"
 #include "DxDevice.h"
 
-
+using namespace MathLib;
 void Torus::SetMajorRadius(float radius)
 {
 	float r = std::clamp(radius, minorRadius, cMaxMajorRadius);
@@ -41,7 +41,7 @@ void Torus::SetScale(float scale)
 	if (s != m_scale)
 	{
 		m_scale = s;
-		dirty = true;
+		UpdateModelMatrix();
 	}
 }
 
@@ -59,6 +59,13 @@ void Torus::UpdateBuffers(const DxDevice& device)
 {
 	m_vertexBuffer = device.CreateVertexBuffer(vertices);
 	m_indexBuffer = device.CreateIndexBuffer(indices);
+}
+
+void Torus::UpdateModelMatrix()
+{
+	Mat4f translation = Mat4f::Translation(m_position.x, m_position.y, m_position.z);
+	Mat4f scaling = Mat4f::Scaling(m_scale);
+	m_modelMatrix = translation * m_rotationMatrix * scaling;
 }
 
 void Torus::GenerateMesh()

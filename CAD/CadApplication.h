@@ -77,13 +77,17 @@ private:
 	POINT m_startMousePos{};
 	MathLib::Vec3f m_startArcballVector{};
 	Torus m_torus;
-	void DrawMenu(int width, int height);
+	void DrawMenu();
 	void InitImGui();
 	MathLib::Vec3f ScreenToArcballVector(int x, int y, int width, int height);
 
 	float m_fovY = 60.0f;
 	float m_nearPlane = 0.1f;
 	float m_farPlane = 100.0f;
-	void UpdateProjectionMatrix(int width, int height);
+	float m_panScaleFactor = 0.0f;
+	void UpdateProjectionMatrix();
+
+	static constexpr float cMenuWidth = 400.0f;
+	SIZE m_renderSize{};
 };
 

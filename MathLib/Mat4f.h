@@ -174,22 +174,22 @@ namespace MathLib
 
 		static Vec3f ExtractEulerAngles(const MathLib::Mat4f& mat)
 		{
-			float sy = std::sqrt(mat.m[0][0] * mat.m[0][0] + mat.m[1][0] * mat.m[1][0]);
+			float cosX = std::sqrt(mat.m[2][0] * mat.m[2][0] + mat.m[2][2] * mat.m[2][2]);
 
-			bool singular = sy < 1e-6; // Check for Gimbal lock
+			bool singular = cosX < 1e-6; // Check for Gimbal lock
 
 			float x, y, z;
 			if (!singular)
 			{
-				x = std::atan2(mat.m[2][1], mat.m[2][2]);
-				y = std::atan2(-mat.m[2][0], sy);
-				z = std::atan2(mat.m[1][0], mat.m[0][0]);
+				x = std::atan2(-mat.m[2][1], cosX);
+				y = std::atan2(mat.m[2][0], mat.m[2][2]);
+				z = std::atan2(mat.m[0][1], mat.m[1][1]);
 			}
 			else
 			{
 				// In Gimbal lock, we can set Z to 0 and calculate X
-				x = std::atan2(-mat.m[1][2], mat.m[1][1]);
-				y = std::atan2(-mat.m[2][0], sy);
+				x = (mat.m[2][1] < 0) ? (std::numbers::pi_v<float> / 2.0f) : (-std::numbers::pi_v<float> / 2.0f);
+				y = std::atan2(-mat.m[0][2], mat.m[0][0]);
 				z = 0;
 			}
 

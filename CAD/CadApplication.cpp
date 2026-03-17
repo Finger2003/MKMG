@@ -68,10 +68,16 @@ MathLib::Vec3f CadApplication::ScreenToArcballVector(int x, int y, int width, in
 	return p;
 }
 
-void CadApplication::UpdateProjectionMatrix(int width, int height)
+void CadApplication::UpdateProjectionMatrix()
 {
+	int width = m_renderSize.cx;
+	int height = m_renderSize.cy;
 	float aspect = static_cast<float>(width) / height;
 	float fovY = m_fovY * (std::numbers::pi_v<float> / 180.0f);
+	m_panScaleFactor = 2.0f * std::tan(fovY / 2.0f) / height;
+
+	m_nearPlane = std::max(m_nearPlane, 0.01f); // Ensure near plane is positive and not too close to zero.
+	m_farPlane = std::max(m_farPlane, m_nearPlane + 0.01f); // Ensure far plane is greater than near plane.
 	m_projMatrix = Mat4f::Perspective(fovY, aspect, m_nearPlane, m_farPlane);
 
 	if (m_cbPerPass)
@@ -98,7 +104,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 
 	int xPos = (int)(short)LOWORD(msg.lParam);
 	int yPos = (int)(short)HIWORD(msg.lParam);
-	SIZE wndSize = m_window.getClientSize();
+	//SIZE wndSize = m_window.getClientSize();
 
 	switch (msg.message)
 	{
@@ -106,7 +112,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		m_interactionMode = InteractionMode::Rotating;
 		m_lastMousePos = { xPos, yPos };
 		m_startMousePos = { xPos, yPos };
-		m_startArcballVector = ScreenToArcballVector(xPos, yPos, wndSize.cx, wndSize.cy);
+		m_startArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
 		m_torus.m_baseRotationMatrix = m_torus.m_rotationMatrix;
 		SetCapture(m_window.getHandle());
 		return true;
@@ -127,7 +133,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			int dy = yPos - m_lastMousePos.y;
 			if (m_interactionMode == InteractionMode::Rotating)
 			{
-				Vec3f currentArcballVector = ScreenToArcballVector(xPos, yPos, wndSize.cx, wndSize.cy);
+				Vec3f currentArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
 				float dot = std::clamp(Vec3f::dot(m_startArcballVector, currentArcballVector), -1.0f, 1.0f);
 				float angle = std::acos(dot) * 2.0f;
 				Vec3f rotationAxis = Vec3f::cross(m_startArcballVector, currentArcballVector);
@@ -142,26 +148,15 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			}
 			else if (m_interactionMode == InteractionMode::Translating)
 			{
-				SIZE wndSize = m_window.getClientSize();
-				float width = static_cast<float>(wndSize.cx);
-				float height = static_cast<float>(wndSize.cy);
-
 				float fovY = m_fovY * (std::numbers::pi_v<float> / 180.0f);
 				float distanceZ = std::abs(m_torus.m_position.z);
 
-				float frustumHeight = 2.0f * distanceZ * std::tan(fovY / 2.0f);
-				float worldUnitsPerPixelY = frustumHeight / height;
+				float unitsPerPixel = m_panScaleFactor * distanceZ;
 
-				float aspect = width / height;
-				float frustumWidth = frustumHeight * aspect;
-				float worldUnitsPerPixelX = frustumWidth / width;
-
-				m_torus.m_position.x += dx * worldUnitsPerPixelX;
-				m_torus.m_position.y -= dy * worldUnitsPerPixelY;
+				m_torus.m_position.x += dx * unitsPerPixel;
+				m_torus.m_position.y -= dy * unitsPerPixel;
 			}
-			Mat4f translation = Mat4f::Translation(m_torus.m_position.x, m_torus.m_position.y, m_torus.m_position.z);
-			Mat4f scaling = Mat4f::Scaling(m_torus.m_scale);
-			m_torus.m_modelMatrix = translation * m_torus.m_rotationMatrix * scaling;
+			m_torus.UpdateModelMatrix();
 			m_lastMousePos = { xPos, yPos };
 		}
 		return true;
@@ -174,22 +169,12 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		{
 			m_torus.m_position.z += (zDelta > 0) ? 0.1 : -0.1; // Move along z-axis.
 		}
-		//else if (fwKeys & MK_SHIFT)
-		//{
-		//	// Rotate around z-axis.
-		//	//m_ellipsoid.rotation.z += (zDelta > 0) ? 0.1 : -0.1;
-		//	Mat4d rotZ = Mat4d::RotationZ((zDelta > 0) ? 0.1 : -0.1);
-		//	m_ellipsoid.rotationMatrix = rotZ * m_ellipsoid.rotationMatrix;
-		//	m_ellipsoid.rotationMatrix.Orthonormalize3x3(); // Keep the rotation matrix orthonormal to prevent distortion.
-		//}
 		else
 		{
 			float scaleFactor = (zDelta > 0) ? 1.1f : 0.9f;
 			m_torus.SetScale(m_torus.GetScale() * scaleFactor);
 		}
-		Mat4f translation = Mat4f::Translation(m_torus.m_position.x, m_torus.m_position.y, m_torus.m_position.z);
-		Mat4f scaling = Mat4f::Scaling(m_torus.m_scale);
-		m_torus.m_modelMatrix = translation * m_torus.m_rotationMatrix * scaling;
+		m_torus.UpdateModelMatrix();
 		return true;
 	}
 	}
@@ -208,11 +193,14 @@ CadApplication::~CadApplication()
 void CadApplication::UpdateResources(int width, int height)
 {
 	m_depthBuffer = m_device.CreateDepthStencilView(SIZE{ width, height });
-	Viewport viewport{ SIZE{ width, height } };
+	m_renderSize.cx = (width - cMenuWidth);
+	m_renderSize.cy = height;
+
+	Viewport viewport{ m_renderSize };
 	m_device.getContext()->RSSetViewports(1, &viewport);
 
 
-	UpdateProjectionMatrix(width, height);
+	UpdateProjectionMatrix();
 	m_viewMatrix = Mat4f::Identity();
 	if (m_cbPerPass)
 	{
@@ -224,10 +212,10 @@ void CadApplication::UpdateResources(int width, int height)
 
 void CadApplication::Render()
 {
-	SIZE wndSize = m_window.getClientSize();
-	int width = wndSize.cx;
-	int height = wndSize.cy;
-	DrawMenu(width, height);
+	//SIZE wndSize = m_window.getClientSize();
+	//int width = wndSize.cx;
+	//int height = wndSize.cy;
+	DrawMenu();
 
 	m_torus.UpdateMesh(m_device);
 
@@ -263,21 +251,21 @@ void CadApplication::Render()
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
 
-void CadApplication::DrawMenu(int width, int height)
+void CadApplication::DrawMenu()
 {
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
-	constexpr float menuWidth = 300.0f;
-	ImGui::SetNextWindowPos(ImVec2(width - menuWidth, 0.0f));
-	ImGui::SetNextWindowSize(ImVec2(menuWidth, height));
+	//constexpr float menuWidth = 300.0f;
+	ImGui::SetNextWindowPos(ImVec2(m_renderSize.cx, 0.0f));
+	ImGui::SetNextWindowSize(ImVec2(cMenuWidth, m_renderSize.cy));
 
 	ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoMove |
 		ImGuiWindowFlags_NoResize |
 		ImGuiWindowFlags_NoCollapse;
 
-	ImGui::Begin("Torus Parameters", nullptr, windowFlags);
+	ImGui::Begin("Menu", nullptr);
 	float tempMajor = m_torus.GetMajorRadius();
 	float tempMinor = m_torus.GetMinorRadius();
 	int tempSegs[2] = { m_torus.GetMajorSegments(), m_torus.GetMinorSegments() };
@@ -301,7 +289,7 @@ void CadApplication::DrawMenu(int width, int height)
 		Mat4f rotX = Mat4f::RotationX(m_torus.m_eulerAngles.x);
 		Mat4f rotY = Mat4f::RotationY(m_torus.m_eulerAngles.y);
 		Mat4f rotZ = Mat4f::RotationZ(m_torus.m_eulerAngles.z);
-		m_torus.m_rotationMatrix = rotY * rotX * rotZ;
+		m_torus.m_rotationMatrix = rotZ * rotX * rotY;
 		transformChanged = true;
 	}
 	if (ImGui::Button("Reset Rotation"))
@@ -316,11 +304,7 @@ void CadApplication::DrawMenu(int width, int height)
 		transformChanged = true;
 
 	if (transformChanged)
-	{
-		Mat4f translation = Mat4f::Translation(m_torus.m_position.x, m_torus.m_position.y, m_torus.m_position.z);
-		Mat4f scaling = Mat4f::Scaling(m_torus.m_scale);
-		m_torus.m_modelMatrix = translation * m_torus.m_rotationMatrix * scaling;
-	}
+		m_torus.UpdateModelMatrix();
 
 	ImGui::Separator();
 	ImGui::Text("Camera Settings");
@@ -333,7 +317,7 @@ void CadApplication::DrawMenu(int width, int height)
 		cameraChanged = true;
 
 	if(cameraChanged)
-		UpdateProjectionMatrix(width, height);
+		UpdateProjectionMatrix();
 
 	ImGui::End();
 	ImGui::Render();
