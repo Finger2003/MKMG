@@ -136,5 +136,16 @@ namespace MathLib
 				Vec4f(row3)
 			);
 		}
+
+		static Mat4f Perspective(float fovY, float aspect, float nearZ, float farZ)
+		{
+			float f = 1.0 / std::tan(fovY / 2.0);
+			return Mat4f(
+				Vec4f(f / aspect, 0.0, 0.0, 0.0),
+				Vec4f(0.0, f, 0.0, 0.0),
+				Vec4f(0.0, 0.0, farZ / (nearZ - farZ), (farZ * nearZ) / (nearZ - farZ)),
+				Vec4f(0.0, 0.0, -1.0, 0.0)
+			);
+		}
 	};
 }

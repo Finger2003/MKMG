@@ -1,0 +1,54 @@
+#pragma once
+
+
+class DxDevice;
+
+struct VertexPosition
+{
+	float x, y, z;
+};
+
+struct Torus
+{
+	std::vector<VertexPosition> vertices;
+	std::vector<unsigned int> indices;
+
+	static constexpr float cMinMajorRadius = 0.1f;
+	static constexpr float cMaxMajorRadius = 100.0f;
+	static constexpr float cMinMinorRadius = 0.1f;
+	static constexpr float cMaxMinorRadius = 100.0f;
+	static constexpr int cMinMajorSegments = 3;
+	static constexpr int cMaxMajorSegments = 100;
+	static constexpr int cMinMinorSegments = 3;
+	static constexpr int cMaxMinorSegments = 100;
+
+	void SetMajorRadius(float radius);
+	void SetMinorRadius(float radius);
+	void SetSegments(int major, int minor);
+	bool IsDirty() const { return dirty; }
+	void UpdateMesh(const DxDevice& device);
+
+	float GetMajorRadius() const { return majorRadius; }
+	float GetMinorRadius() const { return minorRadius; }
+	int GetMajorSegments() const { return majorSegments; }
+	int GetMinorSegments() const { return minorSegments; }
+
+	Microsoft::WRL::ComPtr<ID3D11Buffer> GetVertexBuffer() const { return m_vertexBuffer; }
+	Microsoft::WRL::ComPtr<ID3D11Buffer> GetIndexBuffer() const { return m_indexBuffer; }
+
+private:
+	void GenerateMesh();
+	void GenerateVertices();
+	void GenerateIndices();
+	void UpdateBuffers(const DxDevice& device);
+
+	float majorRadius = 0.5f;
+	float minorRadius = 0.2f;
+	int majorSegments = 20;
+	int minorSegments = 10;
+	bool dirty = true; // Indicates whether the mesh needs to be regenerated.
+
+
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_vertexBuffer;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_indexBuffer;
+};

@@ -1,6 +1,17 @@
 #pragma once
 #include "DxApplication.h"
 #include "../MathLib/Mat4f.h"
+#include "Torus.h"
+
+struct PerObjectBuffer
+{
+	MathLib::Mat4f model;
+};
+
+struct PerPassBuffer
+{
+	MathLib::Mat4f viewProj;
+};
 
 class CadApplication : public DxApplication
 {
@@ -21,9 +32,24 @@ public:
 		int wndHeight = Window::m_defaultWindowHeight,
 		std::wstring wndTitle = L"CADApp");
 
-	void InitImGui();
+	/**
+	 * @brief Handles system messages received by the window.
+	 *
+	 * @param [in, out] msg contains message ID and its parameters.
+	 * @return true if the message is processed and should not be passed
+	 * to the default window procedure, false otherwise.
+	 */
+	bool ProcessMessage(WindowMessage& msg) override;
 
 	virtual ~CadApplication();
+
+	/**
+	 * @brief Updates application resources that depend on the size of the window.
+	 *
+	 * @param [in] width New width of the window's client area.
+	 * @param [in] height New height of the window's client area.
+	 */
+	void UpdateResources(int width, int height) override;
 
 protected:
 	void Render() override; // Renders the scene to the window.
@@ -33,31 +59,14 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_pixelShader;
 	Microsoft::WRL::ComPtr<ID3D11InputLayout> m_layout;
 
-	MathLib::Mat4f viewProjMatrix;
-	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbMVP;
-};
-
-struct VertexPosition
-{
-	float x, y, z;
-};
-
-struct Torus
-{
-	float majorRadius = 0.5f;
-	float minorRadius = 0.2f;
-	int majorSegments = 20;
-	int minorSegments = 10;
-	std::vector<VertexPosition> vertices;
-	std::vector<unsigned int> indices;
-	void GenerateMesh();
-
-	static constexpr int cMinMajorSegments = 3;
-	static constexpr int cMaxMajorSegments = 1000;
-	static constexpr int cMinMinorSegments = 3;
-	static constexpr int cMaxMinorSegments = 1000;
+	MathLib::Mat4f m_viewMatrix;
+	MathLib::Mat4f m_projMatrix;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerObject;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerPass;
 
 private:
-	void GenerateVertices();
-	void GenerateIndices();
+	Torus m_torus;
+	void DrawMenu(int width, int height);
+	void InitImGui();
 };
+

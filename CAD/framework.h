@@ -5,6 +5,7 @@
 #include <cmath>
 #include <vector>
 #include <numbers>
+#include <algorithm>
 
 #include <d3d11.h>
 

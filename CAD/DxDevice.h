@@ -28,25 +28,39 @@ public:
 	Microsoft::WRL::ComPtr<ID3D11InputLayout> CreateInputLayout(const std::vector<D3D11_INPUT_ELEMENT_DESC>& elements, const std::vector<BYTE>& vsCode) const;
 #pragma endregion
 
+	void UpdateBuffer(const Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, const void* data, size_t count);
+	template<typename T>
+	void UpdateBuffer(const Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, const T& data)
+	{
+		UpdateBuffer(buffer, &data, sizeof(T));
+	}
 
 	template<typename T>
 	Microsoft::WRL::ComPtr<ID3D11Buffer> CreateVertexBuffer(const std::vector<T>& vertices) const
 	{
 		D3D11_BUFFER_DESC desc = BufferDescription::VertexBufferDescription(sizeof(T) * vertices.size());
-		return CreateBuffer(vertices.data(), desc);
+		return CreateBuffer(desc, vertices.data());
 	}
 	template<typename T>
 	Microsoft::WRL::ComPtr<ID3D11Buffer> CreateIndexBuffer(const std::vector<T>& indices) const
 	{
 		D3D11_BUFFER_DESC desc = BufferDescription::IndexBufferDescription(sizeof(T) * indices.size());
-		return CreateBuffer(indices.data(), desc);
+		return CreateBuffer(desc, indices.data());
 	}
 	template<typename T>
 	Microsoft::WRL::ComPtr<ID3D11Buffer> CreateConstantBuffer(const std::vector<T>& data) const
 	{
 		D3D11_BUFFER_DESC desc = BufferDescription::ConstantBufferDescription(sizeof(T) * data.size());
-		return CreateBuffer(data.data(), desc);
+		return CreateBuffer(desc, data.data());
 	}
+
+	template<typename T, size_t N = 1>
+	Microsoft::WRL::ComPtr<ID3D11Buffer> CreateConstantBuffer() const
+	{
+		D3D11_BUFFER_DESC desc = BufferDescription::ConstantBufferDescription(N * sizeof(T));
+		return CreateBuffer(desc);
+	}
+
 private:
 	Microsoft::WRL::ComPtr<ID3D11Device> m_device;
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_context;

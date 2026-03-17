@@ -118,4 +118,5 @@ private:
 	std::wstring m_message; // Custom error message
 };
 #define THROW_WINAPI throw WinAPIException(__AT__)
+#define THROW_DX(hr) throw WinAPIException(__AT__, hr)
 #define THROW(msg) throw CustomException(__AT__, msg)
