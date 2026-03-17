@@ -1,6 +1,7 @@
 #pragma once
 #include "DxApplication.h"
 #include "../MathLib/Mat4f.h"
+#include "../MathLib/Vec3f.h"
 #include "Torus.h"
 
 struct PerObjectBuffer
@@ -13,9 +14,15 @@ struct PerPassBuffer
 	MathLib::Mat4f viewProj;
 };
 
+enum class InteractionMode
+{
+	None,
+	Rotating,
+	Translating,
+};
+
 class CadApplication : public DxApplication
 {
-
 	/**
 	 * @brief Creates application instance.
 	 *
@@ -65,8 +72,13 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerPass;
 
 private:
+	InteractionMode m_interactionMode = InteractionMode::None;
+	POINT m_lastMousePos{};
+	POINT m_startMousePos{};
+	MathLib::Vec3f m_startArcballVector{};
 	Torus m_torus;
 	void DrawMenu(int width, int height);
 	void InitImGui();
+	MathLib::Vec3f ScreenToArcballVector(int x, int y, int width, int height);
 };
 

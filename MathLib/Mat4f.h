@@ -1,5 +1,6 @@
 #pragma once
 #include "Vec4f.h"
+#include "Vec3f.h"
 
 namespace MathLib
 {
@@ -80,6 +81,11 @@ namespace MathLib
 			);
 		}
 
+		static Mat4f Scaling(float s)
+		{
+			return Scaling(s, s, s);
+		}
+
 		static Mat4f Scaling(float sx, float sy, float sz)
 		{
 			return Mat4f(
@@ -145,6 +151,24 @@ namespace MathLib
 				Vec4f(0.0, f, 0.0, 0.0),
 				Vec4f(0.0, 0.0, farZ / (nearZ - farZ), (farZ * nearZ) / (nearZ - farZ)),
 				Vec4f(0.0, 0.0, -1.0, 0.0)
+			);
+		}
+
+		static Mat4f RotationAxis(const Vec3f& axis, float angle)
+		{
+			float c = std::cos(angle);
+			float s = std::sin(angle);
+			float t = 1.0f - c;
+
+			float x = axis.x;
+			float y = axis.y;
+			float z = axis.z;
+
+			return Mat4f(
+				Vec4f(t * x * x + c, t * x * y - s * z, t * x * z + s * y, 0.0f),
+				Vec4f(t * x * y + s * z, t * y * y + c, t * y * z - s * x, 0.0f),
+				Vec4f(t * x * z - s * y, t * y * z + s * x, t * z * z + c, 0.0f),
+				Vec4f(0.0f, 0.0f, 0.0f, 1.0f)
 			);
 		}
 	};

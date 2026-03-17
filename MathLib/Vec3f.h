@@ -73,5 +73,23 @@ namespace MathLib
 				return Vec3f(0.0f, 0.0f, 0.0f);
 			return *this / len;
 		}
+
+		static Vec3f cross(const Vec3f& a, const Vec3f& b)
+		{
+			// Layout 1: A = (y, z, x, w), B = (z, x, y, w)
+			__m128 a_yzx = _mm_shuffle_ps(a.v, a.v, _MM_SHUFFLE(3, 0, 2, 1));
+			__m128 b_zxy = _mm_shuffle_ps(b.v, b.v, _MM_SHUFFLE(3, 1, 0, 2));
+
+			// Layout 2: A = (z, x, y, w), B = (y, z, x, w)
+			__m128 a_zxy = _mm_shuffle_ps(a.v, a.v, _MM_SHUFFLE(3, 1, 0, 2));
+			__m128 b_yzx = _mm_shuffle_ps(b.v, b.v, _MM_SHUFFLE(3, 0, 2, 1));
+
+			// Multiply layouts
+			__m128 mul1 = _mm_mul_ps(a_yzx, b_zxy);
+			__m128 mul2 = _mm_mul_ps(a_zxy, b_yzx);
+
+			// Subtract to get the final cross product
+			return _mm_sub_ps(mul1, mul2);
+		}
 	};
 }
