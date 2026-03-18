@@ -275,7 +275,10 @@ void CadApplication::DrawMenu()
 		m_torus.SetMajorRadius(tempMajor);
 	if (ImGui::SliderFloat("Minor Radius", &tempMinor, Torus::cMinMinorRadius, Torus::cMaxMinorRadius))
 		m_torus.SetMinorRadius(tempMinor);
-	if (ImGui::SliderInt2("Segments (Major, Minor)", tempSegs, Torus::cMinMajorSegments, Torus::cMaxMajorSegments))
+
+	ImGui::Text("Segments (Major, Minor)");
+	//ImGui::PushItemWidth(-1.0f);
+	if (ImGui::SliderInt2("##Segments (Major, Minor)", tempSegs, Torus::cMinMajorSegments, Torus::cMaxMajorSegments))
 		m_torus.SetSegments(tempSegs[0], tempSegs[1]);
 
 	ImGui::Separator();
@@ -284,7 +287,10 @@ void CadApplication::DrawMenu()
 
 	if (ImGui::DragFloat3("Position", &m_torus.m_position.x, 0.01f))
 		transformChanged = true;
-	if (ImGui::DragFloat3("Rotation (Euler angles)", &m_torus.m_eulerAngles.x, 0.01f))
+
+	ImGui::Text("Rotation (Euler angles), Z-X-Y order");
+	//ImGui::PushItemWidth(-1.0f);
+	if (ImGui::DragFloat3("##Rotation (Euler angles)", &m_torus.m_eulerAngles.x, 0.01f))
 	{
 		Mat4f rotX = Mat4f::RotationX(m_torus.m_eulerAngles.x);
 		Mat4f rotY = Mat4f::RotationY(m_torus.m_eulerAngles.y);
