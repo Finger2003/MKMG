@@ -89,5 +89,8 @@ private:
 
 	static constexpr float cMenuWidth = 400.0f;
 	SIZE m_renderSize{};
+
+	static constexpr int cMinWidth = 500;
+	static constexpr int cMinHeight = 500;
 };
 

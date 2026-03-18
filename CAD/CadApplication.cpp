@@ -108,6 +108,14 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 
 	switch (msg.message)
 	{
+	case WM_GETMINMAXINFO:
+	{
+		MINMAXINFO* mmi = reinterpret_cast<MINMAXINFO*>(msg.lParam);
+		mmi->ptMinTrackSize.x = cMinWidth;
+		mmi->ptMinTrackSize.y = cMinHeight;
+		msg.result = 0;
+		return true;
+	}
 	case WM_LBUTTONDOWN:
 		m_interactionMode = InteractionMode::Rotating;
 		m_lastMousePos = { xPos, yPos };
@@ -148,9 +156,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			}
 			else if (m_interactionMode == InteractionMode::Translating)
 			{
-				float fovY = m_fovY * (std::numbers::pi_v<float> / 180.0f);
 				float distanceZ = std::abs(m_torus.m_position.z);
-
 				float unitsPerPixel = m_panScaleFactor * distanceZ;
 
 				m_torus.m_position.x += dx * unitsPerPixel;
