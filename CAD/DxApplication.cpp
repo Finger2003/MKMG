@@ -54,4 +54,7 @@ void DxApplication::OnResize(int width, int height)
 	m_backBuffer = m_device.CreateRenderTargetView(backTexture);
 
 	UpdateResources(width, height);
+
+	Render();
+	m_device.getSwapChain()->Present(0, 0);
 }

@@ -294,7 +294,7 @@ void CadApplication::DrawMenu()
 	if (ImGui::DragFloat3("Position", &m_torus.m_position.x, 0.01f))
 		transformChanged = true;
 
-	ImGui::Text("Rotation (Euler angles), Z-X-Y order");
+	ImGui::Text("Rotation (XYZ Euler angles), Z-X-Y application order");
 	//ImGui::PushItemWidth(-1.0f);
 	if (ImGui::DragFloat3("##Rotation (Euler angles)", &m_torus.m_eulerAngles.x, 0.01f))
 	{
