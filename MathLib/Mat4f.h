@@ -181,15 +181,15 @@ namespace MathLib
 			float x, y, z;
 			if (!singular)
 			{
-				x = std::atan2(-mat.m[2][1], cosX);
-				y = std::atan2(mat.m[2][0], mat.m[2][2]);
-				z = std::atan2(mat.m[0][1], mat.m[1][1]);
+				x = std::atan2(mat.m[2][1], cosX);
+				y = std::atan2(-mat.m[2][0], mat.m[2][2]);
+				z = std::atan2(-mat.m[0][1], mat.m[1][1]);
 			}
 			else
 			{
 				// In Gimbal lock, we can set Z to 0 and calculate X
-				x = (mat.m[2][1] < 0) ? (std::numbers::pi_v<float> / 2.0f) : (-std::numbers::pi_v<float> / 2.0f);
-				y = std::atan2(-mat.m[0][2], mat.m[0][0]);
+				x = (mat.m[2][1] > 0) ? (std::numbers::pi_v<float> / 2.0f) : (-std::numbers::pi_v<float> / 2.0f);
+				y = std::atan2(mat.m[0][2], mat.m[0][0]);
 				z = 0;
 			}
 
