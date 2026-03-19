@@ -185,6 +185,81 @@ namespace MathLibTest
 			Assert::AreEqual(1.0f, result.w);
 		}
 
+		void AssertVec3Equal(const Vec3f& expected, const Vec3f& actual, float epsilon = 1e-5f)
+		{
+			Assert::AreEqual(expected.x, actual.x, epsilon, L"X-axis mismatch");
+			Assert::AreEqual(expected.y, actual.y, epsilon, L"Y-axis mismatch");
+			Assert::AreEqual(expected.z, actual.z, epsilon, L"Z-axis mismatch");
+		}
+
+		TEST_METHOD(ExtractEulerAnglesIdentityTest)
+		{
+			MathLib::Mat4f identity = MathLib::Mat4f::Identity(); // Assuming an Identity helper exists
+			Vec3f result = Mat4f::ExtractEulerAngles(identity);
+
+			AssertVec3Equal({ 0.0f, 0.0f, 0.0f }, result);
+		}
+
+		TEST_METHOD(ExtractEulerAnglesXRotationTest)
+		{
+			float angle = std::numbers::pi_v<float> / 4; // 45 degrees
+			Mat4f rotationX = Mat4f::RotationX(angle);
+			Vec3f result = Mat4f::ExtractEulerAngles(rotationX);
+			AssertVec3Equal({ angle, 0.0f, 0.0f }, result);
+		}
+
+		TEST_METHOD(ExtractEulerAnglesYRotationTest)
+		{
+			float angle = std::numbers::pi_v<float> / 4; // 45 degrees
+			Mat4f rotationY = Mat4f::RotationY(angle);
+			Vec3f result = Mat4f::ExtractEulerAngles(rotationY);
+			AssertVec3Equal({ 0.0f, angle, 0.0f }, result);
+		}
+
+		TEST_METHOD(ExtractEulerAnglesZRotationTest)
+		{
+			float angle = std::numbers::pi_v<float> / 4; // 45 degrees
+			Mat4f rotationZ = Mat4f::RotationZ(angle);
+			Vec3f result = Mat4f::ExtractEulerAngles(rotationZ);
+			AssertVec3Equal({ 0.0f, 0.0f, angle }, result);
+		}
+
+		TEST_METHOD(ExtractEulerAnglesGimbalLockPositive)
+		{
+			MathLib::Mat4f mat = MathLib::Mat4f::Identity();
+			mat.m[2][1] = 1.0f;  // sin(90)
+			mat.m[1][1] = 0.0f;  // cos(90)
+			mat.m[2][2] = 0.0f;  // cos(90)
+			mat.m[1][2] = -1.0f; // -sin(90)
+
+			Vec3f result = Mat4f::ExtractEulerAngles(mat);
+
+			Assert::AreEqual(std::numbers::pi_v<float> / 2.0f, result.x, 1e-6f);
+			Assert::AreEqual(0.0f, result.z, 1e-6f);
+		}
+
+		TEST_METHOD(ExtractEulerAnglesGimbalLockNegative)
+		{
+			MathLib::Mat4f mat = MathLib::Mat4f::Identity();
+			mat.m[2][1] = -1.0f; // sin(-90)
+			mat.m[1][1] = 0.0f;
+			mat.m[2][2] = 0.0f;
+			mat.m[1][2] = 1.0f;
+
+			Vec3f result = Mat4f::ExtractEulerAngles(mat);
+
+			Assert::AreEqual(-std::numbers::pi_v<float> / 2.0f, result.x, 1e-6f);
+			Assert::AreEqual(0.0f, result.z, 1e-6f);
+		}
+
+		TEST_METHOD(ExtractEulerAnglesCombinedRotation)
+		{
+			float x = 0.3f, y = 0.5f, z = -0.2f;
+			MathLib::Mat4f mat = MathLib::Mat4f::RotationZ(z) * MathLib::Mat4f::RotationX(x) * MathLib::Mat4f::RotationY(y);
+
+			Vec3f result = Mat4f::ExtractEulerAngles(mat);
+			AssertVec3Equal({ x, y, z }, result);
+		}
 		//TEST_METHOD(InverseSingularMatTest)
 		//{
 		//	Mat4f mat(
