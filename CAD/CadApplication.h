@@ -135,5 +135,8 @@ private:
 	int m_lastClickedIndex = -1;
 
 	void DeleteSelectedObjects();
+
+	int m_nameEditingIndex = -1;
+	char m_renameBuffer[128] = {};
 };
 

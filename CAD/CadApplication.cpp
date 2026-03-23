@@ -489,50 +489,76 @@ void CadApplication::DrawMenu()
 	{
 		ImGui::PushID(i);
 		auto& obj = m_sceneObjects[i];
-		bool isSelected = obj->selected;
+		
 
-		if (ImGui::Selectable(obj->name.c_str(), isSelected))
+		if (m_nameEditingIndex == i)
 		{
-			if (io.KeyCtrl && io.KeyShift)
+			ImGui::SetKeyboardFocusHere();
+			if (ImGui::InputText("##rename", m_renameBuffer, IM_ARRAYSIZE(m_renameBuffer),
+				ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
 			{
-				if (m_lastClickedIndex != -1)
-				{
-					int start = std::min(i, m_lastClickedIndex);
-					int end = std::max(i, m_lastClickedIndex);
-					for (int j = start; j <= end; j++)
-						m_sceneObjects[j]->selected = true;
-				}
+
+				obj->name = string(m_renameBuffer);
+				m_nameEditingIndex = -1;
 			}
-			else if (io.KeyShift)
+			
+			if (!ImGui::IsItemActive() && ImGui::IsMouseClicked(0))
 			{
-				for (auto& o : m_sceneObjects) 
-					o->selected = false;
-				if (m_lastClickedIndex != -1)
+				m_nameEditingIndex = -1;
+			}
+		}
+		else
+		{
+			if (ImGui::Selectable(obj->name.c_str(), obj->selected))
+			{
+				if (io.KeyCtrl && io.KeyShift)
 				{
-					int start = std::min(i, m_lastClickedIndex);
-					int end = std::max(i, m_lastClickedIndex);
-					for (int j = start; j <= end; j++) 
-						m_sceneObjects[j]->selected = true;
+					if (m_lastClickedIndex != -1)
+					{
+						int start = std::min(i, m_lastClickedIndex);
+						int end = std::max(i, m_lastClickedIndex);
+						for (int j = start; j <= end; j++)
+							m_sceneObjects[j]->selected = true;
+					}
+				}
+				else if (io.KeyShift)
+				{
+					for (auto& o : m_sceneObjects)
+						o->selected = false;
+					if (m_lastClickedIndex != -1)
+					{
+						int start = std::min(i, m_lastClickedIndex);
+						int end = std::max(i, m_lastClickedIndex);
+						for (int j = start; j <= end; j++)
+							m_sceneObjects[j]->selected = true;
+					}
+					else
+					{
+						obj->selected = true;
+						m_lastClickedIndex = i;
+					}
+				}
+				else if (io.KeyCtrl)
+				{
+					obj->selected = !obj->selected;
+					m_lastClickedIndex = i;
 				}
 				else
 				{
+					for (auto& o : m_sceneObjects)
+						o->selected = false;
 					obj->selected = true;
 					m_lastClickedIndex = i;
 				}
 			}
-			else if (io.KeyCtrl)
+
+			if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
 			{
-				obj->selected = !obj->selected;
-				m_lastClickedIndex = i;
-			}
-			else
-			{
-				for (auto& o : m_sceneObjects)
-					o->selected = false;
-				obj->selected = true;
-				m_lastClickedIndex = i;
+				m_nameEditingIndex = i;
+				strncpy_s(m_renameBuffer, obj->name.c_str(), sizeof(m_renameBuffer) - 1);
 			}
 		}
+
 		ImGui::PopID();
 	}
 
