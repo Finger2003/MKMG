@@ -22,6 +22,12 @@ namespace MathLib
 			return _mm_add_ps(a.v, b.v);
 		}
 
+		friend Vec3f& operator +=(Vec3f& a, const Vec3f& b)
+		{
+			a = a + b;
+			return a;
+		}
+
 		friend Vec3f operator-(const Vec3f& a, const Vec3f& b)
 		{
 			return _mm_sub_ps(a.v, b.v);

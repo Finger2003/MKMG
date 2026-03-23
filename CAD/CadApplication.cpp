@@ -83,10 +83,12 @@ void CadApplication::UpdateProjectionMatrix()
 	m_farPlane = std::max(m_farPlane, m_nearPlane + 0.01f); // Ensure far plane is greater than near plane.
 	m_projMatrix = Mat4f::Perspective(fovY, aspect, m_nearPlane, m_farPlane);
 
+	m_viewMatrix = m_camera.GetViewMatrix();
+	m_projViewMatrix = m_projMatrix * m_viewMatrix;
 	if (m_cbPerPass)
 	{
 		PerPassBuffer perPassData;
-		perPassData.viewProj = m_projMatrix * m_viewMatrix;
+		perPassData.viewProj = m_projViewMatrix;
 		m_device.UpdateBuffer(m_cbPerPass, perPassData);
 	}
 }
@@ -153,11 +155,26 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 	}
 	case WM_LBUTTONDOWN:
 	{
-		Vec3f arcballVec = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
-		constexpr float distance = 2.0f;
-		Vec3f worldPos = arcballVec * distance;
-		m_cursor.position = { worldPos.x, worldPos.y, -worldPos.z };
+		auto [normX, normY] = CalculateCoordsFromPixel(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
+
+		float distance = m_camera.GetDistance();
+
+		float fovY_rad = m_fovY * (std::numbers::pi_v<float> / 180.0f);
+		float aspect = static_cast<float>(m_renderSize.cx) / m_renderSize.cy;
+
+		float planeHeight = 2.0f * distance * std::tan(fovY_rad / 2.0f);
+		float planeWidth = planeHeight * aspect;
+
+		float localX = normX * (planeWidth / 2.0f);
+		float localY = normY * (planeHeight / 2.0f);
+		float localZ = -distance;
+
+		Vec4f localPos(localX, localY, localZ, 1.0f);
+		Vec4f worldPos = m_camera.GetInverseViewMatrix() * localPos;
+
+		m_cursor.position = { worldPos.x, worldPos.y, worldPos.z };
 	}
+	return true;
 
 		//m_interactionMode = InteractionMode::Rotating;
 		//m_lastMousePos = { xPos, yPos };
@@ -166,17 +183,54 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		//m_torus.m_baseRotationMatrix = m_torus.m_rotationMatrix;
 		//SetCapture(m_window.getHandle());
 		//return true;
+
+	case WM_MBUTTONDOWN:
+		m_interactionMode = InteractionMode::Orbiting;
+		m_lastMousePos = { xPos, yPos };
+		SetCapture(m_window.getHandle());
+		return true;
 	case WM_RBUTTONDOWN:
+		m_interactionMode = InteractionMode::Panning;
+		m_lastMousePos = { xPos, yPos };
+		SetCapture(m_window.getHandle());
+		return true;
 		//m_interactionMode = InteractionMode::Translating;
 		//m_lastMousePos = { xPos, yPos };
 		//SetCapture(m_window.getHandle());
 		//return true;
 	case WM_LBUTTONUP:
 	case WM_RBUTTONUP:
-		//m_interactionMode = InteractionMode::None;
-		//ReleaseCapture();
-		//return true;
+	case WM_MBUTTONUP:
+		m_interactionMode = InteractionMode::None;
+		ReleaseCapture();
+		return true;
 	case WM_MOUSEMOVE:
+		if (m_interactionMode != InteractionMode::None)
+		{
+			int dx = xPos - m_lastMousePos.x;
+			int dy = yPos - m_lastMousePos.y;
+
+			if (m_interactionMode == InteractionMode::Orbiting)
+			{
+				m_camera.Orbit(dx * 0.01f, dy * 0.01f);
+			}
+			else if (m_interactionMode == InteractionMode::Panning)
+			{
+				float panSpeed = 0.002f * std::max(1.0f, m_camera.GetDistance());
+				m_camera.Pan(-dx * panSpeed, dy * panSpeed);
+			}
+
+			UpdateProjectionMatrix();
+
+			//if (m_cbPerPass)
+			//{
+			//	PerPassBuffer perPassData;
+			//	perPassData.viewProj = m_camera.GetProjectionMatrix() * m_camera.GetViewMatrix();
+			//	m_device.UpdateBuffer(m_cbPerPass, perPassData);
+			//}
+
+			m_lastMousePos = { xPos, yPos };
+		}
 		//if (m_interactionMode != InteractionMode::None)
 		//{
 		//	int dx = xPos - m_lastMousePos.x;
@@ -210,7 +264,9 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		return true;
 	case WM_MOUSEWHEEL:
 	{
-		//short zDelta = (short)HIWORD(msg.wParam);
+		short zDelta = (short)HIWORD(msg.wParam);
+		m_camera.Zoom((zDelta / 120.0f) * 0.5f);
+		UpdateProjectionMatrix();
 		//WORD fwKeys = LOWORD(msg.wParam);
 
 		//if (fwKeys & MK_CONTROL)
@@ -275,7 +331,7 @@ void CadApplication::Render()
 	context->ClearRenderTargetView(m_backBuffer.Get(), clear_color);
 	context->ClearDepthStencilView(m_depthBuffer.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 
-	context->OMSetRenderTargets(1, m_backBuffer.GetAddressOf(), nullptr);
+	context->OMSetRenderTargets(1, m_backBuffer.GetAddressOf(), m_depthBuffer.Get());
 
 	context->VSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
 
@@ -376,6 +432,45 @@ void CadApplication::DrawMenu()
 
 	if(cameraChanged)
 		UpdateProjectionMatrix();
+
+
+	ImGui::Separator();
+	ImGui::Text("Cursor Settings");
+	ImGui::DragFloat3("Cursor Position", &m_cursor.position.x, 0.01f);
+	Vec4f worldPos = Vec4f(m_cursor.position.x, m_cursor.position.y, m_cursor.position.z, 1.0f);
+	Vec4f clipPos = m_projViewMatrix * worldPos;
+	int screenPos[2] = { 0 };
+	if (std::abs(clipPos.w) > 0.0001f)
+	{
+		float ndcX = clipPos.x / clipPos.w;
+		float ndcY = clipPos.y / clipPos.w;
+		screenPos[0] = static_cast<int>(std::round((ndcX + 1.0f) * 0.5f * m_renderSize.cx));
+		screenPos[1] = static_cast<int>(std::round((1.0f - ndcY) * 0.5f * m_renderSize.cy));
+	}
+
+	if (ImGui::DragInt2("Screen Position", screenPos))
+	{
+		screenPos[0] = std::clamp(screenPos[0], 0, static_cast<int>(m_renderSize.cx));
+		screenPos[1] = std::clamp(screenPos[1], 0, static_cast<int>(m_renderSize.cy));
+		auto [ndcX, ndcY] = CalculateCoordsFromPixel((float)screenPos[0], (float)screenPos[1], (float)m_renderSize.cx, (float)m_renderSize.cy);
+
+
+		Vec4f viewPos = m_viewMatrix * worldPos;
+		float actualDepth = std::abs(viewPos.z);
+
+		float distance = m_camera.GetDistance();
+		float fovY_rad = m_fovY * (std::numbers::pi_v<float> / 180.0f);
+		float aspect = static_cast<float>(m_renderSize.cx) / m_renderSize.cy;
+
+		float planeHeight = 2.0f * actualDepth * std::tan(fovY_rad / 2.0f);
+		float planeWidth = planeHeight * aspect;
+
+		Vec4f localPos{ ndcX * (planeWidth / 2.0f), ndcY * (planeHeight / 2.0f), viewPos.z, 1.0f };
+		Vec4f newWorldPos = m_camera.GetInverseViewMatrix() * localPos;
+		
+		m_cursor.position = { newWorldPos.x, newWorldPos.y, newWorldPos.z };
+	}
+
 
 	ImGui::End();
 	ImGui::Render();

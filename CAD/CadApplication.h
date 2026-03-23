@@ -4,6 +4,7 @@
 #include "../MathLib/Vec3f.h"
 #include "Torus.h"
 #include "Cursor3D.h"
+#include "Camera.h"
 
 struct PerObjectBuffer
 {
@@ -18,9 +19,12 @@ struct PerPassBuffer
 
 enum class InteractionMode
 {
+	//None,
+	//Rotating,
+	//Translating,
 	None,
-	Rotating,
-	Translating,
+	Orbiting,
+	Panning
 };
 
 class CadApplication : public DxApplication
@@ -70,6 +74,7 @@ protected:
 
 	MathLib::Mat4f m_viewMatrix;
 	MathLib::Mat4f m_projMatrix;
+	MathLib::Mat4f m_projViewMatrix;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerObject;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerPass;
 
@@ -98,5 +103,7 @@ private:
 	Cursor3D m_cursor;
 
 	void DrawCursor();
+
+	Camera m_camera;
 };
 
