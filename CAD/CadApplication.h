@@ -2,9 +2,18 @@
 #include "DxApplication.h"
 #include "../MathLib/Mat4f.h"
 #include "../MathLib/Vec3f.h"
+#include "SceneObject.h"
 #include "Torus.h"
+#include "Point.h"
 #include "Cursor3D.h"
 #include "Camera.h"
+
+struct PerPointBuffer
+{
+	MathLib::Vec4f color;
+};
+
+//struct 
 
 struct PerObjectBuffer
 {
@@ -15,6 +24,7 @@ struct PerObjectBuffer
 struct PerPassBuffer
 {
 	MathLib::Mat4f viewProj;
+	float aspectRatio;
 };
 
 enum class InteractionMode
@@ -72,6 +82,12 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_pixelShader;
 	Microsoft::WRL::ComPtr<ID3D11InputLayout> m_layout;
 
+	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_pointVertexShader;
+	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_pointPixelShader;
+	Microsoft::WRL::ComPtr<ID3D11GeometryShader> m_pointGeometryShader;
+	//Microsoft::WRL::ComPtr<ID3D11InputLayout> m_pointLayout;
+
+
 	MathLib::Mat4f m_viewMatrix;
 	MathLib::Mat4f m_projMatrix;
 	MathLib::Mat4f m_projViewMatrix;
@@ -83,9 +99,16 @@ private:
 	POINT m_lastMousePos{};
 	POINT m_startMousePos{};
 	MathLib::Vec3f m_startArcballVector{};
-	Torus m_torus;
+	//Torus m_torus;
 	
-	std::vector<std::unique_ptr<Torus>> m_toruses;
+
+	std::vector<std::unique_ptr<SceneObject>> m_sceneObjects;
+
+	//std::vector<std::unique_ptr<Torus>> m_toruses;
+	//std::vector<VertexPosition> m_points;
+	//Microsoft::WRL::ComPtr<ID3D11Buffer> m_pointsBuffer;
+	bool m_pointsDirty = false;
+	void UpdatePointsBuffer();
 
 	void DrawMenu();
 	void InitImGui();
@@ -108,5 +131,9 @@ private:
 	void DrawCursor();
 
 	Camera m_camera;
+
+	int m_lastClickedIndex = -1;
+
+	void DeleteSelectedObjects();
 };
 

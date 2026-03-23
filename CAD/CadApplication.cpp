@@ -29,8 +29,14 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 
 	const auto vsByteCode = DxDevice::LoadByteCode(L"VertexShader.cso");
 	const auto psByteCode = DxDevice::LoadByteCode(L"PixelShader.cso");
+	const auto pointVsByteCode = DxDevice::LoadByteCode(L"PointVS.cso");
+	const auto pointPsByteCode = DxDevice::LoadByteCode(L"PointPS.cso");
+	const auto pointGsByteCode = DxDevice::LoadByteCode(L"PointGS.cso");
 	m_vertexShader = m_device.CreateVertexShader(vsByteCode);
 	m_pixelShader = m_device.CreatePixelShader(psByteCode);
+	m_pointVertexShader = m_device.CreateVertexShader(pointVsByteCode);
+	m_pointPixelShader = m_device.CreatePixelShader(pointPsByteCode);
+	m_pointGeometryShader = m_device.CreateGeometryShader(pointGsByteCode);
 
 	vector<D3D11_INPUT_ELEMENT_DESC> inputElements = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
@@ -89,6 +95,7 @@ void CadApplication::UpdateProjectionMatrix()
 	{
 		PerPassBuffer perPassData;
 		perPassData.viewProj = m_projViewMatrix;
+		perPassData.aspectRatio = aspect;
 		m_device.UpdateBuffer(m_cbPerPass, perPassData);
 	}
 }
@@ -100,7 +107,7 @@ void CadApplication::DrawCursor()
 	UINT offset = 0;
 
 	context->IASetVertexBuffers(0, 1, m_cursor.GetVertexBuffer().GetAddressOf(), &stride, &offset);
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
 	PerObjectBuffer objData;
 	Mat4f translation = m_cursor.GetTranslationMatrix();
@@ -123,6 +130,12 @@ void CadApplication::DrawCursor()
 	objData.color = { 0.0f, 0.0f, 1.0f, 1.0f };
 	m_device.UpdateBuffer(m_cbPerObject, objData);
 	context->Draw(Cursor3D::VertexCount, 0);
+}
+
+void CadApplication::DeleteSelectedObjects()
+{
+	erase_if(m_sceneObjects, [](const auto& obj) { return obj->selected; });
+	m_lastClickedIndex = -1;
 }
 
 bool CadApplication::ProcessMessage(WindowMessage& msg)
@@ -307,13 +320,13 @@ void CadApplication::UpdateResources(int width, int height)
 
 
 	UpdateProjectionMatrix();
-	m_viewMatrix = Mat4f::Identity();
-	if (m_cbPerPass)
-	{
-		PerPassBuffer perPassData;
-		perPassData.viewProj = m_projMatrix * m_viewMatrix;
-		m_device.UpdateBuffer(m_cbPerPass, perPassData);
-	}
+	//m_viewMatrix = Mat4f::Identity();
+	//if (m_cbPerPass)
+	//{
+	//	PerPassBuffer perPassData;
+	//	perPassData.viewProj = m_projMatrix * m_viewMatrix;
+	//	m_device.UpdateBuffer(m_cbPerPass, perPassData);
+	//}
 }
 
 void CadApplication::Render()
@@ -341,22 +354,87 @@ void CadApplication::Render()
 	context->VSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
-	for (const auto& torusPtr : m_toruses)
+
+	DrawCursor();
+
+	for (auto& obj : m_sceneObjects)
 	{
-		auto& torus = *torusPtr;
-		torus.UpdateMesh(m_device);
+		if (obj->type == ObjectType::Torus)
+		{
+			auto& torus = *static_cast<Torus*>(obj.get());
+			torus.UpdateMesh(m_device);
 
-		PerObjectBuffer objData;
-		objData.model = torus.m_modelMatrix;
-		objData.color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		m_device.UpdateBuffer(m_cbPerObject, objData);
+			PerObjectBuffer objData;
+			objData.model = torus.m_modelMatrix;
+			objData.color = torus.selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+			m_device.UpdateBuffer(m_cbPerObject, objData);
 
-		UINT stride = sizeof(VertexPosition);
-		UINT offset = 0;
-		context->IASetVertexBuffers(0, 1, torus.GetVertexBuffer().GetAddressOf(), &stride, &offset);
-		context->IASetIndexBuffer(torus.GetIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
-		context->DrawIndexed(static_cast<UINT>(torus.indices.size()), 0, 0);
+			UINT stride = sizeof(VertexPosition);
+			UINT offset = 0;
+			context->IASetVertexBuffers(0, 1, torus.GetVertexBuffer().GetAddressOf(), &stride, &offset);
+			context->IASetIndexBuffer(torus.GetIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
+			context->DrawIndexed(static_cast<UINT>(torus.indices.size()), 0, 0);
+		}
 	}
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+	//context->VSSetShader(m_pointVertexShader.Get(), nullptr, 0);
+	context->GSSetShader(m_pointGeometryShader.Get(), nullptr, 0);
+	context->PSSetShader(m_pointPixelShader.Get(), nullptr, 0);
+
+	for (auto& obj : m_sceneObjects)
+	{
+		if (obj->type == ObjectType::Point)
+		{
+			auto& point = *static_cast<Point*>(obj.get());
+			PerObjectBuffer objData;
+			objData.model = point.GetModelMatrix();
+			objData.color = point.selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+			m_device.UpdateBuffer(m_cbPerObject, objData);
+
+			UINT stride = sizeof(VertexPosition);
+			UINT offset = 0;
+			context->IASetVertexBuffers(0, 1, point.GetVertexBuffer().GetAddressOf(), &stride, &offset);
+			context->Draw(1, 0);
+		}
+	}
+	context->GSSetShader(nullptr, nullptr, 0);
+	//for (const auto& torusPtr : m_toruses)
+	//{
+	//	auto& torus = *torusPtr;
+	//	torus.UpdateMesh(m_device);
+
+	//	PerObjectBuffer objData;
+	//	objData.model = torus.m_modelMatrix;
+	//	objData.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	//	m_device.UpdateBuffer(m_cbPerObject, objData);
+
+	//	UINT stride = sizeof(VertexPosition);
+	//	UINT offset = 0;
+	//	context->IASetVertexBuffers(0, 1, torus.GetVertexBuffer().GetAddressOf(), &stride, &offset);
+	//	context->IASetIndexBuffer(torus.GetIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
+	//	context->DrawIndexed(static_cast<UINT>(torus.indices.size()), 0, 0);
+	//}
+
+	//if (!m_points.empty())
+	//{
+	//	UpdatePointsBuffer();
+	//	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+
+	//	context->VSSetShader(m_pointVertexShader.Get(), nullptr, 0);
+	//	context->GSSetShader(m_pointGeometryShader.Get(), nullptr, 0);
+	//	context->PSSetShader(m_pointPixelShader.Get(), nullptr, 0);
+
+	//	UINT stride = sizeof(VertexPosition);
+	//	UINT offset = 0;
+	//	context->IASetVertexBuffers(0, 1, m_pointsBuffer.GetAddressOf(), &stride, &offset);
+	//	PerPointBuffer pointData;
+	//	pointData.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	//	m_device.UpdateBuffer(m_cbPerObject, pointData);
+
+	//	context->Draw(static_cast<UINT>(m_points.size()), 0);
+	//	context->GSSetShader(nullptr, nullptr, 0); 
+	//}
 
 	//PerObjectBuffer objData;
 	//objData.model = m_torus.m_modelMatrix;
@@ -371,9 +449,13 @@ void CadApplication::Render()
 
 	//context->DrawIndexed(static_cast<UINT>(m_torus.indices.size()), 0, 0);
 
-	DrawCursor();
 
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+}
+
+void CadApplication::UpdatePointsBuffer()
+{
+
 }
 
 void CadApplication::DrawMenu()
@@ -391,17 +473,94 @@ void CadApplication::DrawMenu()
 		ImGuiWindowFlags_NoCollapse;
 
 	ImGui::Begin("Menu", nullptr);
-	if (ImGui::Button("Add Torus at Cursor", ImVec2(-1, 0)))
+	if (ImGui::Button("Add Torus"))
 	{
-		auto newTorus = std::make_unique<Torus>();
-		newTorus->m_position = { m_cursor.position.x, m_cursor.position.y, m_cursor.position.z };
-		newTorus->UpdateModelMatrix();
+		m_sceneObjects.push_back(std::make_unique<Torus>(m_cursor.position));
+	}
 
-		m_toruses.push_back(std::move(newTorus));
-		//m_selectedTorusIndex = static_cast<int>(m_toruses.size()) - 1; // Auto-select the new one
+	if (ImGui::Button("Add Point"))
+	{
+		m_sceneObjects.push_back(std::make_unique<Point>(m_cursor.position));
 	}
 
 	ImGui::Separator();
+	ImGuiIO& io = ImGui::GetIO();
+	for (int i = 0; i < m_sceneObjects.size(); i++)
+	{
+		ImGui::PushID(i);
+		auto& obj = m_sceneObjects[i];
+		bool isSelected = obj->selected;
+
+		if (ImGui::Selectable(obj->name.c_str(), isSelected))
+		{
+			if (io.KeyCtrl && io.KeyShift)
+			{
+				if (m_lastClickedIndex != -1)
+				{
+					int start = std::min(i, m_lastClickedIndex);
+					int end = std::max(i, m_lastClickedIndex);
+					for (int j = start; j <= end; j++)
+						m_sceneObjects[j]->selected = true;
+				}
+			}
+			else if (io.KeyShift)
+			{
+				for (auto& o : m_sceneObjects) 
+					o->selected = false;
+				if (m_lastClickedIndex != -1)
+				{
+					int start = std::min(i, m_lastClickedIndex);
+					int end = std::max(i, m_lastClickedIndex);
+					for (int j = start; j <= end; j++) 
+						m_sceneObjects[j]->selected = true;
+				}
+				else
+				{
+					obj->selected = true;
+					m_lastClickedIndex = i;
+				}
+			}
+			else if (io.KeyCtrl)
+			{
+				obj->selected = !obj->selected;
+				m_lastClickedIndex = i;
+			}
+			else
+			{
+				for (auto& o : m_sceneObjects)
+					o->selected = false;
+				obj->selected = true;
+				m_lastClickedIndex = i;
+			}
+		}
+		ImGui::PopID();
+	}
+
+	ImGui::Separator();
+
+	if (ImGui::Button("Select All", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f - 4, 0)))
+	{
+		for (auto& obj : m_sceneObjects)
+			obj->selected = true; 
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Deselect All", ImVec2(-1, 0)))
+	{
+		for (auto& obj : m_sceneObjects)
+			obj->selected = false;
+	}
+
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.1f, 0.1f, 1.0f));
+
+	if (ImGui::Button("Delete Selected", ImVec2(-1, 0)))
+	{
+		DeleteSelectedObjects();
+	}
+
+	ImGui::PopStyleColor(2);
+
+
 
 	//float tempMajor = m_torus.GetMajorRadius();
 	//float tempMinor = m_torus.GetMinorRadius();

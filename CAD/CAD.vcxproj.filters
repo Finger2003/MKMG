@@ -54,6 +54,12 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Pliki źródłowe</Filter>
     </ClCompile>
+    <ClCompile Include="Point.cpp">
+      <Filter>Pliki źródłowe</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneObject.cpp">
+      <Filter>Pliki źródłowe</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DxApplication.h">
@@ -95,12 +101,27 @@
     <ClInclude Include="Camera.h">
       <Filter>Pliki nagłówkowe</Filter>
     </ClInclude>
+    <ClInclude Include="Point.h">
+      <Filter>Pliki nagłówkowe</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneObject.h">
+      <Filter>Pliki nagłówkowe</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="VertexShader.hlsl">
       <Filter>Pliki shaderów</Filter>
     </FxCompile>
     <FxCompile Include="PixelShader.hlsl">
+      <Filter>Pliki shaderów</Filter>
+    </FxCompile>
+    <FxCompile Include="PointVS.hlsl">
+      <Filter>Pliki shaderów</Filter>
+    </FxCompile>
+    <FxCompile Include="PointPS.hlsl">
+      <Filter>Pliki shaderów</Filter>
+    </FxCompile>
+    <FxCompile Include="PointGS.hlsl">
       <Filter>Pliki shaderów</Filter>
     </FxCompile>
   </ItemGroup>

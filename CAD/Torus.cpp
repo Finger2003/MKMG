@@ -2,10 +2,19 @@
 #include "Torus.h"
 #include "DxDevice.h"
 
+using namespace std;
 using namespace MathLib;
+
+unsigned int Torus::s_nextId = 0;
+
+Torus::Torus(float3 position) : SceneObject("Torus" + to_string(s_nextId++), ObjectType::Torus), m_position(position)
+{
+	UpdateModelMatrix();
+}
+
 void Torus::SetMajorRadius(float radius)
 {
-	float r = std::clamp(radius, minorRadius, cMaxMajorRadius);
+	float r = clamp(radius, minorRadius, cMaxMajorRadius);
 	if (r != majorRadius)
 	{
 		majorRadius = r;
@@ -15,7 +24,7 @@ void Torus::SetMajorRadius(float radius)
 
 void Torus::SetMinorRadius(float radius)
 {
-	float r = std::clamp(radius, cMinMinorRadius, majorRadius);
+	float r = clamp(radius, cMinMinorRadius, majorRadius);
 	if (r != minorRadius)
 	{
 		minorRadius = r;
@@ -25,8 +34,8 @@ void Torus::SetMinorRadius(float radius)
 
 void Torus::SetSegments(int major, int minor)
 {
-	int mSeg = std::clamp(major, cMinMajorSegments, cMaxMajorSegments);
-	int nSeg = std::clamp(minor, cMinMinorSegments, cMaxMinorSegments);
+	int mSeg = clamp(major, cMinMajorSegments, cMaxMajorSegments);
+	int nSeg = clamp(minor, cMinMinorSegments, cMaxMinorSegments);
 	if (mSeg != majorSegments || nSeg != minorSegments)
 	{
 		majorSegments = mSeg;
@@ -37,7 +46,7 @@ void Torus::SetSegments(int major, int minor)
 
 void Torus::SetScale(float scale)
 {
-	float s = std::clamp(scale, cMinScale, cMaxScale);
+	float s = clamp(scale, cMinScale, cMaxScale);
 	if (s != m_scale)
 	{
 		m_scale = s;
@@ -80,14 +89,14 @@ void Torus::GenerateVertices()
 	vertices.reserve(static_cast<size_t>(majorSegments) * minorSegments);
 	for (int i = 0; i < majorSegments; i++)
 	{
-		float beta = i * 2.0f * std::numbers::pi_v<float> / majorSegments;
-		float cosBeta = std::cos(beta);
-		float sinBeta = std::sin(beta);
+		float beta = i * 2.0f * numbers::pi_v<float> / majorSegments;
+		float cosBeta = cos(beta);
+		float sinBeta = sin(beta);
 		for (int j = 0; j < minorSegments; j++)
 		{
-			float alpha = j * 2.0f * std::numbers::pi_v<float> / minorSegments;
-			float cosAlpha = std::cos(alpha);
-			float sinAlpha = std::sin(alpha);
+			float alpha = j * 2.0f * numbers::pi_v<float> / minorSegments;
+			float cosAlpha = cos(alpha);
+			float sinAlpha = sin(alpha);
 			vertices.emplace_back(
 				(majorRadius + minorRadius * cosAlpha) * cosBeta,
 				minorRadius * sinAlpha,

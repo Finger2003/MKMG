@@ -1,15 +1,19 @@
 #pragma once
 #include "../MathLib/Mat4f.h"
 #include "structs.h"
+#include "SceneObject.h"
 
 class DxDevice;
 
 
-struct Torus
+struct Torus : public SceneObject
 {
+	Torus(float3 position);
+
 	std::vector<VertexPosition> vertices;
 	std::vector<unsigned int> indices;
 
+#pragma region Constants
 	static constexpr float cMinMajorRadius = 0.1f;
 	static constexpr float cMaxMajorRadius = 1.0f;
 	static constexpr float cMinMinorRadius = 0.1f;
@@ -20,15 +24,19 @@ struct Torus
 	static constexpr int cMaxMinorSegments = 100;
 	static constexpr float cMinScale = 0.1f;
 	static constexpr float cMaxScale = 100.0f;
+#pragma endregion
 
+#pragma region Setters
 	void SetMajorRadius(float radius);
 	void SetMinorRadius(float radius);
 	void SetSegments(int major, int minor);
 	void SetScale(float scale);
+#pragma endregion
 
 	bool IsDirty() const { return dirty; }
 	void UpdateMesh(const DxDevice& device);
 
+#pragma region Getters
 	float GetMajorRadius() const { return majorRadius; }
 	float GetMinorRadius() const { return minorRadius; }
 	int GetMajorSegments() const { return majorSegments; }
@@ -37,6 +45,7 @@ struct Torus
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> GetVertexBuffer() const { return m_vertexBuffer; }
 	Microsoft::WRL::ComPtr<ID3D11Buffer> GetIndexBuffer() const { return m_indexBuffer; }
+#pragma endregion
 
 	float3 m_position{ 0, 0,-2 };
 	float3 m_eulerAngles{ 0, 0, 0 };
@@ -46,6 +55,9 @@ struct Torus
 	MathLib::Mat4f m_modelMatrix = MathLib::Mat4f::Translation(m_position.x, m_position.y, m_position.z);
 
 	void UpdateModelMatrix();
+
+	virtual ~Torus() = default;
+
 private:
 	void GenerateMesh();
 	void GenerateVertices();
@@ -61,4 +73,6 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_vertexBuffer;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_indexBuffer;
+
+	static unsigned int s_nextId;
 };
