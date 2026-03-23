@@ -6,6 +6,7 @@
 #include <vector>
 #include <numbers>
 #include <algorithm>
+#include <memory>
 
 #include <d3d11.h>
 

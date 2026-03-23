@@ -84,6 +84,9 @@ private:
 	POINT m_startMousePos{};
 	MathLib::Vec3f m_startArcballVector{};
 	Torus m_torus;
+	
+	std::vector<std::unique_ptr<Torus>> m_toruses;
+
 	void DrawMenu();
 	void InitImGui();
 	MathLib::Vec3f ScreenToArcballVector(int x, int y, int width, int height);

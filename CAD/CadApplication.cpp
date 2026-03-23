@@ -323,7 +323,7 @@ void CadApplication::Render()
 	//int height = wndSize.cy;
 	DrawMenu();
 
-	m_torus.UpdateMesh(m_device);
+	//m_torus.UpdateMesh(m_device);
 
 	auto& context = m_device.getContext();
 
@@ -338,12 +338,29 @@ void CadApplication::Render()
 	context->IASetInputLayout(m_layout.Get());
 	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
 	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
+	context->VSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
 
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+	for (const auto& torusPtr : m_toruses)
+	{
+		auto& torus = *torusPtr;
+		torus.UpdateMesh(m_device);
+
+		PerObjectBuffer objData;
+		objData.model = torus.m_modelMatrix;
+		objData.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		m_device.UpdateBuffer(m_cbPerObject, objData);
+
+		UINT stride = sizeof(VertexPosition);
+		UINT offset = 0;
+		context->IASetVertexBuffers(0, 1, torus.GetVertexBuffer().GetAddressOf(), &stride, &offset);
+		context->IASetIndexBuffer(torus.GetIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
+		context->DrawIndexed(static_cast<UINT>(torus.indices.size()), 0, 0);
+	}
 
 	//PerObjectBuffer objData;
 	//objData.model = m_torus.m_modelMatrix;
 	//m_device.UpdateBuffer(m_cbPerObject, objData);
-	context->VSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
 
 	//UINT stride = sizeof(VertexPosition);
 	//UINT offset = 0;
@@ -374,51 +391,63 @@ void CadApplication::DrawMenu()
 		ImGuiWindowFlags_NoCollapse;
 
 	ImGui::Begin("Menu", nullptr);
-	float tempMajor = m_torus.GetMajorRadius();
-	float tempMinor = m_torus.GetMinorRadius();
-	int tempSegs[2] = { m_torus.GetMajorSegments(), m_torus.GetMinorSegments() };
+	if (ImGui::Button("Add Torus at Cursor", ImVec2(-1, 0)))
+	{
+		auto newTorus = std::make_unique<Torus>();
+		newTorus->m_position = { m_cursor.position.x, m_cursor.position.y, m_cursor.position.z };
+		newTorus->UpdateModelMatrix();
 
-	ImGui::Text("Torus Settings");
-	if (ImGui::SliderFloat("Major Radius", &tempMajor, Torus::cMinMajorRadius, Torus::cMaxMajorRadius))
-		m_torus.SetMajorRadius(tempMajor);
-	if (ImGui::SliderFloat("Minor Radius", &tempMinor, Torus::cMinMinorRadius, Torus::cMaxMinorRadius))
-		m_torus.SetMinorRadius(tempMinor);
-
-	ImGui::Text("Segments (Major, Minor)");
-	//ImGui::PushItemWidth(-1.0f);
-	if (ImGui::SliderInt2("##Segments (Major, Minor)", tempSegs, Torus::cMinMajorSegments, Torus::cMaxMajorSegments))
-		m_torus.SetSegments(tempSegs[0], tempSegs[1]);
+		m_toruses.push_back(std::move(newTorus));
+		//m_selectedTorusIndex = static_cast<int>(m_toruses.size()) - 1; // Auto-select the new one
+	}
 
 	ImGui::Separator();
-	ImGui::Text("Transformations");
-	bool transformChanged = false;
 
-	if (ImGui::DragFloat3("Position", &m_torus.m_position.x, 0.01f))
-		transformChanged = true;
+	//float tempMajor = m_torus.GetMajorRadius();
+	//float tempMinor = m_torus.GetMinorRadius();
+	//int tempSegs[2] = { m_torus.GetMajorSegments(), m_torus.GetMinorSegments() };
 
-	ImGui::Text("Rotation (XYZ Euler angles), Z-X-Y application order");
-	//ImGui::PushItemWidth(-1.0f);
-	if (ImGui::DragFloat3("##Rotation (Euler angles)", &m_torus.m_eulerAngles.x, 0.01f))
-	{
-		Mat4f rotX = Mat4f::RotationX(m_torus.m_eulerAngles.x);
-		Mat4f rotY = Mat4f::RotationY(m_torus.m_eulerAngles.y);
-		Mat4f rotZ = Mat4f::RotationZ(m_torus.m_eulerAngles.z);
-		m_torus.m_rotationMatrix = rotZ * rotX * rotY;
-		transformChanged = true;
-	}
-	if (ImGui::Button("Reset Rotation"))
-	{
-		m_torus.m_eulerAngles = { 0, 0, 0 };
-		m_torus.m_rotationMatrix = Mat4f::Identity();
-		m_torus.m_baseRotationMatrix = Mat4f::Identity();
-		transformChanged = true;
-	}
+	//ImGui::Text("Torus Settings");
+	//if (ImGui::SliderFloat("Major Radius", &tempMajor, Torus::cMinMajorRadius, Torus::cMaxMajorRadius))
+	//	m_torus.SetMajorRadius(tempMajor);
+	//if (ImGui::SliderFloat("Minor Radius", &tempMinor, Torus::cMinMinorRadius, Torus::cMaxMinorRadius))
+	//	m_torus.SetMinorRadius(tempMinor);
 
-	if (ImGui::DragFloat("Scale", &m_torus.m_scale, 0.01f, Torus::cMinScale, Torus::cMaxScale))
-		transformChanged = true;
+	//ImGui::Text("Segments (Major, Minor)");
+	////ImGui::PushItemWidth(-1.0f);
+	//if (ImGui::SliderInt2("##Segments (Major, Minor)", tempSegs, Torus::cMinMajorSegments, Torus::cMaxMajorSegments))
+	//	m_torus.SetSegments(tempSegs[0], tempSegs[1]);
 
-	if (transformChanged)
-		m_torus.UpdateModelMatrix();
+	//ImGui::Separator();
+	//ImGui::Text("Transformations");
+	//bool transformChanged = false;
+
+	//if (ImGui::DragFloat3("Position", &m_torus.m_position.x, 0.01f))
+	//	transformChanged = true;
+
+	//ImGui::Text("Rotation (XYZ Euler angles), Z-X-Y application order");
+	////ImGui::PushItemWidth(-1.0f);
+	//if (ImGui::DragFloat3("##Rotation (Euler angles)", &m_torus.m_eulerAngles.x, 0.01f))
+	//{
+	//	Mat4f rotX = Mat4f::RotationX(m_torus.m_eulerAngles.x);
+	//	Mat4f rotY = Mat4f::RotationY(m_torus.m_eulerAngles.y);
+	//	Mat4f rotZ = Mat4f::RotationZ(m_torus.m_eulerAngles.z);
+	//	m_torus.m_rotationMatrix = rotZ * rotX * rotY;
+	//	transformChanged = true;
+	//}
+	//if (ImGui::Button("Reset Rotation"))
+	//{
+	//	m_torus.m_eulerAngles = { 0, 0, 0 };
+	//	m_torus.m_rotationMatrix = Mat4f::Identity();
+	//	m_torus.m_baseRotationMatrix = Mat4f::Identity();
+	//	transformChanged = true;
+	//}
+
+	//if (ImGui::DragFloat("Scale", &m_torus.m_scale, 0.01f, Torus::cMinScale, Torus::cMaxScale))
+	//	transformChanged = true;
+
+	//if (transformChanged)
+	//	m_torus.UpdateModelMatrix();
 
 	ImGui::Separator();
 	ImGui::Text("Camera Settings");
