@@ -3,10 +3,12 @@
 #include "../MathLib/Mat4f.h"
 #include "../MathLib/Vec3f.h"
 #include "Torus.h"
+#include "Cursor3D.h"
 
 struct PerObjectBuffer
 {
 	MathLib::Mat4f model;
+	MathLib::Vec4f color;
 };
 
 struct PerPassBuffer
@@ -92,5 +94,9 @@ private:
 
 	static constexpr int cMinWidth = 500;
 	static constexpr int cMinHeight = 500;
+
+	Cursor3D m_cursor;
+
+	void DrawCursor();
 };
 

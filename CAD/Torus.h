@@ -1,17 +1,9 @@
 #pragma once
 #include "../MathLib/Mat4f.h"
+#include "structs.h"
 
 class DxDevice;
 
-struct VertexPosition
-{
-	float x, y, z;
-};
-
-struct float3
-{
-	float x, y, z;
-};
 
 struct Torus
 {

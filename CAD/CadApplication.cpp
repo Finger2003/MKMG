@@ -4,7 +4,7 @@
 #include "../ImGuiLib/imgui.h"
 #include "../ImGuiLib/imgui_impl_win32.h"
 #include "../ImGuiLib/imgui_impl_dx11.h"
-#include "Torus.h"
+
 
 using namespace MathLib;
 using namespace std;
@@ -42,6 +42,9 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	m_cbPerPass = m_device.CreateConstantBuffer<PerPassBuffer>();
 	m_cbPerObject = m_device.CreateConstantBuffer<PerObjectBuffer>();
 	InitImGui();
+
+
+	Cursor3D::InitSharedGeometry(m_device);
 }
 
 void CadApplication::InitImGui()
@@ -88,6 +91,38 @@ void CadApplication::UpdateProjectionMatrix()
 	}
 }
 
+void CadApplication::DrawCursor()
+{
+	auto& context = m_device.getContext();
+	UINT stride = sizeof(VertexPosition);
+	UINT offset = 0;
+
+	context->IASetVertexBuffers(0, 1, m_cursor.GetVertexBuffer().GetAddressOf(), &stride, &offset);
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+
+	PerObjectBuffer objData;
+	Mat4f translation = m_cursor.GetTranslationMatrix();
+	Mat4f scale = Mat4f::Scaling(0.1f);
+
+	// X axis - Red
+	objData.model = translation * scale;
+	objData.color = { 1.0f, 0.0f, 0.0f, 1.0f };
+	m_device.UpdateBuffer(m_cbPerObject, objData);
+	context->Draw(Cursor3D::VertexCount, 0);
+
+	// Y axis - Green (Rotate X arrow 90 degrees around Z axis)
+	objData.model = translation * Mat4f::RotationZ(std::numbers::pi_v<float> / 2.0f) * scale;
+	objData.color = { 0.0f, 1.0f, 0.0f, 1.0f };
+	m_device.UpdateBuffer(m_cbPerObject, objData);
+	context->Draw(Cursor3D::VertexCount, 0);
+
+	// Z axis - Blue (Rotate X arrow -90 degrees around Y axis)
+	objData.model = translation * Mat4f::RotationY(-std::numbers::pi_v<float> / 2.0f) * scale;
+	objData.color = { 0.0f, 0.0f, 1.0f, 1.0f };
+	m_device.UpdateBuffer(m_cbPerObject, objData);
+	context->Draw(Cursor3D::VertexCount, 0);
+}
+
 bool CadApplication::ProcessMessage(WindowMessage& msg)
 {
 	if (ImGui::GetCurrentContext() == nullptr)
@@ -117,70 +152,77 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		return true;
 	}
 	case WM_LBUTTONDOWN:
-		m_interactionMode = InteractionMode::Rotating;
-		m_lastMousePos = { xPos, yPos };
-		m_startMousePos = { xPos, yPos };
-		m_startArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
-		m_torus.m_baseRotationMatrix = m_torus.m_rotationMatrix;
-		SetCapture(m_window.getHandle());
-		return true;
+	{
+		Vec3f arcballVec = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
+		constexpr float distance = 2.0f;
+		Vec3f worldPos = arcballVec * distance;
+		m_cursor.position = { worldPos.x, worldPos.y, -worldPos.z };
+	}
+
+		//m_interactionMode = InteractionMode::Rotating;
+		//m_lastMousePos = { xPos, yPos };
+		//m_startMousePos = { xPos, yPos };
+		//m_startArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
+		//m_torus.m_baseRotationMatrix = m_torus.m_rotationMatrix;
+		//SetCapture(m_window.getHandle());
+		//return true;
 	case WM_RBUTTONDOWN:
-		m_interactionMode = InteractionMode::Translating;
-		m_lastMousePos = { xPos, yPos };
-		SetCapture(m_window.getHandle());
-		return true;
+		//m_interactionMode = InteractionMode::Translating;
+		//m_lastMousePos = { xPos, yPos };
+		//SetCapture(m_window.getHandle());
+		//return true;
 	case WM_LBUTTONUP:
 	case WM_RBUTTONUP:
-		m_interactionMode = InteractionMode::None;
-		ReleaseCapture();
-		return true;
+		//m_interactionMode = InteractionMode::None;
+		//ReleaseCapture();
+		//return true;
 	case WM_MOUSEMOVE:
-		if (m_interactionMode != InteractionMode::None)
-		{
-			int dx = xPos - m_lastMousePos.x;
-			int dy = yPos - m_lastMousePos.y;
-			if (m_interactionMode == InteractionMode::Rotating)
-			{
-				Vec3f currentArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
-				float dot = std::clamp(Vec3f::dot(m_startArcballVector, currentArcballVector), -1.0f, 1.0f);
-				float angle = std::acos(dot) * 2.0f;
-				Vec3f rotationAxis = Vec3f::cross(m_startArcballVector, currentArcballVector);
+		//if (m_interactionMode != InteractionMode::None)
+		//{
+		//	int dx = xPos - m_lastMousePos.x;
+		//	int dy = yPos - m_lastMousePos.y;
+		//	if (m_interactionMode == InteractionMode::Rotating)
+		//	{
+		//		Vec3f currentArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
+		//		float dot = std::clamp(Vec3f::dot(m_startArcballVector, currentArcballVector), -1.0f, 1.0f);
+		//		float angle = std::acos(dot) * 2.0f;
+		//		Vec3f rotationAxis = Vec3f::cross(m_startArcballVector, currentArcballVector);
 
-				if (rotationAxis.length_sqr() > 1e-6f)
-				{
-					Mat4f rot = Mat4f::RotationAxis(rotationAxis.normalize(), angle);
-					m_torus.m_rotationMatrix = rot * m_torus.m_baseRotationMatrix;
-					Vec3f euler = Mat4f::ExtractEulerAngles(m_torus.m_rotationMatrix);
-					m_torus.m_eulerAngles = { euler.x, euler.y, euler.z };
-				}
-			}
-			else if (m_interactionMode == InteractionMode::Translating)
-			{
-				float distanceZ = std::abs(m_torus.m_position.z);
-				float unitsPerPixel = m_panScaleFactor * distanceZ;
+		//		if (rotationAxis.length_sqr() > 1e-6f)
+		//		{
+		//			Mat4f rot = Mat4f::RotationAxis(rotationAxis.normalize(), angle);
+		//			m_torus.m_rotationMatrix = rot * m_torus.m_baseRotationMatrix;
+		//			Vec3f euler = Mat4f::ExtractEulerAngles(m_torus.m_rotationMatrix);
+		//			m_torus.m_eulerAngles = { euler.x, euler.y, euler.z };
+		//		}
+		//	}
+		//	else if (m_interactionMode == InteractionMode::Translating)
+		//	{
+		//		float distanceZ = std::abs(m_torus.m_position.z);
+		//		float unitsPerPixel = m_panScaleFactor * distanceZ;
 
-				m_torus.m_position.x += dx * unitsPerPixel;
-				m_torus.m_position.y -= dy * unitsPerPixel;
-			}
-			m_torus.UpdateModelMatrix();
-			m_lastMousePos = { xPos, yPos };
-		}
+		//		m_torus.m_position.x += dx * unitsPerPixel;
+		//		m_torus.m_position.y -= dy * unitsPerPixel;
+		//	}
+		//	m_torus.UpdateModelMatrix();
+		//	m_lastMousePos = { xPos, yPos };
+		//}
 		return true;
 	case WM_MOUSEWHEEL:
 	{
-		short zDelta = (short)HIWORD(msg.wParam);
-		WORD fwKeys = LOWORD(msg.wParam);
+		//short zDelta = (short)HIWORD(msg.wParam);
+		//WORD fwKeys = LOWORD(msg.wParam);
 
-		if (fwKeys & MK_CONTROL)
-		{
-			m_torus.m_position.z += (zDelta > 0) ? 0.1 : -0.1; // Move along z-axis.
-		}
-		else
-		{
-			float scaleFactor = (zDelta > 0) ? 1.1f : 0.9f;
-			m_torus.SetScale(m_torus.GetScale() * scaleFactor);
-		}
-		m_torus.UpdateModelMatrix();
+		//if (fwKeys & MK_CONTROL)
+		//{
+		//	m_torus.m_position.z += (zDelta > 0) ? 0.1 : -0.1; // Move along z-axis.
+		//}
+		//else
+		//{
+		//	float scaleFactor = (zDelta > 0) ? 1.1f : 0.9f;
+		//	m_torus.SetScale(m_torus.GetScale() * scaleFactor);
+		//}
+		//m_torus.UpdateModelMatrix();
 		return true;
 	}
 	}
@@ -191,6 +233,8 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 
 CadApplication::~CadApplication()
 {
+	Cursor3D::ReleaseSharedGeometry();
+
 	ImGui_ImplDX11_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
@@ -240,19 +284,21 @@ void CadApplication::Render()
 	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
 
 
-	PerObjectBuffer objData;
-	objData.model = m_torus.m_modelMatrix;
-	m_device.UpdateBuffer(m_cbPerObject, objData);
+	//PerObjectBuffer objData;
+	//objData.model = m_torus.m_modelMatrix;
+	//m_device.UpdateBuffer(m_cbPerObject, objData);
 	context->VSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
 
-	UINT stride = sizeof(VertexPosition);
-	UINT offset = 0;
-	context->IASetVertexBuffers(0, 1, m_torus.GetVertexBuffer().GetAddressOf(), &stride, &offset);
-	context->IASetIndexBuffer(m_torus.GetIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
+	//UINT stride = sizeof(VertexPosition);
+	//UINT offset = 0;
+	//context->IASetVertexBuffers(0, 1, m_torus.GetVertexBuffer().GetAddressOf(), &stride, &offset);
+	//context->IASetIndexBuffer(m_torus.GetIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
 
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
-	context->DrawIndexed(static_cast<UINT>(m_torus.indices.size()), 0, 0);
+	//context->DrawIndexed(static_cast<UINT>(m_torus.indices.size()), 0, 0);
+
+	DrawCursor();
 
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }

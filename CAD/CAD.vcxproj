@@ -152,6 +152,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CadApplication.cpp" />
+    <ClCompile Include="Cursor3D.cpp" />
     <ClCompile Include="DxApplication.cpp" />
     <ClCompile Include="DxDevice.cpp" />
     <ClCompile Include="DxStructures.cpp" />
@@ -169,12 +170,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CadApplication.h" />
+    <ClInclude Include="Cursor3D.h" />
     <ClInclude Include="DxApplication.h" />
     <ClInclude Include="DxDevice.h" />
     <ClInclude Include="DxStructures.h" />
     <ClInclude Include="exceptions.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="structs.h" />
     <ClInclude Include="Torus.h" />
     <ClInclude Include="Window.h" />
     <ClInclude Include="WindowApplication.h" />
