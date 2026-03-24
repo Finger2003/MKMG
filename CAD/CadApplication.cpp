@@ -89,6 +89,7 @@ void CadApplication::UpdateProjectionMatrix()
 	m_farPlane = std::max(m_farPlane, m_nearPlane + 0.01f); // Ensure far plane is greater than near plane.
 	m_projMatrix = Mat4f::Perspective(fovY, aspect, m_nearPlane, m_farPlane);
 
+	m_camera.UpdateMatrices();
 	m_viewMatrix = m_camera.GetViewMatrix();
 	m_projViewMatrix = m_projMatrix * m_viewMatrix;
 	if (m_cbPerPass)

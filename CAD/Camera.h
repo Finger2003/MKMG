@@ -20,11 +20,15 @@ public:
 	MathLib::Vec3f GetForwardVector() const;
 	MathLib::Vec3f GetPosition() const;
 
+	void UpdateMatrices();
 private:
 	MathLib::Vec3f m_target{ 0.0f, 0.0f, 0.0f };
 	float m_distance = 5.0f;
 	float m_pitch = 0.0f; // Rotation around X-axis
 	float m_yaw = 0.0f;   // Rotation around Y-axis
+
+	MathLib::Mat4f m_viewMatrix;
+	MathLib::Mat4f m_invViewMatrix;
 
 	MathLib::Mat4f m_projMatrix = MathLib::Mat4f::Identity();
 };

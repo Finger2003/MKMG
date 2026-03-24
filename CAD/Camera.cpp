@@ -36,45 +36,61 @@ void Camera::Zoom(float delta)
 
 MathLib::Mat4f Camera::GetViewMatrix() const
 {
-	Mat4f translationToTarget = Mat4f::Translation(-m_target.x, -m_target.y, -m_target.z);
-	Mat4f rotY = Mat4f::RotationY(m_yaw);
-	Mat4f rotX = Mat4f::RotationX(m_pitch);
-	Mat4f pushAway = Mat4f::Translation(0.0f, 0.0f, -m_distance);
+	//Mat4f translationToTarget = Mat4f::Translation(-m_target.x, -m_target.y, -m_target.z);
+	//Mat4f rotY = Mat4f::RotationY(m_yaw);
+	//Mat4f rotX = Mat4f::RotationX(m_pitch);
+	//Mat4f pushAway = Mat4f::Translation(0.0f, 0.0f, -m_distance);
 
-	return pushAway * rotX * rotY * translationToTarget;
+	//return pushAway * rotX * rotY * translationToTarget;
+	return m_viewMatrix;
 }
 
 MathLib::Mat4f Camera::GetInverseViewMatrix() const
 {
-	Mat4f translationFromTarget = Mat4f::Translation(m_target.x, m_target.y, m_target.z);
-	Mat4f rotY = Mat4f::RotationY(-m_yaw);
-	Mat4f rotX = Mat4f::RotationX(-m_pitch);
-	Mat4f pullBack = Mat4f::Translation(0.0f, 0.0f, m_distance);
+	//Mat4f translationFromTarget = Mat4f::Translation(m_target.x, m_target.y, m_target.z);
+	//Mat4f rotY = Mat4f::RotationY(-m_yaw);
+	//Mat4f rotX = Mat4f::RotationX(-m_pitch);
+	//Mat4f pullBack = Mat4f::Translation(0.0f, 0.0f, m_distance);
 
-	return translationFromTarget * rotY * rotX * pullBack;
+	//return translationFromTarget * rotY * rotX * pullBack;
+	return m_invViewMatrix;
 }
 
 MathLib::Vec3f Camera::GetRightVector() const
 {
-	Mat4f invView = GetInverseViewMatrix();
-	return Vec3f(invView.m[0][0], invView.m[1][0], invView.m[2][0]);
+	return Vec3f(m_invViewMatrix.m[0][0], m_invViewMatrix.m[1][0], m_invViewMatrix.m[2][0]);
 }
 
 MathLib::Vec3f Camera::GetUpVector() const
 {
-	Mat4f invView = GetInverseViewMatrix();
-	return Vec3f(invView.m[0][1], invView.m[1][1], invView.m[2][1]);
+	return Vec3f(m_invViewMatrix.m[0][1], m_invViewMatrix.m[1][1], m_invViewMatrix.m[2][1]);
 }
 
 MathLib::Vec3f Camera::GetForwardVector() const
 {
-	Mat4f invView = GetInverseViewMatrix();
-	return Vec3f(-invView.m[0][2], -invView.m[1][2], -invView.m[2][2]);
+	return Vec3f(-m_invViewMatrix.m[0][2], -m_invViewMatrix.m[1][2], -m_invViewMatrix.m[2][2]);
 }
 
 MathLib::Vec3f Camera::GetPosition() const
 {
-	Vec4f pos = GetInverseViewMatrix() * Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
+	Vec4f pos = m_invViewMatrix * Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
 	pos /= pos.w;
 	return Vec3f(pos.x, pos.y, pos.z);
+}
+
+void Camera::UpdateMatrices()
+{
+	Mat4f translationToTarget = Mat4f::Translation(-m_target.x, -m_target.y, -m_target.z);
+	Mat4f rotY = Mat4f::RotationY(m_yaw);
+	Mat4f rotX = Mat4f::RotationX(m_pitch);
+	Mat4f pushAway = Mat4f::Translation(0.0f, 0.0f, -m_distance);
+	m_viewMatrix = pushAway * rotX * rotY * translationToTarget;
+
+	Mat4f translationFromTarget = Mat4f::Translation(m_target.x, m_target.y, m_target.z);
+	Mat4f invRotY = rotY.Transpose();
+	Mat4f invRotX = rotX.Transpose();
+	//Mat4f invRotY = Mat4f::RotationY(-m_yaw);
+	//Mat4f invRotX = Mat4f::RotationX(-m_pitch);
+	Mat4f pullBack = Mat4f::Translation(0.0f, 0.0f, m_distance);
+	m_invViewMatrix = translationFromTarget * invRotY * invRotX * pullBack;
 }
