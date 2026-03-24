@@ -10,6 +10,31 @@ using namespace MathLib;
 using namespace std;
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+static MathLib::Vec3f ScreenToObjectArcballVector(int mouseX, int mouseY, float objScreenX, float objScreenY, float radius)
+{
+	float dx = (mouseX - objScreenX) / radius;
+	float dy = (objScreenY - mouseY) / radius; // Invert Y because screen Y goes down
+
+	MathLib::Vec3f p(dx, dy, 0.0f);
+	float length_sqr = p.length_sqr();
+
+	if (length_sqr <= 0.5f)
+	{
+		p.z = std::sqrt(1.0f - length_sqr);
+	}
+	else
+	{
+		p.z = 0.5f / std::sqrt(length_sqr);
+	}
+
+	//if (length_sqr <= 1.0f)
+	//	p.z = std::sqrt(1.0f - length_sqr); // Inside the sphere
+	//else
+	//	p = p.normalize(); // Outside the sphere (maps to the edge)
+
+	return p.normalize();
+}
+
 static pair<float, float> CalculateCoordsFromPixel(float x, float y, float width, float height)
 {
 	float normX = (x / width) * 2.0f - 1.0f;
@@ -186,8 +211,16 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		{
 			m_isEditing = true;
 			m_lastMousePos = { xPos, yPos };
-			m_startArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
 			auto& obj = m_sceneObjects[m_lastClickedIndex];
+
+			Vec4f worldPos = Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);
+			Vec4f clipPos = m_projViewMatrix * worldPos;
+			clipPos /= clipPos.w;
+
+			m_editObjScreenX = (clipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
+			m_editObjScreenY = (1.0f - clipPos.y) * 0.5f * m_renderSize.cy;
+			m_startArcballVector = ScreenToObjectArcballVector(xPos, yPos, m_editObjScreenX, m_editObjScreenY, 150.0f);
+
 			Vec3f objPos = Vec3f(obj->m_position.x, obj->m_position.y, obj->m_position.z);
 			Vec3f toObj = objPos - m_camera.GetPosition();
 			m_editAnchorDepth = Vec3f::dot(toObj, m_camera.GetForwardVector());
@@ -335,14 +368,18 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 
 				if (m_currentEditAction == EditAction::RotateFree)
 				{
-					Vec3f currentArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
+					//Vec3f currentArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
+					Vec3f currentArcballVector = ScreenToObjectArcballVector(xPos, yPos, m_editObjScreenX, m_editObjScreenY, 150.0f);
 					float dot = std::clamp(Vec3f::dot(m_startArcballVector, currentArcballVector), -1.0f, 1.0f);
 					float angle = std::acos(dot) * 2.0f;
-					Vec3f rotationAxis = Vec3f::cross(m_startArcballVector, currentArcballVector);
+					Vec3f cameraSpaceAxis = Vec3f::cross(m_startArcballVector, currentArcballVector);	
 
-					if (rotationAxis.length_sqr() > 1e-6f)
+					if (cameraSpaceAxis.length_sqr() > 1e-6f)
 					{
-						Mat4f rot = Mat4f::RotationAxis(rotationAxis.normalize(), angle);
+						Vec4f worldAxis4 = m_camera.GetInverseViewMatrix() * Vec4f(cameraSpaceAxis.x, cameraSpaceAxis.y, cameraSpaceAxis.z, 0.0f);
+						Vec3f worldAxis = Vec3f(worldAxis4.x, worldAxis4.y, worldAxis4.z).normalize();
+
+						Mat4f rot = Mat4f::RotationAxis(worldAxis, angle);
 						torus->m_rotationMatrix = rot * torus->m_baseRotationMatrix;
 						Vec3f euler = Mat4f::ExtractEulerAngles(torus->m_rotationMatrix);
 						torus->m_eulerAngles = { euler.x, euler.y, euler.z };
@@ -465,7 +502,6 @@ void CadApplication::Render()
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
 
-	//auto& context = m_device.getContext();
 	UINT stride = sizeof(VertexPosition);
 	UINT offset = 0;
 	context->IASetVertexBuffers(0, 1, m_cursor.GetVertexBuffer().GetAddressOf(), &stride, &offset);
@@ -516,64 +552,10 @@ void CadApplication::Render()
 		}
 	}
 	context->GSSetShader(nullptr, nullptr, 0);
-	//for (const auto& torusPtr : m_toruses)
-	//{
-	//	auto& torus = *torusPtr;
-	//	torus.UpdateMesh(m_device);
-
-	//	PerObjectBuffer objData;
-	//	objData.model = torus.m_modelMatrix;
-	//	objData.color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	//	m_device.UpdateBuffer(m_cbPerObject, objData);
-
-	//	UINT stride = sizeof(VertexPosition);
-	//	UINT offset = 0;
-	//	context->IASetVertexBuffers(0, 1, torus.GetVertexBuffer().GetAddressOf(), &stride, &offset);
-	//	context->IASetIndexBuffer(torus.GetIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
-	//	context->DrawIndexed(static_cast<UINT>(torus.indices.size()), 0, 0);
-	//}
-
-	//if (!m_points.empty())
-	//{
-	//	UpdatePointsBuffer();
-	//	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-
-	//	context->VSSetShader(m_pointVertexShader.Get(), nullptr, 0);
-	//	context->GSSetShader(m_pointGeometryShader.Get(), nullptr, 0);
-	//	context->PSSetShader(m_pointPixelShader.Get(), nullptr, 0);
-
-	//	UINT stride = sizeof(VertexPosition);
-	//	UINT offset = 0;
-	//	context->IASetVertexBuffers(0, 1, m_pointsBuffer.GetAddressOf(), &stride, &offset);
-	//	PerPointBuffer pointData;
-	//	pointData.color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	//	m_device.UpdateBuffer(m_cbPerObject, pointData);
-
-	//	context->Draw(static_cast<UINT>(m_points.size()), 0);
-	//	context->GSSetShader(nullptr, nullptr, 0); 
-	//}
-
-	//PerObjectBuffer objData;
-	//objData.model = m_torus.m_modelMatrix;
-	//m_device.UpdateBuffer(m_cbPerObject, objData);
-
-	//UINT stride = sizeof(VertexPosition);
-	//UINT offset = 0;
-	//context->IASetVertexBuffers(0, 1, m_torus.GetVertexBuffer().GetAddressOf(), &stride, &offset);
-	//context->IASetIndexBuffer(m_torus.GetIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
-
-	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
-
-	//context->DrawIndexed(static_cast<UINT>(m_torus.indices.size()), 0, 0);
-
 
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
 
-void CadApplication::UpdatePointsBuffer()
-{
-
-}
 
 void CadApplication::DrawMenu()
 {

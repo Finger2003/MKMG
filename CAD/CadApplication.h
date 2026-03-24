@@ -111,17 +111,10 @@ private:
 	InteractionMode m_interactionMode = InteractionMode::None;
 	POINT m_lastMousePos{};
 	POINT m_startMousePos{};
-	MathLib::Vec3f m_startArcballVector{};
-	//Torus m_torus;
-	
+	MathLib::Vec3f m_startArcballVector{};	
 
 	std::vector<std::unique_ptr<SceneObject>> m_sceneObjects;
 
-	//std::vector<std::unique_ptr<Torus>> m_toruses;
-	//std::vector<VertexPosition> m_points;
-	//Microsoft::WRL::ComPtr<ID3D11Buffer> m_pointsBuffer;
-	bool m_pointsDirty = false;
-	void UpdatePointsBuffer();
 
 	void DrawMenu();
 	void InitImGui();
@@ -158,5 +151,7 @@ private:
 	EditAction m_currentEditAction = EditAction::None;
 	bool m_isEditing = false;
 	float m_editAnchorDepth = 0.0f;
+
+	float m_editObjScreenX, m_editObjScreenY;
 };
 
