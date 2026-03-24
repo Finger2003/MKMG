@@ -37,6 +37,19 @@ enum class InteractionMode
 	Panning
 };
 
+enum class MenuState
+{
+	List,
+	Edit
+};
+enum class EditAction
+{
+	None,
+	TranslateFree, TranslateX, TranslateY, TranslateZ,
+	RotateFree, RotateX, RotateY, RotateZ,
+	Scale
+};
+
 class CadApplication : public DxApplication
 {
 	/**
@@ -140,5 +153,8 @@ private:
 	int m_nameEditingIndex = -1;
 	char m_renameBuffer[128] = {};
 	std::optional<float3> GetSelectionCenter() const;
+
+	MenuState m_menuState = MenuState::List;
+	EditAction m_currentEditAction = EditAction::None;
 };
 

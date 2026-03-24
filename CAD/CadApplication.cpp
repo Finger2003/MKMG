@@ -407,7 +407,8 @@ void CadApplication::Render()
 
 	auto& context = m_device.getContext();
 
-	const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	//const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	const float clear_color[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
 	context->ClearRenderTargetView(m_backBuffer.Get(), clear_color);
 	context->ClearDepthStencilView(m_depthBuffer.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 
@@ -548,119 +549,278 @@ void CadApplication::DrawMenu()
 		ImGuiWindowFlags_NoCollapse;
 
 	ImGui::Begin("Menu", nullptr);
-	if (ImGui::Button("Add Torus"))
-	{
-		m_sceneObjects.push_back(std::make_unique<Torus>(m_cursorPosition));
-	}
 
-	if (ImGui::Button("Add Point"))
+	if (m_menuState == MenuState::List)
 	{
-		m_sceneObjects.push_back(std::make_unique<Point>(m_cursorPosition));
-		m_sceneObjects.push_back(std::make_unique<Point>(m_cursorPosition));
-	}
-
-	ImGui::Separator();
-	ImGuiIO& io = ImGui::GetIO();
-	for (int i = 0; i < m_sceneObjects.size(); i++)
-	{
-		ImGui::PushID(i);
-		auto& obj = m_sceneObjects[i];
-		
-
-		if (m_nameEditingIndex == i)
+		if (ImGui::Button("Add Torus"))
 		{
-			ImGui::SetKeyboardFocusHere();
-			if (ImGui::InputText("##rename", m_renameBuffer, IM_ARRAYSIZE(m_renameBuffer),
-				ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
-			{
-
-				obj->name = string(m_renameBuffer);
-				m_nameEditingIndex = -1;
-			}
-			
-			if (!ImGui::IsItemActive() && ImGui::IsMouseClicked(0))
-			{
-				m_nameEditingIndex = -1;
-			}
+			m_sceneObjects.push_back(std::make_unique<Torus>(m_cursorPosition));
 		}
-		else
+
+		if (ImGui::Button("Add Point"))
 		{
-			if (ImGui::Selectable(obj->name.c_str(), obj->selected))
+			m_sceneObjects.push_back(std::make_unique<Point>(m_cursorPosition));
+		}
+
+		ImGui::Separator();
+		ImGuiIO& io = ImGui::GetIO();
+		for (int i = 0; i < m_sceneObjects.size(); i++)
+		{
+			ImGui::PushID(i);
+			auto& obj = m_sceneObjects[i];
+
+
+			if (m_nameEditingIndex == i)
 			{
-				if (io.KeyCtrl && io.KeyShift)
+				ImGui::SetKeyboardFocusHere();
+				if (ImGui::InputText("##rename", m_renameBuffer, IM_ARRAYSIZE(m_renameBuffer),
+					ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
 				{
-					if (m_lastClickedIndex != -1)
-					{
-						int start = std::min(i, m_lastClickedIndex);
-						int end = std::max(i, m_lastClickedIndex);
-						for (int j = start; j <= end; j++)
-							m_sceneObjects[j]->selected = true;
-					}
+
+					obj->name = string(m_renameBuffer);
+					m_nameEditingIndex = -1;
 				}
-				else if (io.KeyShift)
+
+				if (!ImGui::IsItemActive() && ImGui::IsMouseClicked(0))
 				{
-					for (auto& o : m_sceneObjects)
-						o->selected = false;
-					if (m_lastClickedIndex != -1)
+					m_nameEditingIndex = -1;
+				}
+			}
+			else
+			{
+				if (ImGui::Selectable(obj->name.c_str(), obj->selected))
+				{
+					if (io.KeyCtrl && io.KeyShift)
 					{
-						int start = std::min(i, m_lastClickedIndex);
-						int end = std::max(i, m_lastClickedIndex);
-						for (int j = start; j <= end; j++)
-							m_sceneObjects[j]->selected = true;
+						if (m_lastClickedIndex != -1)
+						{
+							int start = std::min(i, m_lastClickedIndex);
+							int end = std::max(i, m_lastClickedIndex);
+							for (int j = start; j <= end; j++)
+								m_sceneObjects[j]->selected = true;
+						}
+					}
+					else if (io.KeyShift)
+					{
+						for (auto& o : m_sceneObjects)
+							o->selected = false;
+						if (m_lastClickedIndex != -1)
+						{
+							int start = std::min(i, m_lastClickedIndex);
+							int end = std::max(i, m_lastClickedIndex);
+							for (int j = start; j <= end; j++)
+								m_sceneObjects[j]->selected = true;
+						}
+						else
+						{
+							obj->selected = true;
+							m_lastClickedIndex = i;
+						}
+					}
+					else if (io.KeyCtrl)
+					{
+						obj->selected = !obj->selected;
+						m_lastClickedIndex = i;
 					}
 					else
 					{
+						for (auto& o : m_sceneObjects)
+							o->selected = false;
 						obj->selected = true;
 						m_lastClickedIndex = i;
 					}
 				}
-				else if (io.KeyCtrl)
+
+				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
 				{
-					obj->selected = !obj->selected;
-					m_lastClickedIndex = i;
-				}
-				else
-				{
-					for (auto& o : m_sceneObjects)
-						o->selected = false;
-					obj->selected = true;
-					m_lastClickedIndex = i;
+					m_nameEditingIndex = i;
+					strncpy_s(m_renameBuffer, obj->name.c_str(), sizeof(m_renameBuffer) - 1);
 				}
 			}
 
-			if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
-			{
-				m_nameEditingIndex = i;
-				strncpy_s(m_renameBuffer, obj->name.c_str(), sizeof(m_renameBuffer) - 1);
-			}
+			ImGui::PopID();
 		}
 
-		ImGui::PopID();
+		ImGui::Separator();
+
+		int selectedCount = 0;
+		for (const auto& obj : m_sceneObjects)
+			if (obj->selected) selectedCount++;
+
+		ImGui::BeginDisabled(selectedCount != 1);
+		if (ImGui::Button("Edit Selected", ImVec2(-1, 0)))
+		{
+			m_menuState = MenuState::Edit;
+			m_currentEditAction = EditAction::None;
+		}
+		ImGui::EndDisabled();
+
+		if (ImGui::Button("Select All", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f - 4, 0)))
+		{
+			for (auto& obj : m_sceneObjects)
+				obj->selected = true;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Deselect All", ImVec2(-1, 0)))
+		{
+			for (auto& obj : m_sceneObjects)
+				obj->selected = false;
+		}
+
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.1f, 0.1f, 1.0f));
+
+		if (ImGui::Button("Delete Selected", ImVec2(-1, 0)))
+		{
+			DeleteSelectedObjects();
+		}
+
+		ImGui::PopStyleColor(2);
+
+
+		ImGui::Separator();
+		ImGui::Text("Camera Settings");
+		bool cameraChanged = false;
+		if (ImGui::SliderFloat("FOV", &m_fovY, 30.0f, 120.0f))
+			cameraChanged = true;
+		if (ImGui::DragFloat("Near Plane", &m_nearPlane, 0.01f, 0.001f, 10.0f))
+			cameraChanged = true;
+		if (ImGui::DragFloat("Far Plane", &m_farPlane, 0.1f, 10.0f, 1000.0f))
+			cameraChanged = true;
+
+		if (cameraChanged)
+			UpdateProjectionMatrix();
+
+
+		ImGui::Separator();
+		ImGui::Text("Cursor Settings");
+		ImGui::DragFloat3("Cursor Position", &m_cursorPosition.x, 0.01f);
+		Vec4f worldPos = Vec4f(m_cursorPosition.x, m_cursorPosition.y, m_cursorPosition.z, 1.0f);
+		Vec4f clipPos = m_projViewMatrix * worldPos;
+		int screenPos[2] = { 0 };
+		if (std::abs(clipPos.w) > 0.0001f)
+		{
+			float ndcX = clipPos.x / clipPos.w;
+			float ndcY = clipPos.y / clipPos.w;
+			screenPos[0] = static_cast<int>(std::round((ndcX + 1.0f) * 0.5f * m_renderSize.cx));
+			screenPos[1] = static_cast<int>(std::round((1.0f - ndcY) * 0.5f * m_renderSize.cy));
+		}
+
+		if (ImGui::DragInt2("Screen Position", screenPos))
+		{
+			screenPos[0] = std::clamp(screenPos[0], 0, static_cast<int>(m_renderSize.cx));
+			screenPos[1] = std::clamp(screenPos[1], 0, static_cast<int>(m_renderSize.cy));
+			auto [ndcX, ndcY] = CalculateCoordsFromPixel((float)screenPos[0], (float)screenPos[1], (float)m_renderSize.cx, (float)m_renderSize.cy);
+
+
+			Vec4f viewPos = m_viewMatrix * worldPos;
+			float actualDepth = std::abs(viewPos.z);
+
+			float distance = m_camera.GetDistance();
+			float fovY_rad = m_fovY * (std::numbers::pi_v<float> / 180.0f);
+			float aspect = static_cast<float>(m_renderSize.cx) / m_renderSize.cy;
+
+			float planeHeight = 2.0f * actualDepth * std::tan(fovY_rad / 2.0f);
+			float planeWidth = planeHeight * aspect;
+
+			Vec4f localPos{ ndcX * (planeWidth / 2.0f), ndcY * (planeHeight / 2.0f), viewPos.z, 1.0f };
+			Vec4f newWorldPos = m_camera.GetInverseViewMatrix() * localPos;
+
+			m_cursorPosition = { newWorldPos.x, newWorldPos.y, newWorldPos.z };
+		}
 	}
-
-	ImGui::Separator();
-
-	if (ImGui::Button("Select All", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f - 4, 0)))
+	else if (m_menuState == MenuState::Edit)
 	{
-		for (auto& obj : m_sceneObjects)
-			obj->selected = true; 
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("Deselect All", ImVec2(-1, 0)))
-	{
-		for (auto& obj : m_sceneObjects)
-			obj->selected = false;
-	}
+		if (m_lastClickedIndex < 0 || m_lastClickedIndex >= m_sceneObjects.size())
+		{
+			m_menuState = MenuState::List;
+		}
+		else
+		{
+			auto& selectedObj = m_sceneObjects[m_lastClickedIndex];
+			if (ImGui::Button("< Back to List"))
+			{
+				m_menuState = MenuState::List;
+			}
+			ImGui::Separator();
 
-	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.1f, 0.1f, 1.0f));
+			ImGui::Text("Editing: %s", selectedObj->name.c_str());
+			ImGui::Spacing();
 
-	if (ImGui::Button("Delete Selected", ImVec2(-1, 0)))
-	{
-		DeleteSelectedObjects();
+			if (selectedObj->type == ObjectType::Point)
+			{
+				ImGui::DragFloat3("Position", &selectedObj->m_position.x, 0.01f);
+
+				ImGui::Separator();
+				ImGui::Text("Interactive Action");
+				const char* actions[] = { "None", "Free Translation", "Translate X", "Translate Y", "Translate Z" };
+				int actionIndex = static_cast<int>(m_currentEditAction);
+				if (actionIndex > 4) actionIndex = 0; // Prevent out-of-bounds
+
+				if (ImGui::Combo("##PointAction", &actionIndex, actions, IM_ARRAYSIZE(actions)))
+				{
+					m_currentEditAction = static_cast<EditAction>(actionIndex);
+				}
+			}
+			else if (selectedObj->type == ObjectType::Torus)
+			{
+				auto torus = static_cast<Torus*>(selectedObj.get());
+				bool transformChanged = false;
+
+				// --- Geometry Settings ---
+				float tempMajor = torus->GetMajorRadius();
+				float tempMinor = torus->GetMinorRadius();
+				int tempSegs[2] = { torus->GetMajorSegments(), torus->GetMinorSegments() };
+
+				ImGui::Text("Geometry");
+				if (ImGui::SliderFloat("Major Radius", &tempMajor, Torus::cMinMajorRadius, Torus::cMaxMajorRadius))
+					torus->SetMajorRadius(tempMajor);
+				if (ImGui::SliderFloat("Minor Radius", &tempMinor, Torus::cMinMinorRadius, Torus::cMaxMinorRadius))
+					torus->SetMinorRadius(tempMinor);
+				if (ImGui::SliderInt2("Segments", tempSegs, Torus::cMinMajorSegments, Torus::cMaxMajorSegments))
+					torus->SetSegments(tempSegs[0], tempSegs[1]);
+
+				ImGui::Separator();
+
+				if (ImGui::DragFloat3("Position", &torus->m_position.x, 0.01f))
+					transformChanged = true;
+
+				if (ImGui::DragFloat3("Rotation", &torus->m_eulerAngles.x, 0.01f))
+				{
+					MathLib::Mat4f rotX = MathLib::Mat4f::RotationX(torus->m_eulerAngles.x);
+					MathLib::Mat4f rotY = MathLib::Mat4f::RotationY(torus->m_eulerAngles.y);
+					MathLib::Mat4f rotZ = MathLib::Mat4f::RotationZ(torus->m_eulerAngles.z);
+					torus->m_rotationMatrix = rotZ * rotX * rotY;
+					transformChanged = true;
+				}
+				if (ImGui::Button("Reset Rotation"))
+				{
+					torus->m_eulerAngles = { 0, 0, 0 };
+					torus->m_rotationMatrix = MathLib::Mat4f::Identity();
+					torus->m_baseRotationMatrix = MathLib::Mat4f::Identity();
+					transformChanged = true;
+				}
+				if (ImGui::DragFloat("Scale", &torus->m_scale, 0.01f, Torus::cMinScale, Torus::cMaxScale))
+					transformChanged = true;
+
+				if (transformChanged) 
+					torus->UpdateModelMatrix();
+
+				ImGui::Separator();
+
+				ImGui::Text("Interactive Action");
+				const char* actions[] = {
+					"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",
+					"Free Arcball", "Rotate X", "Rotate Y", "Rotate Z", "Scale"
+				};
+				int actionIndex = static_cast<int>(m_currentEditAction);
+				if (ImGui::Combo("##TorusAction", &actionIndex, actions, IM_ARRAYSIZE(actions)))
+				{
+					m_currentEditAction = static_cast<EditAction>(actionIndex);
+				}
+			}
+		}
 	}
-
-	ImGui::PopStyleColor(2);
 
 
 
@@ -709,57 +869,6 @@ void CadApplication::DrawMenu()
 
 	//if (transformChanged)
 	//	m_torus.UpdateModelMatrix();
-
-	ImGui::Separator();
-	ImGui::Text("Camera Settings");
-	bool cameraChanged = false;
-	if (ImGui::SliderFloat("FOV", &m_fovY, 30.0f, 120.0f))
-		cameraChanged = true;
-	if (ImGui::DragFloat("Near Plane", &m_nearPlane, 0.01f, 0.001f, 10.0f))
-		cameraChanged = true;
-	if (ImGui::DragFloat("Far Plane", &m_farPlane, 0.1f, 10.0f, 1000.0f))
-		cameraChanged = true;
-
-	if(cameraChanged)
-		UpdateProjectionMatrix();
-
-
-	ImGui::Separator();
-	ImGui::Text("Cursor Settings");
-	ImGui::DragFloat3("Cursor Position", &m_cursorPosition.x, 0.01f);
-	Vec4f worldPos = Vec4f(m_cursorPosition.x, m_cursorPosition.y, m_cursorPosition.z, 1.0f);
-	Vec4f clipPos = m_projViewMatrix * worldPos;
-	int screenPos[2] = { 0 };
-	if (std::abs(clipPos.w) > 0.0001f)
-	{
-		float ndcX = clipPos.x / clipPos.w;
-		float ndcY = clipPos.y / clipPos.w;
-		screenPos[0] = static_cast<int>(std::round((ndcX + 1.0f) * 0.5f * m_renderSize.cx));
-		screenPos[1] = static_cast<int>(std::round((1.0f - ndcY) * 0.5f * m_renderSize.cy));
-	}
-
-	if (ImGui::DragInt2("Screen Position", screenPos))
-	{
-		screenPos[0] = std::clamp(screenPos[0], 0, static_cast<int>(m_renderSize.cx));
-		screenPos[1] = std::clamp(screenPos[1], 0, static_cast<int>(m_renderSize.cy));
-		auto [ndcX, ndcY] = CalculateCoordsFromPixel((float)screenPos[0], (float)screenPos[1], (float)m_renderSize.cx, (float)m_renderSize.cy);
-
-
-		Vec4f viewPos = m_viewMatrix * worldPos;
-		float actualDepth = std::abs(viewPos.z);
-
-		float distance = m_camera.GetDistance();
-		float fovY_rad = m_fovY * (std::numbers::pi_v<float> / 180.0f);
-		float aspect = static_cast<float>(m_renderSize.cx) / m_renderSize.cy;
-
-		float planeHeight = 2.0f * actualDepth * std::tan(fovY_rad / 2.0f);
-		float planeWidth = planeHeight * aspect;
-
-		Vec4f localPos{ ndcX * (planeWidth / 2.0f), ndcY * (planeHeight / 2.0f), viewPos.z, 1.0f };
-		Vec4f newWorldPos = m_camera.GetInverseViewMatrix() * localPos;
-		
-		m_cursorPosition = { newWorldPos.x, newWorldPos.y, newWorldPos.z };
-	}
 
 
 	ImGui::End();
