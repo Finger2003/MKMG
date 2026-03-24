@@ -23,6 +23,12 @@ namespace MathLib
 			return _mm_add_ps(a.v, b.v);
 		}
 
+		friend Vec4f& operator+=(Vec4f& a, const Vec4f& b)
+		{
+			a = a + b;
+			return a;
+		}
+
 		friend Vec4f operator-(const Vec4f& a, const Vec4f& b)
 		{
 			return _mm_sub_ps(a.v, b.v);
@@ -41,6 +47,12 @@ namespace MathLib
 		friend Vec4f operator/(const Vec4f& vec, float scalar)
 		{
 			return _mm_div_ps(vec.v, _mm_set1_ps(scalar));
+		}
+
+		friend Vec4f& operator /=(Vec4f& vec, float scalar)
+		{
+			vec = vec / scalar;
+			return vec;
 		}
 
 		static float dot(const Vec4f& a, const Vec4f& b)

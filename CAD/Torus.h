@@ -47,12 +47,12 @@ struct Torus : public SceneObject
 	Microsoft::WRL::ComPtr<ID3D11Buffer> GetIndexBuffer() const { return m_indexBuffer; }
 #pragma endregion
 
-	float3 m_position{ 0, 0,-2 };
+	//float3 m_position{ 0, 0,-2 };
 	float3 m_eulerAngles{ 0, 0, 0 };
 	float m_scale = 1.0f;
 	MathLib::Mat4f m_rotationMatrix = MathLib::Mat4f::Identity();
 	MathLib::Mat4f m_baseRotationMatrix = MathLib::Mat4f::Identity();
-	MathLib::Mat4f m_modelMatrix = MathLib::Mat4f::Translation(m_position.x, m_position.y, m_position.z);
+	MathLib::Mat4f m_modelMatrix{};// = MathLib::Mat4f::Translation(m_position.x, m_position.y, m_position.z);
 
 	void UpdateModelMatrix();
 

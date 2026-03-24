@@ -6,7 +6,7 @@ class DxDevice;
 
 struct Cursor3D
 {
-	float3 position{ 0.0f, 0.0f, 0.0f };
+	//float3 position{ 0.0f, 0.0f, 0.0f };
 
 	static void InitSharedGeometry(const DxDevice& device);
 	static void ReleaseSharedGeometry();
@@ -14,7 +14,7 @@ struct Cursor3D
 
 	const Microsoft::WRL::ComPtr<ID3D11Buffer>& GetVertexBuffer() const { return s_vertexBuffer; }
 
-	MathLib::Mat4f GetTranslationMatrix() const;
+	//MathLib::Mat4f GetTranslationMatrix() const;
 
 private:
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> s_vertexBuffer;

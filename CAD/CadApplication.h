@@ -127,8 +127,9 @@ private:
 	static constexpr int cMinHeight = 500;
 
 	Cursor3D m_cursor;
+	float3 m_cursorPosition{ 0.0f, 0.0f, 0.0f };
 
-	void DrawCursor();
+	void DrawCursor(float3 position, float scale);
 
 	Camera m_camera;
 
@@ -138,5 +139,6 @@ private:
 
 	int m_nameEditingIndex = -1;
 	char m_renameBuffer[128] = {};
+	std::optional<float3> GetSelectionCenter() const;
 };
 

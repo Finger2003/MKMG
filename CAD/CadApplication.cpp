@@ -100,33 +100,30 @@ void CadApplication::UpdateProjectionMatrix()
 	}
 }
 
-void CadApplication::DrawCursor()
+void CadApplication::DrawCursor(float3 position, float scale)
 {
 	auto& context = m_device.getContext();
-	UINT stride = sizeof(VertexPosition);
-	UINT offset = 0;
 
-	context->IASetVertexBuffers(0, 1, m_cursor.GetVertexBuffer().GetAddressOf(), &stride, &offset);
 	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
 	PerObjectBuffer objData;
-	Mat4f translation = m_cursor.GetTranslationMatrix();
-	Mat4f scale = Mat4f::Scaling(0.1f);
+	Mat4f translation = Mat4f::Translation(position.x, position.y, position.z);
+	Mat4f scaling = Mat4f::Scaling(scale);
 
 	// X axis - Red
-	objData.model = translation * scale;
+	objData.model = translation * scaling;
 	objData.color = { 1.0f, 0.0f, 0.0f, 1.0f };
 	m_device.UpdateBuffer(m_cbPerObject, objData);
 	context->Draw(Cursor3D::VertexCount, 0);
 
 	// Y axis - Green (Rotate X arrow 90 degrees around Z axis)
-	objData.model = translation * Mat4f::RotationZ(std::numbers::pi_v<float> / 2.0f) * scale;
+	objData.model = translation * Mat4f::RotationZ(std::numbers::pi_v<float> / 2.0f) * scaling;
 	objData.color = { 0.0f, 1.0f, 0.0f, 1.0f };
 	m_device.UpdateBuffer(m_cbPerObject, objData);
 	context->Draw(Cursor3D::VertexCount, 0);
 
 	// Z axis - Blue (Rotate X arrow -90 degrees around Y axis)
-	objData.model = translation * Mat4f::RotationY(-std::numbers::pi_v<float> / 2.0f) * scale;
+	objData.model = translation * Mat4f::RotationY(-std::numbers::pi_v<float> / 2.0f) * scaling;
 	objData.color = { 0.0f, 0.0f, 1.0f, 1.0f };
 	m_device.UpdateBuffer(m_cbPerObject, objData);
 	context->Draw(Cursor3D::VertexCount, 0);
@@ -136,6 +133,22 @@ void CadApplication::DeleteSelectedObjects()
 {
 	erase_if(m_sceneObjects, [](const auto& obj) { return obj->selected; });
 	m_lastClickedIndex = -1;
+}
+
+std::optional<float3> CadApplication::GetSelectionCenter() const
+{
+	Vec4f sum; // .w counts the number of selected objects. Max possible count is 16 777 216 due to float precision.
+	for (const auto& obj : m_sceneObjects)
+	{
+		if (obj->selected)
+			sum += Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);
+	}
+
+	if (sum.w < 1.0f) // No objects selected
+		return std::nullopt;
+
+	Vec4f center = sum / sum.w;
+	return float3( center.x, center.y, center.z );
 }
 
 bool CadApplication::ProcessMessage(WindowMessage& msg)
@@ -168,24 +181,78 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 	}
 	case WM_LBUTTONDOWN:
 	{
-		auto [normX, normY] = CalculateCoordsFromPixel(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
+		SceneObject* closestObj = nullptr;
+		size_t closestIndex = -1;
+		float minZ = std::numeric_limits<float>::max();
+		float toleranceSq = 100.0f;
 
-		float distance = m_camera.GetDistance();
+		for (size_t i = 0; i < m_sceneObjects.size(); i++)
+		{
+			auto& obj = m_sceneObjects[i];
+			if (obj->type != ObjectType::Point)
+				continue;
 
-		float fovY_rad = m_fovY * (std::numbers::pi_v<float> / 180.0f);
-		float aspect = static_cast<float>(m_renderSize.cx) / m_renderSize.cy;
+			Vec4f worldPos = Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);
+			Vec4f clipPos = m_projViewMatrix * worldPos; 
+			if (clipPos.w <= 0)
+				continue;
 
-		float planeHeight = 2.0f * distance * std::tan(fovY_rad / 2.0f);
-		float planeWidth = planeHeight * aspect;
+			clipPos /= clipPos.w;
+			float screenX = (clipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
+			float screenY = (1.0f - clipPos.y) * 0.5f * m_renderSize.cy;
+			float distSq = (screenX - xPos) * (screenX - xPos) + (screenY - yPos) * (screenY - yPos);
+			if (distSq < toleranceSq && clipPos.z < minZ)
+			{
+				minZ = clipPos.z;
+				closestIndex = i;
+				closestObj = obj.get();
+			}
+		}
 
-		float localX = normX * (planeWidth / 2.0f);
-		float localY = normY * (planeHeight / 2.0f);
-		float localZ = -distance;
+		WORD fwKeys = LOWORD(msg.wParam);
+		if (closestObj)
+		{
+			if (fwKeys & MK_CONTROL)
+			{
+				closestObj->selected = !closestObj->selected;
+				m_lastClickedIndex = closestIndex;
+			}
+			else 
+			{
+				for (auto& o : m_sceneObjects)
+					o->selected = false;
+				closestObj->selected = true;
+				m_lastClickedIndex = closestIndex;
+			}
+		}
+		else
+		{
+			if (!(fwKeys & MK_CONTROL))
+			{
+				for (auto& o : m_sceneObjects)
+					o->selected = false;
+				m_lastClickedIndex = -1;
+			}
 
-		Vec4f localPos(localX, localY, localZ, 1.0f);
-		Vec4f worldPos = m_camera.GetInverseViewMatrix() * localPos;
+			auto [normX, normY] = CalculateCoordsFromPixel(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
 
-		m_cursor.position = { worldPos.x, worldPos.y, worldPos.z };
+			float distance = m_camera.GetDistance();
+
+			float fovY_rad = m_fovY * (std::numbers::pi_v<float> / 180.0f);
+			float aspect = static_cast<float>(m_renderSize.cx) / m_renderSize.cy;
+
+			float planeHeight = 2.0f * distance * std::tan(fovY_rad / 2.0f);
+			float planeWidth = planeHeight * aspect;
+
+			float localX = normX * (planeWidth / 2.0f);
+			float localY = normY * (planeHeight / 2.0f);
+			float localZ = -distance;
+
+			Vec4f localPos(localX, localY, localZ, 1.0f);
+			Vec4f worldPos = m_camera.GetInverseViewMatrix() * localPos;
+
+			m_cursorPosition = { worldPos.x, worldPos.y, worldPos.z };
+		}
 	}
 	return true;
 
@@ -355,7 +422,15 @@ void CadApplication::Render()
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
-	DrawCursor();
+
+	//auto& context = m_device.getContext();
+	UINT stride = sizeof(VertexPosition);
+	UINT offset = 0;
+	context->IASetVertexBuffers(0, 1, m_cursor.GetVertexBuffer().GetAddressOf(), &stride, &offset);
+	DrawCursor(m_cursorPosition, 0.1f);
+	auto selectionCenter = GetSelectionCenter();
+	if (selectionCenter.has_value())
+		DrawCursor(selectionCenter.value(), 0.06f);
 
 	for (auto& obj : m_sceneObjects)
 	{
@@ -475,12 +550,13 @@ void CadApplication::DrawMenu()
 	ImGui::Begin("Menu", nullptr);
 	if (ImGui::Button("Add Torus"))
 	{
-		m_sceneObjects.push_back(std::make_unique<Torus>(m_cursor.position));
+		m_sceneObjects.push_back(std::make_unique<Torus>(m_cursorPosition));
 	}
 
 	if (ImGui::Button("Add Point"))
 	{
-		m_sceneObjects.push_back(std::make_unique<Point>(m_cursor.position));
+		m_sceneObjects.push_back(std::make_unique<Point>(m_cursorPosition));
+		m_sceneObjects.push_back(std::make_unique<Point>(m_cursorPosition));
 	}
 
 	ImGui::Separator();
@@ -650,8 +726,8 @@ void CadApplication::DrawMenu()
 
 	ImGui::Separator();
 	ImGui::Text("Cursor Settings");
-	ImGui::DragFloat3("Cursor Position", &m_cursor.position.x, 0.01f);
-	Vec4f worldPos = Vec4f(m_cursor.position.x, m_cursor.position.y, m_cursor.position.z, 1.0f);
+	ImGui::DragFloat3("Cursor Position", &m_cursorPosition.x, 0.01f);
+	Vec4f worldPos = Vec4f(m_cursorPosition.x, m_cursorPosition.y, m_cursorPosition.z, 1.0f);
 	Vec4f clipPos = m_projViewMatrix * worldPos;
 	int screenPos[2] = { 0 };
 	if (std::abs(clipPos.w) > 0.0001f)
@@ -682,7 +758,7 @@ void CadApplication::DrawMenu()
 		Vec4f localPos{ ndcX * (planeWidth / 2.0f), ndcY * (planeHeight / 2.0f), viewPos.z, 1.0f };
 		Vec4f newWorldPos = m_camera.GetInverseViewMatrix() * localPos;
 		
-		m_cursor.position = { newWorldPos.x, newWorldPos.y, newWorldPos.z };
+		m_cursorPosition = { newWorldPos.x, newWorldPos.y, newWorldPos.z };
 	}
 
 

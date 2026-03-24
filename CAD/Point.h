@@ -6,7 +6,7 @@
 class DxDevice;
 struct Point : public SceneObject
 {
-	float3 m_position{ 0.0f, 0.0f, 0.0f };
+	//float3 m_position{ 0.0f, 0.0f, 0.0f };
 	static void InitSharedGeometry(const DxDevice& device);
 	static void ReleaseSharedGeometry();
 

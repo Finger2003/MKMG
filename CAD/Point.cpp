@@ -23,7 +23,7 @@ void Point::ReleaseSharedGeometry()
 }
 
 Point::Point(float3 position)
-	: SceneObject("Point" + to_string(s_nextId++), ObjectType::Point), m_position(position)
+	: SceneObject(position, "Point" + to_string(s_nextId++), ObjectType::Point)//, m_position(position)
 {}
 
 MathLib::Mat4f Point::GetModelMatrix() const

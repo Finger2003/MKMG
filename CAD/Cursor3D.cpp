@@ -30,7 +30,7 @@ void Cursor3D::ReleaseSharedGeometry()
 	s_vertexBuffer.Reset();
 }
 
-MathLib::Mat4f Cursor3D::GetTranslationMatrix() const
-{
-	return Mat4f::Translation(position.x, position.y, position.z);
-}
+//MathLib::Mat4f Cursor3D::GetTranslationMatrix() const
+//{
+//	return Mat4f::Translation(position.x, position.y, position.z);
+//}

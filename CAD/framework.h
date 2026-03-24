@@ -7,6 +7,7 @@
 #include <numbers>
 #include <algorithm>
 #include <memory>
+#include <optional>
 
 #include <d3d11.h>
 
