@@ -305,11 +305,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			auto& obj = m_sceneObjects[m_lastClickedIndex];
 			if (m_currentEditAction >= EditAction::TranslateFree && m_currentEditAction <= EditAction::TranslateZ)
 			{
-
-
-				//float distanceZ = std::abs(obj->m_position.z);
-				//float unitsPerPixel = m_panScaleFactor * std::max(1.0f, distanceZ);
-
 				float moveX = dx * 0.01f;
 				//float moveY = -dy * 0.01f;
 
@@ -328,17 +323,11 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 					obj->m_position.z = newPos.z;
 				}
 				else if (m_currentEditAction == EditAction::TranslateX)
-				{
 					obj->m_position.x += moveX;
-				}
 				else if (m_currentEditAction == EditAction::TranslateY)
-				{
 					obj->m_position.y += moveX;
-				}
 				else if (m_currentEditAction == EditAction::TranslateZ)
-				{
 					obj->m_position.z += moveX;
-				}
 			}
 			else if (obj->type == ObjectType::Torus)
 			{
@@ -403,7 +392,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			}
 
 			UpdateProjectionMatrix();
-
 			m_lastMousePos = { xPos, yPos };
 		}
 		return true;
@@ -413,22 +401,9 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		short zDelta = (short)HIWORD(msg.wParam);
 		m_camera.Zoom((zDelta / 120.0f) * 0.5f);
 		UpdateProjectionMatrix();
-		//WORD fwKeys = LOWORD(msg.wParam);
-
-		//if (fwKeys & MK_CONTROL)
-		//{
-		//	m_torus.m_position.z += (zDelta > 0) ? 0.1 : -0.1; // Move along z-axis.
-		//}
-		//else
-		//{
-		//	float scaleFactor = (zDelta > 0) ? 1.1f : 0.9f;
-		//	m_torus.SetScale(m_torus.GetScale() * scaleFactor);
-		//}
-		//m_torus.UpdateModelMatrix();
 		return true;
 	}
 	}
-
 
 	return DxApplication::ProcessMessage(msg);
 }
@@ -851,8 +826,14 @@ void CadApplication::DrawMenu()
 				if (ImGui::DragFloat3("Position", &torus->m_position.x, 0.01f))
 					transformChanged = true;
 
-				if (ImGui::DragFloat3("Rotation", &torus->m_eulerAngles.x, 0.01f))
+
+				Vec3f eulerDegrees = Vec3f(torus->m_eulerAngles.x, torus->m_eulerAngles.y, torus->m_eulerAngles.z) * (180.0f / std::numbers::pi_v<float>);
+				if (ImGui::DragFloat3("Rotation", eulerDegrees.f, 1.0f, 0.0f, 0.0f, "%.2f"))
 				{
+					eulerDegrees *= (std::numbers::pi_v<float> / 180.0f);
+					torus->m_eulerAngles.x = eulerDegrees.x;
+					torus->m_eulerAngles.y = eulerDegrees.y;
+					torus->m_eulerAngles.z = eulerDegrees.z;
 					MathLib::Mat4f rotX = MathLib::Mat4f::RotationX(torus->m_eulerAngles.x);
 					MathLib::Mat4f rotY = MathLib::Mat4f::RotationY(torus->m_eulerAngles.y);
 					MathLib::Mat4f rotZ = MathLib::Mat4f::RotationZ(torus->m_eulerAngles.z);
