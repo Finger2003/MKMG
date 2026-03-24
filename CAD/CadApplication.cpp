@@ -181,6 +181,24 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 	}
 	case WM_LBUTTONDOWN:
 	{
+		if (m_menuState == MenuState::Edit && m_currentEditAction != EditAction::None)
+		{
+			m_isEditing = true;
+			m_lastMousePos = { xPos, yPos };
+			m_startArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
+			auto& obj = m_sceneObjects[m_lastClickedIndex];
+			Vec3f objPos = Vec3f(obj->m_position.x, obj->m_position.y, obj->m_position.z);
+			Vec3f toObj = objPos - m_camera.GetPosition();
+			m_editAnchorDepth = Vec3f::dot(toObj, m_camera.GetForwardVector());
+			if (obj->type == ObjectType::Torus)
+			{
+				auto torus = static_cast<Torus*>(obj.get());
+				torus->m_baseRotationMatrix = torus->m_rotationMatrix;
+			}
+			SetCapture(m_window.getHandle());
+			return true;
+		}
+
 		SceneObject* closestObj = nullptr;
 		size_t closestIndex = -1;
 		float minZ = std::numeric_limits<float>::max();
@@ -255,15 +273,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		}
 	}
 	return true;
-
-		//m_interactionMode = InteractionMode::Rotating;
-		//m_lastMousePos = { xPos, yPos };
-		//m_startMousePos = { xPos, yPos };
-		//m_startArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
-		//m_torus.m_baseRotationMatrix = m_torus.m_rotationMatrix;
-		//SetCapture(m_window.getHandle());
-		//return true;
-
 	case WM_MBUTTONDOWN:
 		m_interactionMode = InteractionMode::Orbiting;
 		m_lastMousePos = { xPos, yPos };
@@ -281,15 +290,107 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 	case WM_LBUTTONUP:
 	case WM_RBUTTONUP:
 	case WM_MBUTTONUP:
+		m_isEditing = false;
 		m_interactionMode = InteractionMode::None;
 		ReleaseCapture();
 		return true;
 	case WM_MOUSEMOVE:
+	{
+		int dx = xPos - m_lastMousePos.x;
+		int dy = yPos - m_lastMousePos.y;
+
+		if (m_isEditing)
+		{
+			auto& obj = m_sceneObjects[m_lastClickedIndex];
+			if (m_currentEditAction >= EditAction::TranslateFree && m_currentEditAction <= EditAction::TranslateZ)
+			{
+
+
+				//float distanceZ = std::abs(obj->m_position.z);
+				//float unitsPerPixel = m_panScaleFactor * std::max(1.0f, distanceZ);
+
+				float moveX = dx * 0.01f;
+				//float moveY = -dy * 0.01f;
+
+				if (m_currentEditAction == EditAction::TranslateFree)
+				{
+					Vec3f objPos = Vec3f(obj->m_position.x, obj->m_position.y, obj->m_position.z);
+					Vec3f toObj = objPos - m_camera.GetPosition();
+					//float depth = Vec3f::dot(toObj, m_camera.GetForwardVector());
+					float depth = m_editAnchorDepth;
+					float unitsPerPixel = m_panScaleFactor * std::abs(depth);
+
+					Vec3f worldDelta = (m_camera.GetRightVector() * dx - m_camera.GetUpVector() * dy) * unitsPerPixel;
+					Vec3f newPos = objPos + worldDelta;
+					obj->m_position.x = newPos.x;
+					obj->m_position.y = newPos.y;
+					obj->m_position.z = newPos.z;
+				}
+				else if (m_currentEditAction == EditAction::TranslateX)
+				{
+					obj->m_position.x += moveX;
+				}
+				else if (m_currentEditAction == EditAction::TranslateY)
+				{
+					obj->m_position.y += moveX;
+				}
+				else if (m_currentEditAction == EditAction::TranslateZ)
+				{
+					obj->m_position.z += moveX;
+				}
+			}
+			else if (obj->type == ObjectType::Torus)
+			{
+				auto torus = static_cast<Torus*>(obj.get());
+
+				if (m_currentEditAction == EditAction::RotateFree)
+				{
+					Vec3f currentArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
+					float dot = std::clamp(Vec3f::dot(m_startArcballVector, currentArcballVector), -1.0f, 1.0f);
+					float angle = std::acos(dot) * 2.0f;
+					Vec3f rotationAxis = Vec3f::cross(m_startArcballVector, currentArcballVector);
+
+					if (rotationAxis.length_sqr() > 1e-6f)
+					{
+						Mat4f rot = Mat4f::RotationAxis(rotationAxis.normalize(), angle);
+						torus->m_rotationMatrix = rot * torus->m_baseRotationMatrix;
+						Vec3f euler = Mat4f::ExtractEulerAngles(torus->m_rotationMatrix);
+						torus->m_eulerAngles = { euler.x, euler.y, euler.z };
+					}
+				}
+				else if (m_currentEditAction >= EditAction::RotateX && m_currentEditAction <= EditAction::RotateZ)
+				{
+					float angle = dx * 0.01f;
+					Mat4f rot;
+
+					if (m_currentEditAction == EditAction::RotateX) rot = Mat4f::RotationX(angle);
+					else if (m_currentEditAction == EditAction::RotateY) rot = Mat4f::RotationY(angle);
+					else if (m_currentEditAction == EditAction::RotateZ) rot = Mat4f::RotationZ(angle);
+
+					torus->m_rotationMatrix = rot * torus->m_baseRotationMatrix;
+					Vec3f euler = Mat4f::ExtractEulerAngles(torus->m_rotationMatrix);
+					torus->m_eulerAngles = { euler.x, euler.y, euler.z };
+				}
+				else if (m_currentEditAction == EditAction::Scale)
+				{
+					float scaleFactor = 1.0f + dx * 0.01f;
+					torus->SetScale(torus->GetScale() * scaleFactor);
+				}
+			}
+			if (obj->type == ObjectType::Torus)
+				static_cast<Torus*>(obj.get())->UpdateModelMatrix();
+
+			if (m_currentEditAction < EditAction::RotateFree || m_currentEditAction > EditAction::RotateZ)
+			{
+				m_lastMousePos = { xPos, yPos };
+			}
+
+			return true;
+		}
+
+
 		if (m_interactionMode != InteractionMode::None)
 		{
-			int dx = xPos - m_lastMousePos.x;
-			int dy = yPos - m_lastMousePos.y;
-
 			if (m_interactionMode == InteractionMode::Orbiting)
 			{
 				m_camera.Orbit(dx * 0.01f, dy * 0.01f);
@@ -302,46 +403,10 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 
 			UpdateProjectionMatrix();
 
-			//if (m_cbPerPass)
-			//{
-			//	PerPassBuffer perPassData;
-			//	perPassData.viewProj = m_camera.GetProjectionMatrix() * m_camera.GetViewMatrix();
-			//	m_device.UpdateBuffer(m_cbPerPass, perPassData);
-			//}
-
 			m_lastMousePos = { xPos, yPos };
 		}
-		//if (m_interactionMode != InteractionMode::None)
-		//{
-		//	int dx = xPos - m_lastMousePos.x;
-		//	int dy = yPos - m_lastMousePos.y;
-		//	if (m_interactionMode == InteractionMode::Rotating)
-		//	{
-		//		Vec3f currentArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
-		//		float dot = std::clamp(Vec3f::dot(m_startArcballVector, currentArcballVector), -1.0f, 1.0f);
-		//		float angle = std::acos(dot) * 2.0f;
-		//		Vec3f rotationAxis = Vec3f::cross(m_startArcballVector, currentArcballVector);
-
-		//		if (rotationAxis.length_sqr() > 1e-6f)
-		//		{
-		//			Mat4f rot = Mat4f::RotationAxis(rotationAxis.normalize(), angle);
-		//			m_torus.m_rotationMatrix = rot * m_torus.m_baseRotationMatrix;
-		//			Vec3f euler = Mat4f::ExtractEulerAngles(m_torus.m_rotationMatrix);
-		//			m_torus.m_eulerAngles = { euler.x, euler.y, euler.z };
-		//		}
-		//	}
-		//	else if (m_interactionMode == InteractionMode::Translating)
-		//	{
-		//		float distanceZ = std::abs(m_torus.m_position.z);
-		//		float unitsPerPixel = m_panScaleFactor * distanceZ;
-
-		//		m_torus.m_position.x += dx * unitsPerPixel;
-		//		m_torus.m_position.y -= dy * unitsPerPixel;
-		//	}
-		//	m_torus.UpdateModelMatrix();
-		//	m_lastMousePos = { xPos, yPos };
-		//}
 		return true;
+	}
 	case WM_MOUSEWHEEL:
 	{
 		short zDelta = (short)HIWORD(msg.wParam);
@@ -821,54 +886,6 @@ void CadApplication::DrawMenu()
 			}
 		}
 	}
-
-
-
-	//float tempMajor = m_torus.GetMajorRadius();
-	//float tempMinor = m_torus.GetMinorRadius();
-	//int tempSegs[2] = { m_torus.GetMajorSegments(), m_torus.GetMinorSegments() };
-
-	//ImGui::Text("Torus Settings");
-	//if (ImGui::SliderFloat("Major Radius", &tempMajor, Torus::cMinMajorRadius, Torus::cMaxMajorRadius))
-	//	m_torus.SetMajorRadius(tempMajor);
-	//if (ImGui::SliderFloat("Minor Radius", &tempMinor, Torus::cMinMinorRadius, Torus::cMaxMinorRadius))
-	//	m_torus.SetMinorRadius(tempMinor);
-
-	//ImGui::Text("Segments (Major, Minor)");
-	////ImGui::PushItemWidth(-1.0f);
-	//if (ImGui::SliderInt2("##Segments (Major, Minor)", tempSegs, Torus::cMinMajorSegments, Torus::cMaxMajorSegments))
-	//	m_torus.SetSegments(tempSegs[0], tempSegs[1]);
-
-	//ImGui::Separator();
-	//ImGui::Text("Transformations");
-	//bool transformChanged = false;
-
-	//if (ImGui::DragFloat3("Position", &m_torus.m_position.x, 0.01f))
-	//	transformChanged = true;
-
-	//ImGui::Text("Rotation (XYZ Euler angles), Z-X-Y application order");
-	////ImGui::PushItemWidth(-1.0f);
-	//if (ImGui::DragFloat3("##Rotation (Euler angles)", &m_torus.m_eulerAngles.x, 0.01f))
-	//{
-	//	Mat4f rotX = Mat4f::RotationX(m_torus.m_eulerAngles.x);
-	//	Mat4f rotY = Mat4f::RotationY(m_torus.m_eulerAngles.y);
-	//	Mat4f rotZ = Mat4f::RotationZ(m_torus.m_eulerAngles.z);
-	//	m_torus.m_rotationMatrix = rotZ * rotX * rotY;
-	//	transformChanged = true;
-	//}
-	//if (ImGui::Button("Reset Rotation"))
-	//{
-	//	m_torus.m_eulerAngles = { 0, 0, 0 };
-	//	m_torus.m_rotationMatrix = Mat4f::Identity();
-	//	m_torus.m_baseRotationMatrix = Mat4f::Identity();
-	//	transformChanged = true;
-	//}
-
-	//if (ImGui::DragFloat("Scale", &m_torus.m_scale, 0.01f, Torus::cMinScale, Torus::cMaxScale))
-	//	transformChanged = true;
-
-	//if (transformChanged)
-	//	m_torus.UpdateModelMatrix();
 
 
 	ImGui::End();

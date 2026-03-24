@@ -53,3 +53,28 @@ MathLib::Mat4f Camera::GetInverseViewMatrix() const
 
 	return translationFromTarget * rotY * rotX * pullBack;
 }
+
+MathLib::Vec3f Camera::GetRightVector() const
+{
+	Mat4f invView = GetInverseViewMatrix();
+	return Vec3f(invView.m[0][0], invView.m[1][0], invView.m[2][0]);
+}
+
+MathLib::Vec3f Camera::GetUpVector() const
+{
+	Mat4f invView = GetInverseViewMatrix();
+	return Vec3f(invView.m[0][1], invView.m[1][1], invView.m[2][1]);
+}
+
+MathLib::Vec3f Camera::GetForwardVector() const
+{
+	Mat4f invView = GetInverseViewMatrix();
+	return Vec3f(-invView.m[0][2], -invView.m[1][2], -invView.m[2][2]);
+}
+
+MathLib::Vec3f Camera::GetPosition() const
+{
+	Vec4f pos = GetInverseViewMatrix() * Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
+	pos /= pos.w;
+	return Vec3f(pos.x, pos.y, pos.z);
+}

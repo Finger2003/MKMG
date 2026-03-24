@@ -156,5 +156,7 @@ private:
 
 	MenuState m_menuState = MenuState::List;
 	EditAction m_currentEditAction = EditAction::None;
+	bool m_isEditing = false;
+	float m_editAnchorDepth = 0.0f;
 };
 

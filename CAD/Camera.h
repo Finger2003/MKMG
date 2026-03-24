@@ -15,6 +15,11 @@ public:
 	MathLib::Mat4f GetProjectionMatrix() const { return m_projMatrix; }
 	float GetDistance() const { return m_distance; }
 
+	MathLib::Vec3f GetRightVector() const;
+	MathLib::Vec3f GetUpVector() const;
+	MathLib::Vec3f GetForwardVector() const;
+	MathLib::Vec3f GetPosition() const;
+
 private:
 	MathLib::Vec3f m_target{ 0.0f, 0.0f, 0.0f };
 	float m_distance = 5.0f;
