@@ -73,9 +73,7 @@ MathLib::Vec3f Camera::GetForwardVector() const
 
 MathLib::Vec3f Camera::GetPosition() const
 {
-	Vec4f pos = m_invViewMatrix * Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
-	pos /= pos.w;
-	return Vec3f(pos.x, pos.y, pos.z);
+	return Vec3f(m_invViewMatrix.m[0][3], m_invViewMatrix.m[1][3], m_invViewMatrix.m[2][3]);
 }
 
 void Camera::UpdateMatrices()

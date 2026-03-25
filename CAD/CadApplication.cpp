@@ -778,7 +778,6 @@ void CadApplication::DrawMenu()
 					"Free Arcball", "Rotate X", "Rotate Y", "Rotate Z", "Scale"
 				};
 				int actionIndex = static_cast<int>(m_currentEditAction);
-				//if (actionIndex > 4) actionIndex = 0; // Prevent out-of-bounds
 
 				if (ImGui::Combo("##PointAction", &actionIndex, actions, IM_ARRAYSIZE(actions)))
 				{
@@ -913,7 +912,7 @@ void CadApplication::DrawMenu()
 	{
 		screenPos[0] = std::clamp(screenPos[0], 0, static_cast<int>(m_renderSize.cx));
 		screenPos[1] = std::clamp(screenPos[1], 0, static_cast<int>(m_renderSize.cy));
-		auto [ndcX, ndcY] = CalculateCoordsFromPixel((float)screenPos[0], (float)screenPos[1], (float)m_renderSize.cx, (float)m_renderSize.cy);
+		auto [ndcX, ndcY] = CalculateCoordsFromPixel(screenPos[0], screenPos[1], m_renderSize.cx, m_renderSize.cy);
 
 
 		Vec4f viewPos = m_viewMatrix * worldPos;
