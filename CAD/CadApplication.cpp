@@ -206,39 +206,51 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 	}
 	case WM_LBUTTONDOWN:
 	{
+		WORD fwKeys = LOWORD(msg.wParam);
 		if ((m_menuState == MenuState::Edit || m_menuState == MenuState::EditGroup) && m_currentEditAction != EditAction::None)
 		{
 			m_isEditing = true;
 			m_lastMousePos = { xPos, yPos };
 
-			if (m_menuState == MenuState::EditGroup)
+			if (fwKeys & MK_SHIFT)
+				m_groupEditCenter = m_cursorPosition;
+			else if (m_menuState == MenuState::Edit)
+				m_groupEditCenter = m_sceneObjects[m_lastClickedIndex]->m_position;
+			else
 			{
-				WORD fwKeys = LOWORD(msg.wParam);
-				if (fwKeys & MK_SHIFT)
-				{
-					auto center = m_cursorPosition;
-					m_groupEditCenter = m_cursorPosition;
-					Vec3f centerVec = Vec3f(center.x, center.y, center.z);
-					Vec3f toCenter = centerVec - m_camera.GetPosition();
-					m_editAnchorDepth = Vec3f::dot(toCenter, m_camera.GetForwardVector());
-				}
-				else
-				{
-					auto center = GetSelectionCenter();
-					if (center)
-					{
-						m_groupEditCenter = *center;
-						Vec3f centerVec = Vec3f(center->x, center->y, center->z);
-						Vec3f toCenter = centerVec - m_camera.GetPosition();
-						m_editAnchorDepth = Vec3f::dot(toCenter, m_camera.GetForwardVector());
-					}
-				}
+				auto center = GetSelectionCenter();
+				m_groupEditCenter = center ? *center : float3(0.0f, 0.0f, 0.0f);
+			}
 
+			Vec3f toPivot = Vec3f(m_groupEditCenter.x, m_groupEditCenter.y, m_groupEditCenter.z) - m_camera.GetPosition();
+			m_editAnchorDepth = Vec3f::dot(toPivot, m_camera.GetForwardVector());
+
+			Vec4f pivotWorldPos = Vec4f(m_groupEditCenter.x, m_groupEditCenter.y, m_groupEditCenter.z, 1.0f);
+			Vec4f pivotClipPos = m_projViewMatrix * pivotWorldPos;
+			if (std::abs(pivotClipPos.w) > 0.0001f)
+				pivotClipPos /= pivotClipPos.w;
+
+			m_editObjScreenX = (pivotClipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
+			m_editObjScreenY = (1.0f - pivotClipPos.y) * 0.5f * m_renderSize.cy;
+			m_startArcballVector = ScreenToObjectArcballVector(xPos, yPos, m_editObjScreenX, m_editObjScreenY, 150.0f);
+
+			if (m_menuState == MenuState::Edit)
+			{
+				auto& obj = m_sceneObjects[m_lastClickedIndex];
+				obj->m_basePosition = obj->m_position;
+				if (obj->type == ObjectType::Torus)
+				{
+					auto torus = static_cast<Torus*>(obj.get());
+					torus->m_baseRotationMatrix = torus->m_rotationMatrix;
+					torus->m_baseScale = torus->m_scale;
+				}
+			}
+			else // EditGroup
+			{
 				for (auto& obj : m_sceneObjects)
 				{
 					if (!obj->selected)
 						continue;
-
 					obj->m_basePosition = obj->m_position;
 					if (obj->type == ObjectType::Torus)
 					{
@@ -246,46 +258,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 						torus->m_baseRotationMatrix = torus->m_rotationMatrix;
 						torus->m_baseScale = torus->m_scale;
 					}
-				}
-
-				Vec4f centerWorldPos = Vec4f(m_groupEditCenter.x, m_groupEditCenter.y, m_groupEditCenter.z, 1.0f);
-				Vec4f centerClipPos = m_projViewMatrix * centerWorldPos;
-				centerClipPos /= centerClipPos.w;
-
-				m_editObjScreenX = (centerClipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
-				m_editObjScreenY = (1.0f - centerClipPos.y) * 0.5f * m_renderSize.cy;
-				m_startArcballVector = ScreenToObjectArcballVector(xPos, yPos, m_editObjScreenX, m_editObjScreenY, 150.0f);
-			}
-			else
-			{
-				auto& obj = m_sceneObjects[m_lastClickedIndex];
-				obj->m_basePosition = obj->m_position;
-
-				WORD fwKeys = LOWORD(msg.wParam);
-				if (fwKeys & MK_SHIFT)
-					m_groupEditCenter = m_cursorPosition; // Pivot around 3D cursor
-				else
-					m_groupEditCenter = obj->m_position;  // Pivot around itself
-
-
-				//Vec4f worldPos = Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);
-				Vec4f worldPos = Vec4f(m_groupEditCenter.x, m_groupEditCenter.y, m_groupEditCenter.z, 1.0f);
-				Vec4f clipPos = m_projViewMatrix * worldPos;
-				clipPos /= clipPos.w;
-
-				m_editObjScreenX = (clipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
-				m_editObjScreenY = (1.0f - clipPos.y) * 0.5f * m_renderSize.cy;
-				m_startArcballVector = ScreenToObjectArcballVector(xPos, yPos, m_editObjScreenX, m_editObjScreenY, 150.0f);
-
-				Vec3f pivotVec = Vec3f(m_groupEditCenter.x, m_groupEditCenter.y, m_groupEditCenter.z);
-				Vec3f toPivot = pivotVec - m_camera.GetPosition();
-				m_editAnchorDepth = Vec3f::dot(toPivot, m_camera.GetForwardVector());
-
-				if (obj->type == ObjectType::Torus)
-				{
-					auto torus = static_cast<Torus*>(obj.get());
-					torus->m_baseRotationMatrix = torus->m_rotationMatrix;
-					torus->m_baseScale = torus->m_scale;
 				}
 			}
 
@@ -321,21 +293,19 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			}
 		}
 
-		WORD fwKeys = LOWORD(msg.wParam);
 		if (closestObj)
 		{
 			if (fwKeys & MK_CONTROL)
 			{
 				closestObj->selected = !closestObj->selected;
-				m_lastClickedIndex = closestIndex;
 			}
 			else
 			{
 				for (auto& o : m_sceneObjects)
 					o->selected = false;
 				closestObj->selected = true;
-				m_lastClickedIndex = closestIndex;
 			}
+			m_lastClickedIndex = closestIndex;
 		}
 		else
 		{
@@ -349,18 +319,13 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			auto [normX, normY] = CalculateCoordsFromPixel(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
 
 			float distance = m_camera.GetDistance();
-
 			float fovY_rad = m_fovY * (std::numbers::pi_v<float> / 180.0f);
 			float aspect = static_cast<float>(m_renderSize.cx) / m_renderSize.cy;
 
 			float planeHeight = 2.0f * distance * std::tan(fovY_rad / 2.0f);
 			float planeWidth = planeHeight * aspect;
 
-			float localX = normX * (planeWidth / 2.0f);
-			float localY = normY * (planeHeight / 2.0f);
-			float localZ = -distance;
-
-			Vec4f localPos(localX, localY, localZ, 1.0f);
+			Vec4f localPos(normX * (planeWidth / 2.0f), normY * (planeHeight / 2.0f), -distance, 1.0f);
 			Vec4f worldPos = m_camera.GetInverseViewMatrix() * localPos;
 
 			m_cursorPosition = { worldPos.x, worldPos.y, worldPos.z };
