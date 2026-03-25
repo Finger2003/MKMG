@@ -46,7 +46,7 @@ void Torus::SetSegments(int major, int minor)
 
 void Torus::SetScale(float scale)
 {
-	float s = clamp(scale, cMinScale, cMaxScale);
+	float s = scale;// clamp(scale, cMinScale, cMaxScale);
 	if (s != m_scale)
 	{
 		m_scale = s;

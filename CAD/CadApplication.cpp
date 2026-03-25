@@ -130,8 +130,6 @@ void CadApplication::DrawCursor(float3 position, float scale)
 {
 	auto& context = m_device.getContext();
 
-	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
-
 	PerObjectBuffer objData;
 	Mat4f translation = Mat4f::Translation(position.x, position.y, position.z);
 	Mat4f scaling = Mat4f::Scaling(scale);
@@ -356,79 +354,73 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 
 		if (m_isEditing)
 		{
-			if (m_menuState == MenuState::EditGroup)
+			Vec3f editPivot = Vec3f(m_groupEditCenter.x, m_groupEditCenter.y, m_groupEditCenter.z);
+			MathLib::Mat4f deltaRot = MathLib::Mat4f::Identity();
+			float scaleFactor = 1.0f;
+			Vec3f worldDelta(0, 0, 0);
+			bool isTranslating = false, isRotating = false, isScaling = false;
+
+			if (m_currentEditAction >= EditAction::TranslateFree && m_currentEditAction <= EditAction::TranslateZ)
 			{
-				Vec3f editCenter = Vec3f(m_groupEditCenter.x, m_groupEditCenter.y, m_groupEditCenter.z);
-				MathLib::Mat4f deltaRot = MathLib::Mat4f::Identity();
-				float scaleFactor = 1.0f;
-				Vec3f worldDelta(0, 0, 0);
-				bool isTranslating = false, isRotating = false, isScaling = false;
-
-				if (m_currentEditAction >= EditAction::TranslateFree && m_currentEditAction <= EditAction::TranslateZ)
+				float moveX = dx * 0.01f;
+				if (m_currentEditAction == EditAction::TranslateFree)
 				{
-					float moveX = dx * 0.01f;
-					if (m_currentEditAction == EditAction::TranslateFree)
-					{
-						Vec3f toGroup = editCenter - m_camera.GetPosition();
-						float depth = m_editAnchorDepth;
-						float unitsPerPixel = m_panScaleFactor * std::abs(depth);
-						worldDelta = (m_camera.GetRightVector() * dx - m_camera.GetUpVector() * dy) * unitsPerPixel;
-					}
-					else if (m_currentEditAction == EditAction::TranslateX) worldDelta.x = moveX;
-					else if (m_currentEditAction == EditAction::TranslateY) worldDelta.y = moveX;
-					else if (m_currentEditAction == EditAction::TranslateZ) worldDelta.z = moveX;
-
-					isTranslating = true;
+					float unitsPerPixel = m_panScaleFactor * std::abs(m_editAnchorDepth);
+					worldDelta = (m_camera.GetRightVector() * dx - m_camera.GetUpVector() * dy) * unitsPerPixel;
 				}
-				else if (m_currentEditAction == EditAction::RotateFree)
-				{
-					Vec3f currentArcballVector = ScreenToObjectArcballVector(xPos, yPos, m_editObjScreenX, m_editObjScreenY, 150.0f);
-					float dot = std::clamp(Vec3f::dot(m_startArcballVector, currentArcballVector), -1.0f, 1.0f);
-					float angle = std::acos(dot) * 2.0f;
-					Vec3f cameraSpaceAxis = Vec3f::cross(m_startArcballVector, currentArcballVector);
+				else if (m_currentEditAction == EditAction::TranslateX) worldDelta.x = moveX;
+				else if (m_currentEditAction == EditAction::TranslateY) worldDelta.y = moveX;
+				else if (m_currentEditAction == EditAction::TranslateZ) worldDelta.z = moveX;
 
-					if (cameraSpaceAxis.length_sqr() > 1e-6f)
-					{
-						Vec4f worldAxis4 = m_camera.GetInverseViewMatrix() * Vec4f(cameraSpaceAxis.x, cameraSpaceAxis.y, cameraSpaceAxis.z, 0.0f);
-						Vec3f worldAxis = Vec3f(worldAxis4.x, worldAxis4.y, worldAxis4.z).normalize();
+				isTranslating = true;
+			}
+			else if (m_currentEditAction == EditAction::RotateFree)
+			{
+				Vec3f currentArcballVector = ScreenToObjectArcballVector(xPos, yPos, m_editObjScreenX, m_editObjScreenY, 150.0f);
+				float dot = std::clamp(Vec3f::dot(m_startArcballVector, currentArcballVector), -1.0f, 1.0f);
+				float angle = std::acos(dot) * 2.0f;
+				Vec3f cameraSpaceAxis = Vec3f::cross(m_startArcballVector, currentArcballVector);
 
-						deltaRot = Mat4f::RotationAxis(worldAxis, angle);
-						isRotating = true;
-					}
-				}
-				else if (m_currentEditAction >= EditAction::RotateX && m_currentEditAction <= EditAction::RotateZ)
+				if (cameraSpaceAxis.length_sqr() > 1e-6f)
 				{
-					float angle = dx * 0.01f;
-					if (m_currentEditAction == EditAction::RotateX) deltaRot = Mat4f::RotationX(angle);
-					else if (m_currentEditAction == EditAction::RotateY) deltaRot = Mat4f::RotationY(angle);
-					else if (m_currentEditAction == EditAction::RotateZ) deltaRot = Mat4f::RotationZ(angle);
+					Vec4f worldAxis4 = m_camera.GetInverseViewMatrix() * Vec4f(cameraSpaceAxis.x, cameraSpaceAxis.y, cameraSpaceAxis.z, 0.0f);
+					Vec3f worldAxis = Vec3f(worldAxis4.x, worldAxis4.y, worldAxis4.z).normalize();
+
+					deltaRot = Mat4f::RotationAxis(worldAxis, angle);
 					isRotating = true;
 				}
-				else if (m_currentEditAction == EditAction::Scale)
-				{
-					scaleFactor = std::max(0.01f, 1.0f + dx * 0.01f);
-					isScaling = true;
-				}
+			}
+			else if (m_currentEditAction >= EditAction::RotateX && m_currentEditAction <= EditAction::RotateZ)
+			{
+				float angle = dx * 0.01f;
+				if (m_currentEditAction == EditAction::RotateX) deltaRot = Mat4f::RotationX(angle);
+				else if (m_currentEditAction == EditAction::RotateY) deltaRot = Mat4f::RotationY(angle);
+				else if (m_currentEditAction == EditAction::RotateZ) deltaRot = Mat4f::RotationZ(angle);
+				isRotating = true;
+			}
+			else if (m_currentEditAction == EditAction::Scale)
+			{
+				scaleFactor = std::max(0.01f, 1.0f + dx * 0.01f);
+				isScaling = true;
+			}
 
-				if (isTranslating || isRotating || isScaling)
-				{
-					for (auto& obj : m_sceneObjects)
+			if (isTranslating || isRotating || isScaling)
+			{
+				auto applyTransform = [&](const std::unique_ptr<SceneObject>& obj)
 					{
-						if (!obj->selected)
-							continue;
-
 						Vec3f objBasePos = Vec3f(obj->m_basePosition.x, obj->m_basePosition.y, obj->m_basePosition.z);
 
 						if (isTranslating)
 						{
-							objBasePos += worldDelta;
-							obj->m_position = { objBasePos.x, objBasePos.y, objBasePos.z };
+							Vec3f newPos = objBasePos + worldDelta;
+							obj->m_position = { newPos.x, newPos.y, newPos.z };
 						}
 						else if (isScaling)
 						{
-							Vec3f offset = objBasePos - editCenter;
-							objBasePos = editCenter + offset * scaleFactor;
-							obj->m_position = { objBasePos.x, objBasePos.y, objBasePos.z };
+							Vec3f offset = objBasePos - editPivot;
+							Vec3f newPos = editPivot + offset * scaleFactor;
+							obj->m_position = { newPos.x, newPos.y, newPos.z };
+
 							if (obj->type == ObjectType::Torus)
 							{
 								auto torus = static_cast<Torus*>(obj.get());
@@ -437,13 +429,13 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 						}
 						else if (isRotating)
 						{
-							Vec3f offset = objBasePos - editCenter;
+							Vec3f offset = objBasePos - editPivot;
 							Vec4f rotatedOffset4 = deltaRot * Vec4f(offset.x, offset.y, offset.z, 1.0f);
 							Vec3f rotatedOffset(rotatedOffset4.x, rotatedOffset4.y, rotatedOffset4.z);
+							Vec3f newPos = editPivot + rotatedOffset;
 
-							objBasePos = editCenter + rotatedOffset;
+							obj->m_position = { newPos.x, newPos.y, newPos.z };
 
-							obj->m_position = { objBasePos.x, objBasePos.y, objBasePos.z };
 							if (obj->type == ObjectType::Torus)
 							{
 								auto torus = static_cast<Torus*>(obj.get());
@@ -454,114 +446,24 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 						}
 
 						if (obj->type == ObjectType::Torus)
-						{
 							static_cast<Torus*>(obj.get())->UpdateModelMatrix();
-						}
-					}
-				}
+					};
 
-				//m_lastMousePos = { xPos, yPos };
-				return true;
-			}
-			else
-			{
-				auto& obj = m_sceneObjects[m_lastClickedIndex];
-				Vec3f objBasePos = Vec3f(obj->m_basePosition.x, obj->m_basePosition.y, obj->m_basePosition.z);
-				Vec3f editPivot = Vec3f(m_groupEditCenter.x, m_groupEditCenter.y, m_groupEditCenter.z);
-				if (m_currentEditAction >= EditAction::TranslateFree && m_currentEditAction <= EditAction::TranslateZ)
+				if (m_menuState == MenuState::EditGroup)
 				{
-					float moveX = dx * 0.01f;
-
-					if (m_currentEditAction == EditAction::TranslateFree)
+					for (auto& obj : m_sceneObjects)
 					{
-						float depth = m_editAnchorDepth;
-						float unitsPerPixel = m_panScaleFactor * std::abs(depth);
-
-						Vec3f worldDelta = (m_camera.GetRightVector() * dx - m_camera.GetUpVector() * dy) * unitsPerPixel;
-						Vec3f newPos = objBasePos + worldDelta;
-						obj->m_position = { newPos.x, newPos.y, newPos.z };
+						if (obj->selected)
+							applyTransform(obj);
 					}
-					else if (m_currentEditAction == EditAction::TranslateX)
-						obj->m_position.x = obj->m_basePosition.x + moveX;
-					else if (m_currentEditAction == EditAction::TranslateY)
-						obj->m_position.y = obj->m_basePosition.y + moveX;
-					else if (m_currentEditAction == EditAction::TranslateZ)
-						obj->m_position.z = obj->m_basePosition.z + moveX;
 				}
 				else
 				{
-					
-					Mat4f deltaRot = MathLib::Mat4f::Identity();
-					float scaleFactor = 1.0f;
-					bool isRotating = false;
-					bool isScaling = false;
-
-					if (m_currentEditAction == EditAction::RotateFree)
-					{
-						Vec3f currentArcballVector = ScreenToObjectArcballVector(xPos, yPos, m_editObjScreenX, m_editObjScreenY, 150.0f);
-						float dot = std::clamp(Vec3f::dot(m_startArcballVector, currentArcballVector), -1.0f, 1.0f);
-						float angle = std::acos(dot) * 2.0f;
-						Vec3f cameraSpaceAxis = Vec3f::cross(m_startArcballVector, currentArcballVector);
-
-						if (cameraSpaceAxis.length_sqr() > 1e-6f)
-						{
-							Vec4f worldAxis4 = m_camera.GetInverseViewMatrix() * Vec4f(cameraSpaceAxis.x, cameraSpaceAxis.y, cameraSpaceAxis.z, 0.0f);
-							Vec3f worldAxis = Vec3f(worldAxis4.x, worldAxis4.y, worldAxis4.z).normalize();
-
-							deltaRot = Mat4f::RotationAxis(worldAxis, angle);
-							isRotating = true;
-						}
-					}
-					else if (m_currentEditAction >= EditAction::RotateX && m_currentEditAction <= EditAction::RotateZ)
-					{
-						float angle = dx * 0.01f;
-						//Mat4f rot;
-
-						if (m_currentEditAction == EditAction::RotateX) deltaRot = Mat4f::RotationX(angle);
-						else if (m_currentEditAction == EditAction::RotateY) deltaRot = Mat4f::RotationY(angle);
-						else if (m_currentEditAction == EditAction::RotateZ) deltaRot = Mat4f::RotationZ(angle);
-						isRotating = true;
-					}
-					else if (m_currentEditAction == EditAction::Scale)
-					{
-						scaleFactor = std::max(0.01f, 1.0f + dx * 0.01f);
-						isScaling = true;
-					}
-
-					if (isScaling)
-					{
-						Vec3f offset = objBasePos - editPivot;
-						Vec3f newPos = editPivot + offset * scaleFactor;
-						obj->m_position = { newPos.x, newPos.y, newPos.z };
-						if (obj->type == ObjectType::Torus)
-						{
-							auto torus = static_cast<Torus*>(obj.get());
-							torus->SetScale(torus->m_baseScale * scaleFactor);
-						}
-					}
-					else if (isRotating)
-					{
-						Vec3f offset = objBasePos - editPivot;
-						Vec4f rotatedOffset4 = deltaRot * Vec4f(offset.x, offset.y, offset.z, 1.0f);
-						Vec3f rotatedOffset(rotatedOffset4.x, rotatedOffset4.y, rotatedOffset4.z);
-						Vec3f newPos = editPivot + rotatedOffset;
-
-						obj->m_position = { newPos.x, newPos.y, newPos.z };
-
-						if (obj->type == ObjectType::Torus)
-						{
-							auto torus = static_cast<Torus*>(obj.get());
-							torus->m_rotationMatrix = deltaRot * torus->m_baseRotationMatrix;
-							Vec3f euler = Mat4f::ExtractEulerAngles(torus->m_rotationMatrix);
-							torus->m_eulerAngles = { euler.x, euler.y, euler.z };
-						}
-					}
+					applyTransform(m_sceneObjects[m_lastClickedIndex]);
 				}
-				if (obj->type == ObjectType::Torus)
-					static_cast<Torus*>(obj.get())->UpdateModelMatrix();
 			}
-			return true;
 		}
+	
 
 
 		if (m_interactionMode != InteractionMode::None)
@@ -806,8 +708,6 @@ void CadApplication::DrawMenu()
 		ImGui::Separator();
 
 
-
-
 		ImGui::BeginDisabled(selectedCount == 0);
 		if (selectedCount == 1)
 		{
@@ -848,58 +748,6 @@ void CadApplication::DrawMenu()
 		}
 
 		ImGui::PopStyleColor(2);
-
-
-		ImGui::Separator();
-		ImGui::Text("Camera Settings");
-		bool cameraChanged = false;
-		if (ImGui::SliderFloat("FOV", &m_fovY, 30.0f, 120.0f))
-			cameraChanged = true;
-		if (ImGui::DragFloat("Near Plane", &m_nearPlane, 0.01f, 0.001f, 10.0f))
-			cameraChanged = true;
-		if (ImGui::DragFloat("Far Plane", &m_farPlane, 0.1f, 10.0f, 1000.0f))
-			cameraChanged = true;
-
-		if (cameraChanged)
-			UpdateProjectionMatrix();
-
-
-		ImGui::Separator();
-		ImGui::Text("Cursor Settings");
-		ImGui::DragFloat3("Cursor Position", &m_cursorPosition.x, 0.01f);
-		Vec4f worldPos = Vec4f(m_cursorPosition.x, m_cursorPosition.y, m_cursorPosition.z, 1.0f);
-		Vec4f clipPos = m_projViewMatrix * worldPos;
-		int screenPos[2] = { 0 };
-		if (std::abs(clipPos.w) > 0.0001f)
-		{
-			float ndcX = clipPos.x / clipPos.w;
-			float ndcY = clipPos.y / clipPos.w;
-			screenPos[0] = static_cast<int>(std::round((ndcX + 1.0f) * 0.5f * m_renderSize.cx));
-			screenPos[1] = static_cast<int>(std::round((1.0f - ndcY) * 0.5f * m_renderSize.cy));
-		}
-
-		if (ImGui::DragInt2("Screen Position", screenPos))
-		{
-			screenPos[0] = std::clamp(screenPos[0], 0, static_cast<int>(m_renderSize.cx));
-			screenPos[1] = std::clamp(screenPos[1], 0, static_cast<int>(m_renderSize.cy));
-			auto [ndcX, ndcY] = CalculateCoordsFromPixel((float)screenPos[0], (float)screenPos[1], (float)m_renderSize.cx, (float)m_renderSize.cy);
-
-
-			Vec4f viewPos = m_viewMatrix * worldPos;
-			float actualDepth = std::abs(viewPos.z);
-
-			float distance = m_camera.GetDistance();
-			float fovY_rad = m_fovY * (std::numbers::pi_v<float> / 180.0f);
-			float aspect = static_cast<float>(m_renderSize.cx) / m_renderSize.cy;
-
-			float planeHeight = 2.0f * actualDepth * std::tan(fovY_rad / 2.0f);
-			float planeWidth = planeHeight * aspect;
-
-			Vec4f localPos{ ndcX * (planeWidth / 2.0f), ndcY * (planeHeight / 2.0f), viewPos.z, 1.0f };
-			Vec4f newWorldPos = m_camera.GetInverseViewMatrix() * localPos;
-
-			m_cursorPosition = { newWorldPos.x, newWorldPos.y, newWorldPos.z };
-		}
 	}
 	else if (m_menuState == MenuState::Edit)
 	{
@@ -1032,6 +880,57 @@ void CadApplication::DrawMenu()
 		}
 	}
 
+
+	ImGui::Separator();
+	ImGui::Text("Camera Settings");
+	bool cameraChanged = false;
+	if (ImGui::SliderFloat("FOV", &m_fovY, 30.0f, 120.0f))
+		cameraChanged = true;
+	if (ImGui::DragFloat("Near Plane", &m_nearPlane, 0.01f, 0.001f, 10.0f))
+		cameraChanged = true;
+	if (ImGui::DragFloat("Far Plane", &m_farPlane, 0.1f, 10.0f, 1000.0f))
+		cameraChanged = true;
+
+	if (cameraChanged)
+		UpdateProjectionMatrix();
+
+
+	ImGui::Separator();
+	ImGui::Text("Cursor Settings");
+	ImGui::DragFloat3("Cursor Position", &m_cursorPosition.x, 0.01f);
+	Vec4f worldPos = Vec4f(m_cursorPosition.x, m_cursorPosition.y, m_cursorPosition.z, 1.0f);
+	Vec4f clipPos = m_projViewMatrix * worldPos;
+	int screenPos[2] = { 0 };
+	if (std::abs(clipPos.w) > 0.0001f)
+	{
+		float ndcX = clipPos.x / clipPos.w;
+		float ndcY = clipPos.y / clipPos.w;
+		screenPos[0] = static_cast<int>(std::round((ndcX + 1.0f) * 0.5f * m_renderSize.cx));
+		screenPos[1] = static_cast<int>(std::round((1.0f - ndcY) * 0.5f * m_renderSize.cy));
+	}
+
+	if (ImGui::DragInt2("Screen Position", screenPos))
+	{
+		screenPos[0] = std::clamp(screenPos[0], 0, static_cast<int>(m_renderSize.cx));
+		screenPos[1] = std::clamp(screenPos[1], 0, static_cast<int>(m_renderSize.cy));
+		auto [ndcX, ndcY] = CalculateCoordsFromPixel((float)screenPos[0], (float)screenPos[1], (float)m_renderSize.cx, (float)m_renderSize.cy);
+
+
+		Vec4f viewPos = m_viewMatrix * worldPos;
+		float actualDepth = std::abs(viewPos.z);
+
+		float distance = m_camera.GetDistance();
+		float fovY_rad = m_fovY * (std::numbers::pi_v<float> / 180.0f);
+		float aspect = static_cast<float>(m_renderSize.cx) / m_renderSize.cy;
+
+		float planeHeight = 2.0f * actualDepth * std::tan(fovY_rad / 2.0f);
+		float planeWidth = planeHeight * aspect;
+
+		Vec4f localPos{ ndcX * (planeWidth / 2.0f), ndcY * (planeHeight / 2.0f), viewPos.z, 1.0f };
+		Vec4f newWorldPos = m_camera.GetInverseViewMatrix() * localPos;
+
+		m_cursorPosition = { newWorldPos.x, newWorldPos.y, newWorldPos.z };
+	}
 
 	ImGui::End();
 	ImGui::Render();
