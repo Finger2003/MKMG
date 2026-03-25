@@ -193,7 +193,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 
 	int xPos = (int)(short)LOWORD(msg.lParam);
 	int yPos = (int)(short)HIWORD(msg.lParam);
-	//SIZE wndSize = m_window.getClientSize();
 
 	switch (msg.message)
 	{
@@ -207,28 +206,81 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 	}
 	case WM_LBUTTONDOWN:
 	{
-		if (m_menuState == MenuState::Edit && m_currentEditAction != EditAction::None)
+		if ((m_menuState == MenuState::Edit || m_menuState == MenuState::EditGroup) && m_currentEditAction != EditAction::None)
 		{
 			m_isEditing = true;
 			m_lastMousePos = { xPos, yPos };
-			auto& obj = m_sceneObjects[m_lastClickedIndex];
 
-			Vec4f worldPos = Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);
-			Vec4f clipPos = m_projViewMatrix * worldPos;
-			clipPos /= clipPos.w;
-
-			m_editObjScreenX = (clipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
-			m_editObjScreenY = (1.0f - clipPos.y) * 0.5f * m_renderSize.cy;
-			m_startArcballVector = ScreenToObjectArcballVector(xPos, yPos, m_editObjScreenX, m_editObjScreenY, 150.0f);
-
-			Vec3f objPos = Vec3f(obj->m_position.x, obj->m_position.y, obj->m_position.z);
-			Vec3f toObj = objPos - m_camera.GetPosition();
-			m_editAnchorDepth = Vec3f::dot(toObj, m_camera.GetForwardVector());
-			if (obj->type == ObjectType::Torus)
+			if (m_menuState == MenuState::EditGroup)
 			{
-				auto torus = static_cast<Torus*>(obj.get());
-				torus->m_baseRotationMatrix = torus->m_rotationMatrix;
+				WORD fwKeys = LOWORD(msg.wParam);
+				if (fwKeys & MK_SHIFT)
+				{
+					auto center = m_cursorPosition;
+					m_groupEditCenter = m_cursorPosition;
+					Vec3f centerVec = Vec3f(center.x, center.y, center.z);
+					Vec3f toCenter = centerVec - m_camera.GetPosition();
+					m_editAnchorDepth = Vec3f::dot(toCenter, m_camera.GetForwardVector());
+				}
+				else
+				{
+					auto center = GetSelectionCenter();
+					if (center)
+					{
+						m_groupEditCenter = *center;
+						Vec3f centerVec = Vec3f(center->x, center->y, center->z);
+						Vec3f toCenter = centerVec - m_camera.GetPosition();
+						m_editAnchorDepth = Vec3f::dot(toCenter, m_camera.GetForwardVector());
+					}
+				}
+
+				for (auto& obj : m_sceneObjects)
+				{
+					if (!obj->selected)
+						continue;
+
+					obj->m_basePosition = obj->m_position;
+					if (obj->type == ObjectType::Torus)
+					{
+						auto torus = static_cast<Torus*>(obj.get());
+						torus->m_baseRotationMatrix = torus->m_rotationMatrix;
+						torus->m_baseScale = torus->m_scale;
+					}
+				}
+
+				Vec4f centerWorldPos = Vec4f(m_groupEditCenter.x, m_groupEditCenter.y, m_groupEditCenter.z, 1.0f);
+				Vec4f centerClipPos = m_projViewMatrix * centerWorldPos;
+				centerClipPos /= centerClipPos.w;
+
+				m_editObjScreenX = (centerClipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
+				m_editObjScreenY = (1.0f - centerClipPos.y) * 0.5f * m_renderSize.cy;
+				m_startArcballVector = ScreenToObjectArcballVector(xPos, yPos, m_editObjScreenX, m_editObjScreenY, 150.0f);
 			}
+			else
+			{
+				auto& obj = m_sceneObjects[m_lastClickedIndex];
+
+				obj->m_basePosition = obj->m_position;
+
+				Vec4f worldPos = Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);
+				Vec4f clipPos = m_projViewMatrix * worldPos;
+				clipPos /= clipPos.w;
+
+				m_editObjScreenX = (clipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
+				m_editObjScreenY = (1.0f - clipPos.y) * 0.5f * m_renderSize.cy;
+				m_startArcballVector = ScreenToObjectArcballVector(xPos, yPos, m_editObjScreenX, m_editObjScreenY, 150.0f);
+
+				Vec3f objPos = Vec3f(obj->m_position.x, obj->m_position.y, obj->m_position.z);
+				Vec3f toObj = objPos - m_camera.GetPosition();
+				m_editAnchorDepth = Vec3f::dot(toObj, m_camera.GetForwardVector());
+				if (obj->type == ObjectType::Torus)
+				{
+					auto torus = static_cast<Torus*>(obj.get());
+					torus->m_baseRotationMatrix = torus->m_rotationMatrix;
+					torus->m_baseScale = torus->m_scale;
+				}
+			}
+
 			SetCapture(m_window.getHandle());
 			return true;
 		}
@@ -317,10 +369,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		m_lastMousePos = { xPos, yPos };
 		SetCapture(m_window.getHandle());
 		return true;
-		//m_interactionMode = InteractionMode::Translating;
-		//m_lastMousePos = { xPos, yPos };
-		//SetCapture(m_window.getHandle());
-		//return true;
 	case WM_LBUTTONUP:
 	case WM_RBUTTONUP:
 	case WM_MBUTTONUP:
@@ -335,83 +383,185 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 
 		if (m_isEditing)
 		{
-			auto& obj = m_sceneObjects[m_lastClickedIndex];
-			if (m_currentEditAction >= EditAction::TranslateFree && m_currentEditAction <= EditAction::TranslateZ)
+			if (m_menuState == MenuState::EditGroup)
 			{
-				float moveX = dx * 0.01f;
-				//float moveY = -dy * 0.01f;
+				Vec3f editCenter = Vec3f(m_groupEditCenter.x, m_groupEditCenter.y, m_groupEditCenter.z);
+				MathLib::Mat4f deltaRot = MathLib::Mat4f::Identity();
+				float scaleFactor = 1.0f;
+				Vec3f worldDelta(0, 0, 0);
+				bool isTranslating = false, isRotating = false, isScaling = false;
 
-				if (m_currentEditAction == EditAction::TranslateFree)
+				if (m_currentEditAction >= EditAction::TranslateFree && m_currentEditAction <= EditAction::TranslateZ)
 				{
-					Vec3f objPos = Vec3f(obj->m_position.x, obj->m_position.y, obj->m_position.z);
-					Vec3f toObj = objPos - m_camera.GetPosition();
-					//float depth = Vec3f::dot(toObj, m_camera.GetForwardVector());
-					float depth = m_editAnchorDepth;
-					float unitsPerPixel = m_panScaleFactor * std::abs(depth);
+					float moveX = dx * 0.01f;
+					if (m_currentEditAction == EditAction::TranslateFree)
+					{
+						Vec3f toGroup = editCenter - m_camera.GetPosition();
+						float depth = m_editAnchorDepth;
+						float unitsPerPixel = m_panScaleFactor * std::abs(depth);
+						worldDelta = (m_camera.GetRightVector() * dx - m_camera.GetUpVector() * dy) * unitsPerPixel;
+					}
+					else if (m_currentEditAction == EditAction::TranslateX) worldDelta.x = moveX;
+					else if (m_currentEditAction == EditAction::TranslateY) worldDelta.y = moveX;
+					else if (m_currentEditAction == EditAction::TranslateZ) worldDelta.z = moveX;
 
-					Vec3f worldDelta = (m_camera.GetRightVector() * dx - m_camera.GetUpVector() * dy) * unitsPerPixel;
-					Vec3f newPos = objPos + worldDelta;
-					obj->m_position.x = newPos.x;
-					obj->m_position.y = newPos.y;
-					obj->m_position.z = newPos.z;
+					isTranslating = true;
 				}
-				else if (m_currentEditAction == EditAction::TranslateX)
-					obj->m_position.x += moveX;
-				else if (m_currentEditAction == EditAction::TranslateY)
-					obj->m_position.y += moveX;
-				else if (m_currentEditAction == EditAction::TranslateZ)
-					obj->m_position.z += moveX;
-			}
-			else if (obj->type == ObjectType::Torus)
-			{
-				auto torus = static_cast<Torus*>(obj.get());
-
-				if (m_currentEditAction == EditAction::RotateFree)
+				else if (m_currentEditAction == EditAction::RotateFree)
 				{
-					//Vec3f currentArcballVector = ScreenToArcballVector(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
 					Vec3f currentArcballVector = ScreenToObjectArcballVector(xPos, yPos, m_editObjScreenX, m_editObjScreenY, 150.0f);
 					float dot = std::clamp(Vec3f::dot(m_startArcballVector, currentArcballVector), -1.0f, 1.0f);
 					float angle = std::acos(dot) * 2.0f;
-					Vec3f cameraSpaceAxis = Vec3f::cross(m_startArcballVector, currentArcballVector);	
+					Vec3f cameraSpaceAxis = Vec3f::cross(m_startArcballVector, currentArcballVector);
 
 					if (cameraSpaceAxis.length_sqr() > 1e-6f)
 					{
 						Vec4f worldAxis4 = m_camera.GetInverseViewMatrix() * Vec4f(cameraSpaceAxis.x, cameraSpaceAxis.y, cameraSpaceAxis.z, 0.0f);
 						Vec3f worldAxis = Vec3f(worldAxis4.x, worldAxis4.y, worldAxis4.z).normalize();
 
-						Mat4f rot = Mat4f::RotationAxis(worldAxis, angle);
-						torus->m_rotationMatrix = rot * torus->m_baseRotationMatrix;
-						Vec3f euler = Mat4f::ExtractEulerAngles(torus->m_rotationMatrix);
-						torus->m_eulerAngles = { euler.x, euler.y, euler.z };
+						deltaRot = Mat4f::RotationAxis(worldAxis, angle);
+						isRotating = true;
 					}
 				}
 				else if (m_currentEditAction >= EditAction::RotateX && m_currentEditAction <= EditAction::RotateZ)
 				{
 					float angle = dx * 0.01f;
-					Mat4f rot;
-
-					if (m_currentEditAction == EditAction::RotateX) rot = Mat4f::RotationX(angle);
-					else if (m_currentEditAction == EditAction::RotateY) rot = Mat4f::RotationY(angle);
-					else if (m_currentEditAction == EditAction::RotateZ) rot = Mat4f::RotationZ(angle);
-
-					torus->m_rotationMatrix = rot * torus->m_baseRotationMatrix;
-					Vec3f euler = Mat4f::ExtractEulerAngles(torus->m_rotationMatrix);
-					torus->m_eulerAngles = { euler.x, euler.y, euler.z };
+					if (m_currentEditAction == EditAction::RotateX) deltaRot = Mat4f::RotationX(angle);
+					else if (m_currentEditAction == EditAction::RotateY) deltaRot = Mat4f::RotationY(angle);
+					else if (m_currentEditAction == EditAction::RotateZ) deltaRot = Mat4f::RotationZ(angle);
+					isRotating = true;
 				}
 				else if (m_currentEditAction == EditAction::Scale)
 				{
-					float scaleFactor = 1.0f + dx * 0.01f;
-					torus->SetScale(torus->GetScale() * scaleFactor);
+					scaleFactor = std::max(0.01f, 1.0f + dx * 0.01f);
+					isScaling = true;
 				}
-			}
-			if (obj->type == ObjectType::Torus)
-				static_cast<Torus*>(obj.get())->UpdateModelMatrix();
 
-			if (m_currentEditAction < EditAction::RotateFree || m_currentEditAction > EditAction::RotateZ)
+				if (isTranslating || isRotating || isScaling)
+				{
+					for (auto& obj : m_sceneObjects)
+					{
+						if (!obj->selected)
+							continue;
+
+						Vec3f objBasePos = Vec3f(obj->m_basePosition.x, obj->m_basePosition.y, obj->m_basePosition.z);
+
+						if (isTranslating)
+						{
+							objBasePos += worldDelta;
+							obj->m_position = { objBasePos.x, objBasePos.y, objBasePos.z };
+						}
+						else if (isScaling)
+						{
+							Vec3f offset = objBasePos - editCenter;
+							objBasePos = editCenter + offset * scaleFactor;
+							obj->m_position = { objBasePos.x, objBasePos.y, objBasePos.z };
+							if (obj->type == ObjectType::Torus)
+							{
+								auto torus = static_cast<Torus*>(obj.get());
+								torus->SetScale(torus->m_baseScale * scaleFactor);
+							}
+						}
+						else if (isRotating)
+						{
+							Vec3f offset = objBasePos - editCenter;
+							Vec4f rotatedOffset4 = deltaRot * Vec4f(offset.x, offset.y, offset.z, 1.0f);
+							Vec3f rotatedOffset(rotatedOffset4.x, rotatedOffset4.y, rotatedOffset4.z);
+
+							objBasePos = editCenter + rotatedOffset;
+
+							obj->m_position = { objBasePos.x, objBasePos.y, objBasePos.z };
+							if (obj->type == ObjectType::Torus)
+							{
+								auto torus = static_cast<Torus*>(obj.get());
+								torus->m_rotationMatrix = deltaRot * torus->m_baseRotationMatrix;
+								Vec3f euler = Mat4f::ExtractEulerAngles(torus->m_rotationMatrix);
+								torus->m_eulerAngles = { euler.x, euler.y, euler.z };
+							}
+						}
+
+						if (obj->type == ObjectType::Torus)
+						{
+							static_cast<Torus*>(obj.get())->UpdateModelMatrix();
+						}
+					}
+				}
+
+				//m_lastMousePos = { xPos, yPos };
+				return true;
+			}
+			else
 			{
-				m_lastMousePos = { xPos, yPos };
-			}
+				auto& obj = m_sceneObjects[m_lastClickedIndex];
+				if (m_currentEditAction >= EditAction::TranslateFree && m_currentEditAction <= EditAction::TranslateZ)
+				{
+					float moveX = dx * 0.01f;
+					//float moveY = -dy * 0.01f;
 
+					if (m_currentEditAction == EditAction::TranslateFree)
+					{
+						Vec3f objBasePos = Vec3f(obj->m_basePosition.x, obj->m_basePosition.y, obj->m_basePosition.z);
+						//Vec3f objPos = Vec3f(obj->m_position.x, obj->m_position.y, obj->m_position.z);
+						//Vec3f toObj = objPos - m_camera.GetPosition();
+						//float depth = Vec3f::dot(toObj, m_camera.GetForwardVector());
+						float depth = m_editAnchorDepth;
+						float unitsPerPixel = m_panScaleFactor * std::abs(depth);
+
+						Vec3f worldDelta = (m_camera.GetRightVector() * dx - m_camera.GetUpVector() * dy) * unitsPerPixel;
+						Vec3f newPos = objBasePos + worldDelta;
+						obj->m_position = { newPos.x, newPos.y, newPos.z };
+					}
+					else if (m_currentEditAction == EditAction::TranslateX)
+						obj->m_position.x = obj->m_basePosition.x + moveX;
+					else if (m_currentEditAction == EditAction::TranslateY)
+						obj->m_position.y = obj->m_basePosition.y + moveX;
+					else if (m_currentEditAction == EditAction::TranslateZ)
+						obj->m_position.z = obj->m_basePosition.z + moveX;
+				}
+				else if (obj->type == ObjectType::Torus)
+				{
+					auto torus = static_cast<Torus*>(obj.get());
+
+					if (m_currentEditAction == EditAction::RotateFree)
+					{
+						Vec3f currentArcballVector = ScreenToObjectArcballVector(xPos, yPos, m_editObjScreenX, m_editObjScreenY, 150.0f);
+						float dot = std::clamp(Vec3f::dot(m_startArcballVector, currentArcballVector), -1.0f, 1.0f);
+						float angle = std::acos(dot) * 2.0f;
+						Vec3f cameraSpaceAxis = Vec3f::cross(m_startArcballVector, currentArcballVector);
+
+						if (cameraSpaceAxis.length_sqr() > 1e-6f)
+						{
+							Vec4f worldAxis4 = m_camera.GetInverseViewMatrix() * Vec4f(cameraSpaceAxis.x, cameraSpaceAxis.y, cameraSpaceAxis.z, 0.0f);
+							Vec3f worldAxis = Vec3f(worldAxis4.x, worldAxis4.y, worldAxis4.z).normalize();
+
+							Mat4f rot = Mat4f::RotationAxis(worldAxis, angle);
+							torus->m_rotationMatrix = rot * torus->m_baseRotationMatrix;
+							Vec3f euler = Mat4f::ExtractEulerAngles(torus->m_rotationMatrix);
+							torus->m_eulerAngles = { euler.x, euler.y, euler.z };
+						}
+					}
+					else if (m_currentEditAction >= EditAction::RotateX && m_currentEditAction <= EditAction::RotateZ)
+					{
+						float angle = dx * 0.01f;
+						Mat4f rot;
+
+						if (m_currentEditAction == EditAction::RotateX) rot = Mat4f::RotationX(angle);
+						else if (m_currentEditAction == EditAction::RotateY) rot = Mat4f::RotationY(angle);
+						else if (m_currentEditAction == EditAction::RotateZ) rot = Mat4f::RotationZ(angle);
+
+						torus->m_rotationMatrix = rot * torus->m_baseRotationMatrix;
+						Vec3f euler = Mat4f::ExtractEulerAngles(torus->m_rotationMatrix);
+						torus->m_eulerAngles = { euler.x, euler.y, euler.z };
+					}
+					else if (m_currentEditAction == EditAction::Scale)
+					{
+						float scaleFactor = std::max(0.01f, 1.0f + dx * 0.01f);
+						torus->SetScale(torus->m_baseScale * scaleFactor);
+					}
+				}
+				if (obj->type == ObjectType::Torus)
+					static_cast<Torus*>(obj.get())->UpdateModelMatrix();
+			}
 			return true;
 		}
 
@@ -465,23 +615,11 @@ void CadApplication::UpdateResources(int width, int height)
 
 
 	UpdateProjectionMatrix();
-	//m_viewMatrix = Mat4f::Identity();
-	//if (m_cbPerPass)
-	//{
-	//	PerPassBuffer perPassData;
-	//	perPassData.viewProj = m_projMatrix * m_viewMatrix;
-	//	m_device.UpdateBuffer(m_cbPerPass, perPassData);
-	//}
 }
 
 void CadApplication::Render()
 {
-	//SIZE wndSize = m_window.getClientSize();
-	//int width = wndSize.cx;
-	//int height = wndSize.cy;
 	DrawMenu();
-
-	//m_torus.UpdateMesh(m_device);
 
 	auto& context = m_device.getContext();
 
@@ -572,6 +710,9 @@ void CadApplication::DrawMenu()
 		ImGuiWindowFlags_NoCollapse;
 
 	ImGui::Begin("Menu", nullptr);
+
+
+	int selectedCount = count_if(m_sceneObjects.cbegin(), m_sceneObjects.cend(), [](const auto& obj) { return obj->selected; });
 
 	if (m_menuState == MenuState::List)
 	{
@@ -666,15 +807,25 @@ void CadApplication::DrawMenu()
 
 		ImGui::Separator();
 
-		int selectedCount = 0;
-		for (const auto& obj : m_sceneObjects)
-			if (obj->selected) selectedCount++;
 
-		ImGui::BeginDisabled(selectedCount != 1);
-		if (ImGui::Button("Edit Selected", ImVec2(-1, 0)))
+
+
+		ImGui::BeginDisabled(selectedCount == 0);
+		if (selectedCount == 1)
 		{
-			m_menuState = MenuState::Edit;
-			m_currentEditAction = EditAction::None;
+			if (ImGui::Button("Edit Selected", ImVec2(-1, 0)))
+			{
+				m_menuState = MenuState::Edit;
+				m_currentEditAction = EditAction::None;
+			}
+		}
+		else
+		{
+			if (ImGui::Button("Edit Group", ImVec2(-1, 0)))
+			{
+				m_menuState = MenuState::EditGroup;
+				m_currentEditAction = EditAction::None;
+			}
 		}
 		ImGui::EndDisabled();
 
@@ -848,6 +999,35 @@ void CadApplication::DrawMenu()
 					m_currentEditAction = static_cast<EditAction>(actionIndex);
 				}
 			}
+		}
+	}
+	else if (m_menuState == MenuState::EditGroup)
+	{
+		if (ImGui::Button("< Back to List"))
+		{
+			m_menuState = MenuState::List;
+		}
+
+		ImGui::Separator();
+
+		ImGui::Text("Editing Group (%d objects)", selectedCount);
+
+		auto centerOpt = GetSelectionCenter();
+		if (centerOpt)
+		{
+			ImGui::Text("Center: %.2f, %.2f, %.2f", centerOpt->x, centerOpt->y, centerOpt->z);
+		}
+		ImGui::Spacing();
+
+		ImGui::Text("Interactive Group Action");
+		const char* actions[] = {
+			"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",
+			"Free Arcball", "Rotate X", "Rotate Y", "Rotate Z", "Scale"
+		};
+		int actionIndex = static_cast<int>(m_currentEditAction);
+		if (ImGui::Combo("##GroupAction", &actionIndex, actions, IM_ARRAYSIZE(actions)))
+		{
+			m_currentEditAction = static_cast<EditAction>(actionIndex);
 		}
 	}
 

@@ -50,6 +50,7 @@ struct Torus : public SceneObject
 	//float3 m_position{ 0, 0,-2 };
 	float3 m_eulerAngles{ 0, 0, 0 };
 	float m_scale = 1.0f;
+	float m_baseScale = 1.0f;
 	MathLib::Mat4f m_rotationMatrix = MathLib::Mat4f::Identity();
 	MathLib::Mat4f m_baseRotationMatrix = MathLib::Mat4f::Identity();
 	MathLib::Mat4f m_modelMatrix{};// = MathLib::Mat4f::Translation(m_position.x, m_position.y, m_position.z);

@@ -40,7 +40,8 @@ enum class InteractionMode
 enum class MenuState
 {
 	List,
-	Edit
+	Edit,
+	EditGroup
 };
 enum class EditAction
 {
@@ -153,5 +154,6 @@ private:
 	float m_editAnchorDepth = 0.0f;
 
 	float m_editObjScreenX, m_editObjScreenY;
+	float3 m_groupEditCenter;
 };
 
