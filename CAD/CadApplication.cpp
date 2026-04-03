@@ -25,14 +25,10 @@ static MathLib::Vec3f ScreenToObjectArcballVector(int mouseX, int mouseY, float 
 	else
 	{
 		p.z = 0.5f / std::sqrt(length_sqr);
+		p = p.normalize();
 	}
 
-	//if (length_sqr <= 1.0f)
-	//	p.z = std::sqrt(1.0f - length_sqr); // Inside the sphere
-	//else
-	//	p = p.normalize(); // Outside the sphere (maps to the edge)
-
-	return p.normalize();
+	return p;
 }
 
 static pair<float, float> CalculateCoordsFromPixel(float x, float y, float width, float height)
@@ -104,28 +100,8 @@ MathLib::Vec3f CadApplication::ScreenToArcballVector(int x, int y, int width, in
 
 void CadApplication::UpdateProjectionMatrix()
 {
-	//int width = m_renderSize.cx;
-	//int height = m_renderSize.cy;
-	//float aspect = static_cast<float>(width) / height;
-	//float fovY = m_fovY * (std::numbers::pi_v<float> / 180.0f);
-	//m_panScaleFactor = 2.0f * std::tan(fovY / 2.0f) / height;
-
-	//m_nearPlane = std::max(m_nearPlane, 0.01f); // Ensure near plane is positive and not too close to zero.
-	//m_farPlane = std::max(m_farPlane, m_nearPlane + 0.01f); // Ensure far plane is greater than near plane.
-	//m_projMatrix = Mat4f::Perspective(fovY, aspect, m_nearPlane, m_farPlane);
-
-	//m_camera.UpdateViewMatrices();
 	if (m_camera.UpdateProjectionMatrix())
 		SyncPerPassBuffer();
-	//m_viewMatrix = m_camera.GetViewMatrix();
-	//m_projViewMatrix = m_projMatrix * m_viewMatrix;
-	//if (m_cbPerPass)
-	//{
-	//	PerPassBuffer perPassData;
-	//	perPassData.viewProj = m_camera.GetProjectionMatrix() * m_camera.GetViewMatrix();
-	//	perPassData.aspectRatio = m_camera.GetAspectRatio();
-	//	m_device.UpdateBuffer(m_cbPerPass, perPassData);
-	//}
 }
 
 void CadApplication::UpdateViewMatrix()
@@ -334,18 +310,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			}
 
 			auto [normX, normY] = CalculateCoordsFromPixel(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
-
-			//float distance = m_camera.GetDistance();
-			//float fovY_rad = m_fovY * (std::numbers::pi_v<float> / 180.0f);
-			//float aspect = static_cast<float>(m_renderSize.cx) / m_renderSize.cy;
-
-			//float planeHeight = 2.0f * distance * std::tan(fovY_rad / 2.0f);
-			//float planeWidth = planeHeight * aspect;
-
-			//Vec4f localPos(normX * (planeWidth / 2.0f), normY * (planeHeight / 2.0f), -distance, 1.0f);
-			//Vec4f worldPos = m_camera.GetInverseViewMatrix() * localPos;
-
-			//m_cursorPosition = { worldPos.x, worldPos.y, worldPos.z };
 			m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
 		}
 	}
@@ -494,8 +458,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			}
 			else if (m_interactionMode == InteractionMode::Panning)
 			{
-				//float panSpeed = 0.002f * std::max(1.0f, m_camera.GetDistance());
-				//float panSpeed = m_camera.GetPanScaleFactor() * std::max(1.0f, m_camera.GetDistance());
 				float panSpeed = m_camera.GetPanScaleFactor() * m_camera.GetDistance();
 				m_camera.Pan(-dx * panSpeed, dy * panSpeed);
 			}
@@ -510,7 +472,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 	{
 		short zDelta = (short)HIWORD(msg.wParam);
 		m_camera.Zoom((zDelta / 120.0f) * 0.5f);
-		//UpdateProjectionMatrix();
 		UpdateViewMatrix();
 		return true;
 	}
@@ -547,7 +508,6 @@ void CadApplication::Render()
 
 	auto& context = m_device.getContext();
 
-	//const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 	const float clear_color[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
 	context->ClearRenderTargetView(m_backBuffer.Get(), clear_color);
 	context->ClearDepthStencilView(m_depthBuffer.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
@@ -625,7 +585,6 @@ void CadApplication::DrawMenu()
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
-	//constexpr float menuWidth = 300.0f;
 	ImGui::SetNextWindowPos(ImVec2(m_renderSize.cx, 0.0f));
 	ImGui::SetNextWindowSize(ImVec2(cMenuWidth, m_renderSize.cy));
 
@@ -944,22 +903,6 @@ void CadApplication::DrawMenu()
 		float actualDepth = std::abs(viewPos.z);
 
 		m_cursorPosition = m_camera.GetPositionAtDepth(ndcX, ndcY, actualDepth);
-
-
-		//Vec4f viewPos = m_viewMatrix * worldPos;
-		//float actualDepth = std::abs(viewPos.z);
-
-		//float distance = m_camera.GetDistance();
-		//float fovY_rad = m_fovY * (std::numbers::pi_v<float> / 180.0f);
-		//float aspect = static_cast<float>(m_renderSize.cx) / m_renderSize.cy;
-
-		//float planeHeight = 2.0f * actualDepth * std::tan(fovY_rad / 2.0f);
-		//float planeWidth = planeHeight * aspect;
-
-		//Vec4f localPos{ ndcX * (planeWidth / 2.0f), ndcY * (planeHeight / 2.0f), viewPos.z, 1.0f };
-		//Vec4f newWorldPos = m_camera.GetInverseViewMatrix() * localPos;
-
-		//m_cursorPosition = { newWorldPos.x, newWorldPos.y, newWorldPos.z };
 	}
 
 	ImGui::End();

@@ -3,10 +3,6 @@
 
 using namespace std;
 using namespace MathLib;
-//void Camera::SetProjection(float fovY, float aspectRatio, float nearPlane, float farPlane)
-//{
-//	m_projMatrix = Mat4f::Perspective(fovY, aspectRatio, nearPlane, farPlane);
-//}
 
 void Camera::Orbit(float deltaX, float deltaY)
 {
@@ -23,14 +19,6 @@ void Camera::Orbit(float deltaX, float deltaY)
 
 void Camera::Pan(float deltaX, float deltaY)
 {
-	//float cosY = std::cos(m_yaw);
-	//float sinY = std::sin(m_yaw);
-	//float cosP = std::cos(m_pitch);
-	//float sinP = std::sin(m_pitch);
-
-	//Vec3f right(cosY, 0.0f, sinY);
-	//Vec3f up(sinY * sinP, cosP, -cosY * sinP);
-
 	Vec3f right = GetRightVector();
 	Vec3f up = GetUpVector();
 
@@ -52,27 +40,6 @@ void Camera::Zoom(float delta)
 	}
 }
 
-//MathLib::Mat4f Camera::GetViewMatrix() const
-//{
-//	//Mat4f translationToTarget = Mat4f::Translation(-m_target.x, -m_target.y, -m_target.z);
-//	//Mat4f rotY = Mat4f::RotationY(m_yaw);
-//	//Mat4f rotX = Mat4f::RotationX(m_pitch);
-//	//Mat4f pushAway = Mat4f::Translation(0.0f, 0.0f, -m_distance);
-//
-//	//return pushAway * rotX * rotY * translationToTarget;
-//	return m_viewMatrix;
-//}
-//
-//MathLib::Mat4f Camera::GetInverseViewMatrix() const
-//{
-//	//Mat4f translationFromTarget = Mat4f::Translation(m_target.x, m_target.y, m_target.z);
-//	//Mat4f rotY = Mat4f::RotationY(-m_yaw);
-//	//Mat4f rotX = Mat4f::RotationX(-m_pitch);
-//	//Mat4f pullBack = Mat4f::Translation(0.0f, 0.0f, m_distance);
-//
-//	//return translationFromTarget * rotY * rotX * pullBack;
-//	return m_invViewMatrix;
-//}
 
 MathLib::Vec3f Camera::GetRightVector() const
 {
@@ -123,8 +90,6 @@ bool Camera::UpdateProjectionMatrix()
 	if (!m_projDirty)
 		return false;
 
-	//m_aspectRatio = static_cast<float>(m_viewportWidth) / m_viewportHeight;
-
 	m_projMatrix = Mat4f::Perspective(m_fovY, m_aspectRatio, m_nearPlane, m_farPlane);
 	UpdateProjView();
 
@@ -173,18 +138,6 @@ void Camera::SetViewportSize(int width, int height)
 		m_aspectRatio = static_cast<float>(m_viewportWidth) / m_viewportHeight;
 		m_projDirty = true;
 	}
-}
-
-MathLib::Vec3f Camera::GetPositionOnFocalPlane(float normX, float normY) const
-{
-	//float planeHalfHeight = m_panScaleFactor * m_viewportHeight * m_distance / 2.0f;
-	//float planeHalfWidth = planeHalfHeight * m_aspectRatio;
-
-	//Vec4f localPos(normX * planeHalfWidth, normY * planeHalfHeight, -m_distance, 1.0f);
-	//Vec4f worldPos = m_invViewMatrix * localPos;
-
-	//return Vec3f::FromVec4f(worldPos);
-	return GetPositionAtDepth(normX, normY, m_distance);
 }
 
 MathLib::Vec3f Camera::GetPositionAtDepth(float normX, float normY, float depth) const
