@@ -13,7 +13,6 @@ struct PerPointBuffer
 	MathLib::Vec4f color;
 };
 
-//struct 
 
 struct PerObjectBuffer
 {
@@ -102,61 +101,55 @@ protected:
 	//Microsoft::WRL::ComPtr<ID3D11InputLayout> m_pointLayout;
 
 
-	//MathLib::Mat4f m_viewMatrix;
-	//MathLib::Mat4f m_projMatrix;
-	//MathLib::Mat4f m_projViewMatrix;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerObject;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerPass;
 
 private:
+#pragma region Constants
+	static constexpr float cMenuWidth = 400.0f;
+	static constexpr int cMinWidth = 500;
+	static constexpr int cMinHeight = 500;
+#pragma endregion
+	char m_renameBuffer[128] = {};
+	Camera m_camera;
+
+	MathLib::Vec3f m_startArcballVector{};	
+	std::vector<std::unique_ptr<SceneObject>> m_sceneObjects;
+
 	InteractionMode m_interactionMode = InteractionMode::None;
 	POINT m_lastMousePos{};
 	POINT m_startMousePos{};
-	MathLib::Vec3f m_startArcballVector{};	
-
-	std::vector<std::unique_ptr<SceneObject>> m_sceneObjects;
-
-
-	void DrawMenu();
-	void InitImGui();
-	MathLib::Vec3f ScreenToArcballVector(int x, int y, int width, int height);
-
-	//float m_fovY = 60.0f;
-	//float m_nearPlane = 0.1f;
-	//float m_farPlane = 100.0f;
-	//float m_panScaleFactor = 0.0f;
-	void UpdateProjectionMatrix();
-
-	static constexpr float cMenuWidth = 400.0f;
 	SIZE m_renderSize{};
 
-	static constexpr int cMinWidth = 500;
-	static constexpr int cMinHeight = 500;
-
-	Cursor3D m_cursor;
 	float3 m_cursorPosition{ 0.0f, 0.0f, 0.0f };
 
-	void DrawCursor(float3 position, float scale);
-
-	Camera m_camera;
-
 	int m_lastClickedIndex = -1;
-
-	void DeleteSelectedObjects();
-
 	int m_nameEditingIndex = -1;
-	char m_renameBuffer[128] = {};
-	std::optional<float3> GetSelectionCenter() const;
 
 	MenuState m_menuState = MenuState::List;
 	EditAction m_currentEditAction = EditAction::None;
-	bool m_isEditing = false;
-	float m_editAnchorDepth = 0.0f;
 
+	float m_editAnchorDepth = 0.0f;
 	float m_editObjScreenX, m_editObjScreenY;
 	float3 m_groupEditCenter;
+	bool m_isEditing = false;
 
+	Cursor3D m_cursor;
+
+#pragma region Menu Methods
+	void InitImGui();
+	void DrawMenu();
+	void DrawCursor(float3 position, float scale);
+	void DeleteSelectedObjects();
+#pragma endregion
+
+	MathLib::Vec3f ScreenToArcballVector(int x, int y, int width, int height);
+	std::optional<float3> GetSelectionCenter() const;
+
+#pragma region View/Projection Update Methods
+	void UpdateProjectionMatrix();
 	void UpdateViewMatrix();
 	void SyncPerPassBuffer();
+#pragma endregion
 };
 
