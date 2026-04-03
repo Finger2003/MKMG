@@ -94,5 +94,14 @@ namespace MathLibTest
 			float l = v.length();
 			Assert::AreEqual(3.0f, l);
 		}
+
+		TEST_METHOD(FromVec4f)
+		{
+			Vec4f v4(1.0f, 2.0f, 3.0f, 4.0f);
+			Vec3f v3 = Vec3f::FromVec4f(v4);
+			Assert::AreEqual(1.0f, v3.x);
+			Assert::AreEqual(2.0f, v3.y);
+			Assert::AreEqual(3.0f, v3.z);
+		}
 	};
 }

@@ -1,4 +1,5 @@
 #pragma once
+#include "Vec4f.h"
 namespace MathLib
 {
 	struct alignas(16) Vec3f
@@ -16,6 +17,10 @@ namespace MathLib
 		Vec3f() : v(_mm_setzero_ps()) {}
 		Vec3f(__m128 val) : v(_mm_blend_ps(val, _mm_setzero_ps(), 0b1000)) {}
 		Vec3f(float x, float y, float z) : v(_mm_set_ps(0.0f, z, y, x)) {}
+
+		static Vec3f FromVec4f(const Vec4f& vec4) {
+			return _mm_blend_ps(vec4.v, _mm_setzero_ps(), 0b1000);
+		}
 
 		friend Vec3f operator+(const Vec3f& a, const Vec3f& b)
 		{

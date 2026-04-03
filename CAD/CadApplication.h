@@ -102,9 +102,9 @@ protected:
 	//Microsoft::WRL::ComPtr<ID3D11InputLayout> m_pointLayout;
 
 
-	MathLib::Mat4f m_viewMatrix;
-	MathLib::Mat4f m_projMatrix;
-	MathLib::Mat4f m_projViewMatrix;
+	//MathLib::Mat4f m_viewMatrix;
+	//MathLib::Mat4f m_projMatrix;
+	//MathLib::Mat4f m_projViewMatrix;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerObject;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerPass;
 
@@ -121,10 +121,10 @@ private:
 	void InitImGui();
 	MathLib::Vec3f ScreenToArcballVector(int x, int y, int width, int height);
 
-	float m_fovY = 60.0f;
-	float m_nearPlane = 0.1f;
-	float m_farPlane = 100.0f;
-	float m_panScaleFactor = 0.0f;
+	//float m_fovY = 60.0f;
+	//float m_nearPlane = 0.1f;
+	//float m_farPlane = 100.0f;
+	//float m_panScaleFactor = 0.0f;
 	void UpdateProjectionMatrix();
 
 	static constexpr float cMenuWidth = 400.0f;
@@ -155,5 +155,8 @@ private:
 
 	float m_editObjScreenX, m_editObjScreenY;
 	float3 m_groupEditCenter;
+
+	void UpdateViewMatrix();
+	void SyncPerPassBuffer();
 };
 
