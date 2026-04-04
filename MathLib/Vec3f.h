@@ -22,6 +22,10 @@ namespace MathLib
 			return _mm_blend_ps(vec4.v, _mm_setzero_ps(), 0b1000);
 		}
 
+		Vec4f ToVec4f(float w = 0.0f) const {
+			return _mm_blend_ps(v, _mm_set1_ps(w), 0b1000);
+		}
+
 		friend Vec3f operator+(const Vec3f& a, const Vec3f& b)
 		{
 			return _mm_add_ps(a.v, b.v);

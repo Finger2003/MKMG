@@ -77,6 +77,9 @@ public:
 	 */
 	bool ProcessMessage(WindowMessage& msg) override;
 
+	void HandleCameraInteraction(int xPos, int yPos);
+
+
 	virtual ~CadApplication();
 
 	/**
@@ -166,5 +169,8 @@ private:
 	void ClearSelection();
 	void HandleObjectSelection(size_t index, bool ctrlHeld, bool shiftHeld);
 	std::optional<size_t> PickClosestPoint(int mouseX, int mouseY, float toleranceSq = 100.0f);
+
+	void BeginEditAction(int xPos, int yPos, bool shiftHeld);
+	void ApplyEditTransform(int mouseX, int mouseY);
 };
 
