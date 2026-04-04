@@ -123,8 +123,8 @@ private:
 
 	float3 m_cursorPosition{ 0.0f, 0.0f, 0.0f };
 
-	int m_lastClickedIndex = -1;
-	int m_nameEditingIndex = -1;
+	std::optional<size_t> m_lastClickedIndex = std::nullopt;
+	std::optional<size_t> m_nameEditingIndex = std::nullopt;
 
 	MenuState m_menuState = MenuState::List;
 	EditAction m_currentEditAction = EditAction::None;
@@ -132,10 +132,13 @@ private:
 	float m_editAnchorDepth = 0.0f;
 	float m_editObjScreenX, m_editObjScreenY;
 	float3 m_groupEditCenter;
+
+	mutable std::optional<float3> m_selectionCenterCache = std::nullopt;
+
+	mutable bool m_selectionDirty = true;
 	bool m_isEditing = false;
 
 	Cursor3D m_cursor;
-
 #pragma region Menu Methods
 	void InitImGui();
 	void DrawMenu();
@@ -151,5 +154,9 @@ private:
 	void UpdateViewMatrix();
 	void SyncPerPassBuffer();
 #pragma endregion
+
+	void ClearSelection();
+	void HandleObjectSelection(size_t index, bool ctrlHeld, bool shiftHeld);
+	std::optional<size_t> PickClosestPoint(int mouseX, int mouseY, float toleranceSq = 100.0f);
 };
 

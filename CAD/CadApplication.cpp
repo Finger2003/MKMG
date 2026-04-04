@@ -121,6 +121,93 @@ void CadApplication::SyncPerPassBuffer()
 	}
 }
 
+void CadApplication::ClearSelection()
+{
+	for (auto& o : m_sceneObjects)
+		o->selected = false;
+	m_lastClickedIndex = std::nullopt;
+	m_selectionCenterCache = std::nullopt;
+	m_selectionDirty = false;
+}
+
+void CadApplication::HandleObjectSelection(size_t index, bool ctrlHeld, bool shiftHeld)
+{
+	if (ctrlHeld && shiftHeld)
+	{
+		if (m_lastClickedIndex.has_value())
+		{
+			size_t start = std::min(index, m_lastClickedIndex.value());
+			size_t end = std::max(index, m_lastClickedIndex.value());
+			for (size_t j = start; j <= end; j++) 
+				m_sceneObjects[j]->selected = true;
+		}
+	}
+	else if (shiftHeld)
+	{
+		auto anchor = m_lastClickedIndex;
+		ClearSelection();
+		if (anchor.has_value())
+		{
+			size_t start = std::min(index, anchor.value());
+			size_t end = std::max(index, anchor.value());
+			for (size_t j = start; j <= end; j++)
+				m_sceneObjects[j]->selected = true;
+			m_lastClickedIndex = anchor;
+		}
+		else
+		{
+			m_sceneObjects[index]->selected = true;
+			m_lastClickedIndex = index;
+		}
+	}
+	else if (ctrlHeld)
+	{
+		m_sceneObjects[index]->selected = !m_sceneObjects[index]->selected;
+		m_lastClickedIndex = index;
+	}
+	else
+	{
+		ClearSelection();
+		m_sceneObjects[index]->selected = true;
+		m_lastClickedIndex = index;
+	}
+
+	m_selectionDirty = true;
+}
+
+std::optional<size_t> CadApplication::PickClosestPoint(int mouseX, int mouseY, float toleranceSq)
+{
+	std::optional<size_t> closestIndex = std::nullopt;
+	float minZ = std::numeric_limits<float>::max();
+
+	for (size_t i = 0; i < m_sceneObjects.size(); i++)
+	{
+		const auto& obj = m_sceneObjects[i];
+		if (obj->type != ObjectType::Point)
+			continue;
+
+		Vec4f worldPos = obj->m_position.ToVec4f(1.0f);
+		Vec4f clipPos = m_camera.GetProjViewMatrix() * worldPos;
+
+		if (clipPos.w <= 0.0f)
+			continue;
+
+		clipPos /= clipPos.w; // Perspective divide to get NDC
+
+		float screenX = (clipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
+		float screenY = (1.0f - clipPos.y) * 0.5f * m_renderSize.cy;
+		float distSq = (screenX - mouseX) * (screenX - mouseX) + (screenY - mouseY) * (screenY - mouseY);
+
+		if (distSq < toleranceSq && clipPos.z < minZ)
+		{
+			minZ = clipPos.z;
+			closestIndex = i;
+		}
+	}
+	
+	return closestIndex;
+}
+
 void CadApplication::DrawCursor(float3 position, float scale)
 {
 	auto& context = m_device.getContext();
@@ -151,23 +238,26 @@ void CadApplication::DrawCursor(float3 position, float scale)
 void CadApplication::DeleteSelectedObjects()
 {
 	erase_if(m_sceneObjects, [](const auto& obj) { return obj->selected; });
-	m_lastClickedIndex = -1;
+	m_lastClickedIndex = std::nullopt;
+	m_selectionCenterCache = std::nullopt;
+	m_selectionDirty = false;
 }
 
 std::optional<float3> CadApplication::GetSelectionCenter() const
 {
+	if (!m_selectionDirty)
+		return m_selectionCenterCache;
+
 	Vec4f sum; // .w counts the number of selected objects. Max possible count is 16 777 216 due to float precision.
 	for (const auto& obj : m_sceneObjects)
 	{
 		if (obj->selected)
-			sum += Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);
+			sum += obj->m_position.ToVec4f(1.0f); //Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);
 	}
 
-	if (sum.w < 1.0f) // No objects selected
-		return std::nullopt;
-
-	Vec4f center = sum / sum.w;
-	return float3(center.x, center.y, center.z);
+	m_selectionCenterCache = sum.w < 1.0f ? std::nullopt : std::optional<float3>(float3::FromVec4f(sum / sum.w));
+	m_selectionDirty = false;
+	return m_selectionCenterCache;
 }
 
 bool CadApplication::ProcessMessage(WindowMessage& msg)
@@ -200,6 +290,8 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 	case WM_LBUTTONDOWN:
 	{
 		WORD fwKeys = LOWORD(msg.wParam);
+		bool ctrlHeld = (fwKeys & MK_CONTROL) != 0;
+
 		if ((m_menuState == MenuState::Edit || m_menuState == MenuState::EditGroup) && m_currentEditAction != EditAction::None)
 		{
 			m_isEditing = true;
@@ -208,7 +300,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			if (fwKeys & MK_SHIFT)
 				m_groupEditCenter = m_cursorPosition;
 			else if (m_menuState == MenuState::Edit)
-				m_groupEditCenter = m_sceneObjects[m_lastClickedIndex]->m_position;
+				m_groupEditCenter = m_sceneObjects[m_lastClickedIndex.value()]->m_position;
 			else
 			{
 				auto center = GetSelectionCenter();
@@ -229,7 +321,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 
 			if (m_menuState == MenuState::Edit)
 			{
-				auto& obj = m_sceneObjects[m_lastClickedIndex];
+				auto& obj = m_sceneObjects[m_lastClickedIndex.value()];
 				obj->m_basePosition = obj->m_position;
 				if (obj->type == ObjectType::Torus)
 				{
@@ -258,60 +350,74 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			return true;
 		}
 
-		SceneObject* closestObj = nullptr;
-		size_t closestIndex = -1;
-		float minZ = std::numeric_limits<float>::max();
-		float toleranceSq = 100.0f;
-
-		for (size_t i = 0; i < m_sceneObjects.size(); i++)
+		auto pickedIndex = PickClosestPoint(xPos, yPos);
+		if (pickedIndex.has_value())
 		{
-			auto& obj = m_sceneObjects[i];
-			if (obj->type != ObjectType::Point)
-				continue;
-
-			Vec4f worldPos = Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);			
-			Vec4f clipPos = m_camera.GetProjViewMatrix() * worldPos;
-			if (clipPos.w <= 0)
-				continue;
-
-			clipPos /= clipPos.w;
-			float screenX = (clipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
-			float screenY = (1.0f - clipPos.y) * 0.5f * m_renderSize.cy;
-			float distSq = (screenX - xPos) * (screenX - xPos) + (screenY - yPos) * (screenY - yPos);
-			if (distSq < toleranceSq && clipPos.z < minZ)
-			{
-				minZ = clipPos.z;
-				closestIndex = i;
-				closestObj = obj.get();
-			}
-		}
-
-		if (closestObj)
-		{
-			if (fwKeys & MK_CONTROL)
-			{
-				closestObj->selected = !closestObj->selected;
-			}
-			else
-			{
-				for (auto& o : m_sceneObjects)
-					o->selected = false;
-				closestObj->selected = true;
-			}
-			m_lastClickedIndex = closestIndex;
+			HandleObjectSelection(pickedIndex.value(), ctrlHeld, false);
 		}
 		else
 		{
-			if (!(fwKeys & MK_CONTROL))
-			{
-				for (auto& o : m_sceneObjects)
-					o->selected = false;
-				m_lastClickedIndex = -1;
-			}
+			if (!ctrlHeld)
+				ClearSelection();
 
 			auto [normX, normY] = CalculateCoordsFromPixel(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
 			m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
 		}
+			
+
+		//SceneObject* closestObj = nullptr;
+		//size_t closestIndex = -1;
+		//float minZ = std::numeric_limits<float>::max();
+		//float toleranceSq = 100.0f;
+
+		//for (size_t i = 0; i < m_sceneObjects.size(); i++)
+		//{
+		//	auto& obj = m_sceneObjects[i];
+		//	if (obj->type != ObjectType::Point)
+		//		continue;
+
+		//	Vec4f worldPos = Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);			
+		//	Vec4f clipPos = m_camera.GetProjViewMatrix() * worldPos;
+		//	if (clipPos.w <= 0)
+		//		continue;
+
+		//	clipPos /= clipPos.w;
+		//	float screenX = (clipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
+		//	float screenY = (1.0f - clipPos.y) * 0.5f * m_renderSize.cy;
+		//	float distSq = (screenX - xPos) * (screenX - xPos) + (screenY - yPos) * (screenY - yPos);
+		//	if (distSq < toleranceSq && clipPos.z < minZ)
+		//	{
+		//		minZ = clipPos.z;
+		//		closestIndex = i;
+		//		closestObj = obj.get();
+		//	}
+		//}
+
+		//if (closestObj)
+		//{
+		//	if (fwKeys & MK_CONTROL)
+		//	{
+		//		closestObj->selected = !closestObj->selected;
+		//	}
+		//	else
+		//	{
+		//		for (auto& o : m_sceneObjects)
+		//			o->selected = false;
+		//		closestObj->selected = true;
+		//	}
+		//	m_lastClickedIndex = closestIndex;
+		//	m_selectionDirty = true;
+		//}
+		//else
+		//{
+		//	if (!(fwKeys & MK_CONTROL))
+		//	{
+		//		ClearSelection();
+		//	}
+
+		//	auto [normX, normY] = CalculateCoordsFromPixel(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
+		//	m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
+		//}
 	}
 	return true;
 	case WM_MBUTTONDOWN:
@@ -443,8 +549,9 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 				}
 				else
 				{
-					applyTransform(m_sceneObjects[m_lastClickedIndex]);
+					applyTransform(m_sceneObjects[m_lastClickedIndex.value()]);
 				}
+				m_selectionDirty = true;
 			}
 		}
 	
@@ -637,45 +744,47 @@ void CadApplication::DrawMenu()
 			{
 				if (ImGui::Selectable(obj->name.c_str(), obj->selected))
 				{
-					if (io.KeyCtrl && io.KeyShift)
-					{
-						if (m_lastClickedIndex != -1)
-						{
-							int start = std::min(i, m_lastClickedIndex);
-							int end = std::max(i, m_lastClickedIndex);
-							for (int j = start; j <= end; j++)
-								m_sceneObjects[j]->selected = true;
-						}
-					}
-					else if (io.KeyShift)
-					{
-						for (auto& o : m_sceneObjects)
-							o->selected = false;
-						if (m_lastClickedIndex != -1)
-						{
-							int start = std::min(i, m_lastClickedIndex);
-							int end = std::max(i, m_lastClickedIndex);
-							for (int j = start; j <= end; j++)
-								m_sceneObjects[j]->selected = true;
-						}
-						else
-						{
-							obj->selected = true;
-							m_lastClickedIndex = i;
-						}
-					}
-					else if (io.KeyCtrl)
-					{
-						obj->selected = !obj->selected;
-						m_lastClickedIndex = i;
-					}
-					else
-					{
-						for (auto& o : m_sceneObjects)
-							o->selected = false;
-						obj->selected = true;
-						m_lastClickedIndex = i;
-					}
+					HandleObjectSelection(i, io.KeyCtrl, io.KeyShift);
+					//if (io.KeyCtrl && io.KeyShift)
+					//{
+					//	if (m_lastClickedIndex != -1)
+					//	{
+					//		int start = std::min(i, m_lastClickedIndex);
+					//		int end = std::max(i, m_lastClickedIndex);
+					//		for (int j = start; j <= end; j++)
+					//			m_sceneObjects[j]->selected = true;
+					//	}
+					//}
+					//else if (io.KeyShift)
+					//{
+					//	for (auto& o : m_sceneObjects)
+					//		o->selected = false;
+					//	if (m_lastClickedIndex != -1)
+					//	{
+					//		int start = std::min(i, m_lastClickedIndex);
+					//		int end = std::max(i, m_lastClickedIndex);
+					//		for (int j = start; j <= end; j++)
+					//			m_sceneObjects[j]->selected = true;
+					//	}
+					//	else
+					//	{
+					//		obj->selected = true;
+					//		m_lastClickedIndex = i;
+					//	}
+					//}
+					//else if (io.KeyCtrl)
+					//{
+					//	obj->selected = !obj->selected;
+					//	m_lastClickedIndex = i;
+					//}
+					//else
+					//{
+					//	for (auto& o : m_sceneObjects)
+					//		o->selected = false;
+					//	obj->selected = true;
+					//	m_lastClickedIndex = i;
+					//}
+					//m_selectionDirty = true;
 				}
 
 				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
@@ -714,12 +823,12 @@ void CadApplication::DrawMenu()
 		{
 			for (auto& obj : m_sceneObjects)
 				obj->selected = true;
+			m_selectionDirty = true;
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Deselect All", ImVec2(-1, 0)))
 		{
-			for (auto& obj : m_sceneObjects)
-				obj->selected = false;
+			ClearSelection();
 		}
 
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
@@ -734,13 +843,13 @@ void CadApplication::DrawMenu()
 	}
 	else if (m_menuState == MenuState::Edit)
 	{
-		if (m_lastClickedIndex < 0 || m_lastClickedIndex >= m_sceneObjects.size())
+		if (!m_lastClickedIndex.has_value() || m_lastClickedIndex.value() >= m_sceneObjects.size())
 		{
 			m_menuState = MenuState::List;
 		}
 		else
 		{
-			auto& selectedObj = m_sceneObjects[m_lastClickedIndex];
+			auto& selectedObj = m_sceneObjects[m_lastClickedIndex.value()];
 			if (ImGui::Button("< Back to List"))
 			{
 				m_menuState = MenuState::List;
@@ -752,7 +861,8 @@ void CadApplication::DrawMenu()
 
 			if (selectedObj->type == ObjectType::Point)
 			{
-				ImGui::DragFloat3("Position", &selectedObj->m_position.x, 0.01f);
+				if(ImGui::DragFloat3("Position", &selectedObj->m_position.x, 0.01f))
+					m_selectionDirty = true;
 
 				ImGui::Separator();
 				ImGui::Text("Interactive Action");
@@ -788,7 +898,10 @@ void CadApplication::DrawMenu()
 				ImGui::Separator();
 
 				if (ImGui::DragFloat3("Position", &torus->m_position.x, 0.01f))
+				{
 					transformChanged = true;
+					m_selectionDirty = true;
+				}
 
 
 				Vec3f eulerDegrees = Vec3f(torus->m_eulerAngles.x, torus->m_eulerAngles.y, torus->m_eulerAngles.z) * (180.0f / std::numbers::pi_v<float>);
