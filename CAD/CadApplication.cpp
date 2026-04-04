@@ -138,7 +138,7 @@ void CadApplication::HandleObjectSelection(size_t index, bool ctrlHeld, bool shi
 		{
 			size_t start = std::min(index, m_lastClickedIndex.value());
 			size_t end = std::max(index, m_lastClickedIndex.value());
-			for (size_t j = start; j <= end; j++) 
+			for (size_t j = start; j <= end; j++)
 				m_sceneObjects[j]->selected = true;
 		}
 	}
@@ -204,7 +204,7 @@ std::optional<size_t> CadApplication::PickClosestPoint(int mouseX, int mouseY, f
 			closestIndex = i;
 		}
 	}
-	
+
 	return closestIndex;
 }
 
@@ -311,7 +311,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			m_editAnchorDepth = Vec3f::dot(toPivot, m_camera.GetForwardVector());
 
 			Vec4f pivotWorldPos = Vec4f(m_groupEditCenter.x, m_groupEditCenter.y, m_groupEditCenter.z, 1.0f);
-			Vec4f pivotClipPos = m_camera.GetProjViewMatrix() *pivotWorldPos;
+			Vec4f pivotClipPos = m_camera.GetProjViewMatrix() * pivotWorldPos;
 			if (std::abs(pivotClipPos.w) > 0.0001f)
 				pivotClipPos /= pivotClipPos.w;
 
@@ -363,61 +363,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			auto [normX, normY] = CalculateCoordsFromPixel(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
 			m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
 		}
-			
-
-		//SceneObject* closestObj = nullptr;
-		//size_t closestIndex = -1;
-		//float minZ = std::numeric_limits<float>::max();
-		//float toleranceSq = 100.0f;
-
-		//for (size_t i = 0; i < m_sceneObjects.size(); i++)
-		//{
-		//	auto& obj = m_sceneObjects[i];
-		//	if (obj->type != ObjectType::Point)
-		//		continue;
-
-		//	Vec4f worldPos = Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);			
-		//	Vec4f clipPos = m_camera.GetProjViewMatrix() * worldPos;
-		//	if (clipPos.w <= 0)
-		//		continue;
-
-		//	clipPos /= clipPos.w;
-		//	float screenX = (clipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
-		//	float screenY = (1.0f - clipPos.y) * 0.5f * m_renderSize.cy;
-		//	float distSq = (screenX - xPos) * (screenX - xPos) + (screenY - yPos) * (screenY - yPos);
-		//	if (distSq < toleranceSq && clipPos.z < minZ)
-		//	{
-		//		minZ = clipPos.z;
-		//		closestIndex = i;
-		//		closestObj = obj.get();
-		//	}
-		//}
-
-		//if (closestObj)
-		//{
-		//	if (fwKeys & MK_CONTROL)
-		//	{
-		//		closestObj->selected = !closestObj->selected;
-		//	}
-		//	else
-		//	{
-		//		for (auto& o : m_sceneObjects)
-		//			o->selected = false;
-		//		closestObj->selected = true;
-		//	}
-		//	m_lastClickedIndex = closestIndex;
-		//	m_selectionDirty = true;
-		//}
-		//else
-		//{
-		//	if (!(fwKeys & MK_CONTROL))
-		//	{
-		//		ClearSelection();
-		//	}
-
-		//	auto [normX, normY] = CalculateCoordsFromPixel(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
-		//	m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
-		//}
 	}
 	return true;
 	case WM_MBUTTONDOWN:
@@ -554,7 +499,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 				m_selectionDirty = true;
 			}
 		}
-	
+
 
 
 		if (m_interactionMode != InteractionMode::None)
@@ -705,293 +650,283 @@ void CadApplication::DrawMenu()
 	int selectedCount = count_if(m_sceneObjects.cbegin(), m_sceneObjects.cend(), [](const auto& obj) { return obj->selected; });
 
 	if (m_menuState == MenuState::List)
-	{
-		if (ImGui::Button("Add Torus"))
-		{
-			m_sceneObjects.push_back(std::make_unique<Torus>(m_cursorPosition));
-		}
-
-		if (ImGui::Button("Add Point"))
-		{
-			m_sceneObjects.push_back(std::make_unique<Point>(m_cursorPosition));
-		}
-
-		ImGui::Separator();
-		ImGuiIO& io = ImGui::GetIO();
-		for (int i = 0; i < m_sceneObjects.size(); i++)
-		{
-			ImGui::PushID(i);
-			auto& obj = m_sceneObjects[i];
-
-
-			if (m_nameEditingIndex == i)
-			{
-				ImGui::SetKeyboardFocusHere();
-				if (ImGui::InputText("##rename", m_renameBuffer, IM_ARRAYSIZE(m_renameBuffer),
-					ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
-				{
-
-					obj->name = string(m_renameBuffer);
-					m_nameEditingIndex = -1;
-				}
-
-				if (!ImGui::IsItemActive() && ImGui::IsMouseClicked(0))
-				{
-					m_nameEditingIndex = -1;
-				}
-			}
-			else
-			{
-				if (ImGui::Selectable(obj->name.c_str(), obj->selected))
-				{
-					HandleObjectSelection(i, io.KeyCtrl, io.KeyShift);
-					//if (io.KeyCtrl && io.KeyShift)
-					//{
-					//	if (m_lastClickedIndex != -1)
-					//	{
-					//		int start = std::min(i, m_lastClickedIndex);
-					//		int end = std::max(i, m_lastClickedIndex);
-					//		for (int j = start; j <= end; j++)
-					//			m_sceneObjects[j]->selected = true;
-					//	}
-					//}
-					//else if (io.KeyShift)
-					//{
-					//	for (auto& o : m_sceneObjects)
-					//		o->selected = false;
-					//	if (m_lastClickedIndex != -1)
-					//	{
-					//		int start = std::min(i, m_lastClickedIndex);
-					//		int end = std::max(i, m_lastClickedIndex);
-					//		for (int j = start; j <= end; j++)
-					//			m_sceneObjects[j]->selected = true;
-					//	}
-					//	else
-					//	{
-					//		obj->selected = true;
-					//		m_lastClickedIndex = i;
-					//	}
-					//}
-					//else if (io.KeyCtrl)
-					//{
-					//	obj->selected = !obj->selected;
-					//	m_lastClickedIndex = i;
-					//}
-					//else
-					//{
-					//	for (auto& o : m_sceneObjects)
-					//		o->selected = false;
-					//	obj->selected = true;
-					//	m_lastClickedIndex = i;
-					//}
-					//m_selectionDirty = true;
-				}
-
-				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
-				{
-					m_nameEditingIndex = i;
-					strncpy_s(m_renameBuffer, obj->name.c_str(), sizeof(m_renameBuffer) - 1);
-				}
-			}
-
-			ImGui::PopID();
-		}
-
-		ImGui::Separator();
-
-
-		ImGui::BeginDisabled(selectedCount == 0);
-		if (selectedCount == 1)
-		{
-			if (ImGui::Button("Edit Selected", ImVec2(-1, 0)))
-			{
-				m_menuState = MenuState::Edit;
-				m_currentEditAction = EditAction::None;
-			}
-		}
-		else
-		{
-			if (ImGui::Button("Edit Group", ImVec2(-1, 0)))
-			{
-				m_menuState = MenuState::EditGroup;
-				m_currentEditAction = EditAction::None;
-			}
-		}
-		ImGui::EndDisabled();
-
-		if (ImGui::Button("Select All", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f - 4, 0)))
-		{
-			for (auto& obj : m_sceneObjects)
-				obj->selected = true;
-			m_selectionDirty = true;
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Deselect All", ImVec2(-1, 0)))
-		{
-			ClearSelection();
-		}
-
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.1f, 0.1f, 1.0f));
-
-		if (ImGui::Button("Delete Selected", ImVec2(-1, 0)))
-		{
-			DeleteSelectedObjects();
-		}
-
-		ImGui::PopStyleColor(2);
-	}
+		DrawListMenu(selectedCount);
 	else if (m_menuState == MenuState::Edit)
+		DrawEditMenu();
+	else if (m_menuState == MenuState::EditGroup)
+		DrawEditGroupMenu(selectedCount);
+
+
+	DrawCameraSettingsMenu();
+	DrawCursorSettingsMenu();
+
+	ImGui::End();
+	ImGui::Render();
+}
+
+void CadApplication::DrawListMenu(int selectedCount)
+{
+
+	if (ImGui::Button("Add Torus"))
 	{
-		if (!m_lastClickedIndex.has_value() || m_lastClickedIndex.value() >= m_sceneObjects.size())
+		m_sceneObjects.push_back(std::make_unique<Torus>(m_cursorPosition));
+	}
+
+	if (ImGui::Button("Add Point"))
+	{
+		m_sceneObjects.push_back(std::make_unique<Point>(m_cursorPosition));
+	}
+
+	ImGui::Separator();
+	ImGuiIO& io = ImGui::GetIO();
+	for (int i = 0; i < m_sceneObjects.size(); i++)
+	{
+		ImGui::PushID(i);
+		auto& obj = m_sceneObjects[i];
+
+
+		if (m_nameEditingIndex == i)
 		{
-			m_menuState = MenuState::List;
+			ImGui::SetKeyboardFocusHere();
+			if (ImGui::InputText("##rename", m_renameBuffer, IM_ARRAYSIZE(m_renameBuffer),
+				ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
+			{
+
+				obj->name = string(m_renameBuffer);
+				m_nameEditingIndex = std::nullopt;
+			}
+
+			if (!ImGui::IsItemActive() && ImGui::IsMouseClicked(0))
+			{
+				m_nameEditingIndex = std::nullopt;
+			}
 		}
 		else
 		{
-			auto& selectedObj = m_sceneObjects[m_lastClickedIndex.value()];
-			if (ImGui::Button("< Back to List"))
+			if (ImGui::Selectable(obj->name.c_str(), obj->selected))
 			{
-				m_menuState = MenuState::List;
+				HandleObjectSelection(i, io.KeyCtrl, io.KeyShift);
 			}
-			ImGui::Separator();
 
-			ImGui::Text("Editing: %s", selectedObj->name.c_str());
-			ImGui::Spacing();
-
-			if (selectedObj->type == ObjectType::Point)
+			if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
 			{
-				if(ImGui::DragFloat3("Position", &selectedObj->m_position.x, 0.01f))
-					m_selectionDirty = true;
-
-				ImGui::Separator();
-				ImGui::Text("Interactive Action");
-				const char* actions[] = {
-					"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",
-					"Free Arcball", "Rotate X", "Rotate Y", "Rotate Z", "Scale"
-				};
-				int actionIndex = static_cast<int>(m_currentEditAction);
-
-				if (ImGui::Combo("##PointAction", &actionIndex, actions, IM_ARRAYSIZE(actions)))
-				{
-					m_currentEditAction = static_cast<EditAction>(actionIndex);
-				}
-			}
-			else if (selectedObj->type == ObjectType::Torus)
-			{
-				auto torus = static_cast<Torus*>(selectedObj.get());
-				bool transformChanged = false;
-
-				// --- Geometry Settings ---
-				float tempMajor = torus->GetMajorRadius();
-				float tempMinor = torus->GetMinorRadius();
-				int tempSegs[2] = { torus->GetMajorSegments(), torus->GetMinorSegments() };
-
-				ImGui::Text("Geometry");
-				if (ImGui::SliderFloat("Major Radius", &tempMajor, Torus::cMinMajorRadius, Torus::cMaxMajorRadius))
-					torus->SetMajorRadius(tempMajor);
-				if (ImGui::SliderFloat("Minor Radius", &tempMinor, Torus::cMinMinorRadius, Torus::cMaxMinorRadius))
-					torus->SetMinorRadius(tempMinor);
-				if (ImGui::SliderInt2("Segments", tempSegs, Torus::cMinMajorSegments, Torus::cMaxMajorSegments))
-					torus->SetSegments(tempSegs[0], tempSegs[1]);
-
-				ImGui::Separator();
-
-				if (ImGui::DragFloat3("Position", &torus->m_position.x, 0.01f))
-				{
-					transformChanged = true;
-					m_selectionDirty = true;
-				}
-
-
-				Vec3f eulerDegrees = Vec3f(torus->m_eulerAngles.x, torus->m_eulerAngles.y, torus->m_eulerAngles.z) * (180.0f / std::numbers::pi_v<float>);
-				if (ImGui::DragFloat3("Rotation", eulerDegrees.f, 1.0f, 0.0f, 0.0f, "%.2f"))
-				{
-					eulerDegrees *= (std::numbers::pi_v<float> / 180.0f);
-					torus->m_eulerAngles.x = eulerDegrees.x;
-					torus->m_eulerAngles.y = eulerDegrees.y;
-					torus->m_eulerAngles.z = eulerDegrees.z;
-					MathLib::Mat4f rotX = MathLib::Mat4f::RotationX(torus->m_eulerAngles.x);
-					MathLib::Mat4f rotY = MathLib::Mat4f::RotationY(torus->m_eulerAngles.y);
-					MathLib::Mat4f rotZ = MathLib::Mat4f::RotationZ(torus->m_eulerAngles.z);
-					torus->m_rotationMatrix = rotZ * rotX * rotY;
-					transformChanged = true;
-				}
-				if (ImGui::Button("Reset Rotation"))
-				{
-					torus->m_eulerAngles = { 0, 0, 0 };
-					torus->m_rotationMatrix = MathLib::Mat4f::Identity();
-					torus->m_baseRotationMatrix = MathLib::Mat4f::Identity();
-					transformChanged = true;
-				}
-				if (ImGui::DragFloat("Scale", &torus->m_scale, 0.01f, Torus::cMinScale, Torus::cMaxScale))
-					transformChanged = true;
-
-				if (transformChanged)
-					torus->UpdateModelMatrix();
-
-				ImGui::Separator();
-
-				ImGui::Text("Interactive Action");
-				const char* actions[] = {
-					"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",
-					"Free Arcball", "Rotate X", "Rotate Y", "Rotate Z", "Scale"
-				};
-				int actionIndex = static_cast<int>(m_currentEditAction);
-				if (ImGui::Combo("##TorusAction", &actionIndex, actions, IM_ARRAYSIZE(actions)))
-				{
-					m_currentEditAction = static_cast<EditAction>(actionIndex);
-				}
+				m_nameEditingIndex = i;
+				strncpy_s(m_renameBuffer, obj->name.c_str(), sizeof(m_renameBuffer) - 1);
 			}
 		}
+
+		ImGui::PopID();
 	}
-	else if (m_menuState == MenuState::EditGroup)
+
+	ImGui::Separator();
+
+
+	ImGui::BeginDisabled(selectedCount == 0);
+	if (selectedCount == 1)
 	{
+		if (ImGui::Button("Edit Selected", ImVec2(-1, 0)))
+		{
+			m_menuState = MenuState::Edit;
+			m_currentEditAction = EditAction::None;
+		}
+	}
+	else
+	{
+		if (ImGui::Button("Edit Group", ImVec2(-1, 0)))
+		{
+			m_menuState = MenuState::EditGroup;
+			m_currentEditAction = EditAction::None;
+		}
+	}
+	ImGui::EndDisabled();
+
+	if (ImGui::Button("Select All", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f - 4, 0)))
+	{
+		for (auto& obj : m_sceneObjects)
+			obj->selected = true;
+		m_selectionDirty = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Deselect All", ImVec2(-1, 0)))
+	{
+		ClearSelection();
+	}
+
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.1f, 0.1f, 1.0f));
+
+	if (ImGui::Button("Delete Selected", ImVec2(-1, 0)))
+	{
+		DeleteSelectedObjects();
+	}
+
+	ImGui::PopStyleColor(2);
+
+}
+
+void CadApplication::DrawEditMenu()
+{
+
+	if (!m_lastClickedIndex.has_value() || m_lastClickedIndex.value() >= m_sceneObjects.size())
+	{
+		m_menuState = MenuState::List;
+	}
+	else
+	{
+		auto& selectedObj = m_sceneObjects[m_lastClickedIndex.value()];
 		if (ImGui::Button("< Back to List"))
 		{
 			m_menuState = MenuState::List;
 		}
-
 		ImGui::Separator();
 
-		ImGui::Text("Editing Group (%d objects)", selectedCount);
-
-		auto centerOpt = GetSelectionCenter();
-		if (centerOpt)
-		{
-			ImGui::Text("Center: %.2f, %.2f, %.2f", centerOpt->x, centerOpt->y, centerOpt->z);
-		}
+		ImGui::Text("Editing: %s", selectedObj->name.c_str());
 		ImGui::Spacing();
 
-		ImGui::Text("Interactive Group Action");
-		const char* actions[] = {
-			"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",
-			"Free Arcball", "Rotate X", "Rotate Y", "Rotate Z", "Scale"
-		};
-		int actionIndex = static_cast<int>(m_currentEditAction);
-		if (ImGui::Combo("##GroupAction", &actionIndex, actions, IM_ARRAYSIZE(actions)))
+		if (selectedObj->type == ObjectType::Point)
 		{
-			m_currentEditAction = static_cast<EditAction>(actionIndex);
+			DrawPointMenu(*selectedObj);
+		}
+		else if (selectedObj->type == ObjectType::Torus)
+		{
+			DrawTorusMenu(*static_cast<Torus*>(selectedObj.get()));
 		}
 	}
 
+}
 
+void CadApplication::DrawTorusMenu(Torus& torus)
+{
+	bool transformChanged = false;
+
+	// --- Geometry Settings ---
+	float tempMajor = torus.GetMajorRadius();
+	float tempMinor = torus.GetMinorRadius();
+	int tempSegs[2] = { torus.GetMajorSegments(), torus.GetMinorSegments() };
+
+	ImGui::Text("Geometry");
+	if (ImGui::SliderFloat("Major Radius", &tempMajor, Torus::cMinMajorRadius, Torus::cMaxMajorRadius))
+		torus.SetMajorRadius(tempMajor);
+	if (ImGui::SliderFloat("Minor Radius", &tempMinor, Torus::cMinMinorRadius, Torus::cMaxMinorRadius))
+		torus.SetMinorRadius(tempMinor);
+	if (ImGui::SliderInt2("Segments", tempSegs, Torus::cMinMajorSegments, Torus::cMaxMajorSegments))
+		torus.SetSegments(tempSegs[0], tempSegs[1]);
+
+	ImGui::Separator();
+
+	if (ImGui::DragFloat3("Position", &torus.m_position.x, 0.01f))
+	{
+		transformChanged = true;
+		m_selectionDirty = true;
+	}
+
+	//Vec3f eulerDegrees = Vec3f(torus.m_eulerAngles.x, torus.m_eulerAngles.y, torus.m_eulerAngles.z) * (180.0f / std::numbers::pi_v<float>);
+	Vec3f eulerDegrees = torus.m_eulerAngles.ToVec3f() * (180.0f / std::numbers::pi_v<float>);
+	if (ImGui::DragFloat3("Rotation", eulerDegrees.f, 1.0f, 0.0f, 0.0f, "%.2f"))
+	{
+		eulerDegrees *= (std::numbers::pi_v<float> / 180.0f);
+		torus.m_eulerAngles = eulerDegrees;
+		//torus.m_eulerAngles.x = eulerDegrees.x;
+		//torus.m_eulerAngles.y = eulerDegrees.y;
+		//torus.m_eulerAngles.z = eulerDegrees.z;
+		MathLib::Mat4f rotX = MathLib::Mat4f::RotationX(torus.m_eulerAngles.x);
+		MathLib::Mat4f rotY = MathLib::Mat4f::RotationY(torus.m_eulerAngles.y);
+		MathLib::Mat4f rotZ = MathLib::Mat4f::RotationZ(torus.m_eulerAngles.z);
+		torus.m_rotationMatrix = rotZ * rotX * rotY;
+		transformChanged = true;
+	}
+	if (ImGui::Button("Reset Rotation"))
+	{
+		torus.m_eulerAngles = { 0, 0, 0 };
+		torus.m_rotationMatrix = MathLib::Mat4f::Identity();
+		torus.m_baseRotationMatrix = MathLib::Mat4f::Identity();
+		transformChanged = true;
+	}
+	if (ImGui::DragFloat("Scale", &torus.m_scale, 0.01f, Torus::cMinScale, Torus::cMaxScale))
+		transformChanged = true;
+
+	if (transformChanged)
+		torus.UpdateModelMatrix();
+
+	ImGui::Separator();
+	DrawActionCombo();
+}
+
+void CadApplication::DrawPointMenu(SceneObject& selectedObj)
+{
+	if (ImGui::DragFloat3("Position", &selectedObj.m_position.x, 0.01f))
+		m_selectionDirty = true;
+
+	ImGui::Separator();
+	DrawActionCombo();
+}
+
+void CadApplication::DrawActionCombo()
+{	
+	ImGui::Text("Interactive Action");
+	const char* actions[] = {
+		"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",
+		"Free Arcball", "Rotate X", "Rotate Y", "Rotate Z", "Scale"
+	};
+	int actionIndex = static_cast<int>(m_currentEditAction);
+
+	if (ImGui::Combo("##ObjectAction", &actionIndex, actions, IM_ARRAYSIZE(actions)))
+	{
+		m_currentEditAction = static_cast<EditAction>(actionIndex);
+	}
+}
+
+void CadApplication::DrawEditGroupMenu(int selectedCount)
+{
+
+	if (ImGui::Button("< Back to List"))
+	{
+		m_menuState = MenuState::List;
+	}
+
+	ImGui::Separator();
+
+	ImGui::Text("Editing Group (%d objects)", selectedCount);
+
+	auto centerOpt = GetSelectionCenter();
+	if (centerOpt)
+	{
+		ImGui::Text("Center: %.2f, %.2f, %.2f", centerOpt->x, centerOpt->y, centerOpt->z);
+	}
+	ImGui::Spacing();
+	DrawActionCombo();
+	//ImGui::Text("Interactive Group Action");
+	//const char* actions[] = {
+	//	"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",
+	//	"Free Arcball", "Rotate X", "Rotate Y", "Rotate Z", "Scale"
+	//};
+	//int actionIndex = static_cast<int>(m_currentEditAction);
+	//if (ImGui::Combo("##GroupAction", &actionIndex, actions, IM_ARRAYSIZE(actions)))
+	//{
+	//	m_currentEditAction = static_cast<EditAction>(actionIndex);
+	//}
+}
+
+void CadApplication::DrawCameraSettingsMenu()
+{
 	ImGui::Separator();
 	ImGui::Text("Camera Settings");
 	float tempFovDegrees = m_camera.GetFovY() * (180.0f / std::numbers::pi_v<float>);
 	float tempNear = m_camera.GetNearPlane();
 	float tempFar = m_camera.GetFarPlane();
-	
-	if(ImGui::SliderFloat("FOV", &tempFovDegrees, 30.0f, 120.0f))
+
+	if (ImGui::SliderFloat("FOV", &tempFovDegrees, 30.0f, 120.0f))
 		m_camera.SetFovY(tempFovDegrees * (std::numbers::pi_v<float> / 180.0f));
 
-	if (ImGui::DragFloat("Near Plane", &tempNear, 0.01f, 0.001f, 10.0f) || 
+	if (ImGui::DragFloat("Near Plane", &tempNear, 0.01f, 0.001f, 10.0f) ||
 		ImGui::DragFloat("Far Plane", &tempFar, 0.1f, 10.0f, 1000.0f))
 		m_camera.SetPlanes(tempNear, tempFar);
 
 	UpdateProjectionMatrix();
+}
 
-
+void CadApplication::DrawCursorSettingsMenu()
+{
 	ImGui::Separator();
 	ImGui::Text("Cursor Settings");
 	ImGui::DragFloat3("Cursor Position", &m_cursorPosition.x, 0.01f);
@@ -1017,7 +952,4 @@ void CadApplication::DrawMenu()
 
 		m_cursorPosition = m_camera.GetPositionAtDepth(ndcX, ndcY, actualDepth);
 	}
-
-	ImGui::End();
-	ImGui::Render();
 }

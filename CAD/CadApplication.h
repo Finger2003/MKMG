@@ -142,6 +142,14 @@ private:
 #pragma region Menu Methods
 	void InitImGui();
 	void DrawMenu();
+	void DrawListMenu(int selectedCount);
+	void DrawEditMenu();
+	void DrawTorusMenu(Torus& torus);
+	void DrawPointMenu(SceneObject& selectedObj);
+	void DrawActionCombo();
+	void DrawEditGroupMenu(int selectedCount);
+	void DrawCameraSettingsMenu();
+	void DrawCursorSettingsMenu();
 	void DrawCursor(float3 position, float scale);
 	void DeleteSelectedObjects();
 #pragma endregion
