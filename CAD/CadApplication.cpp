@@ -333,7 +333,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		return true;
 	case WM_MOUSEMOVE:
 	{
-		ApplyEditTransform(xPos, yPos);		
+		ApplyEditTransform(xPos, yPos);
 		HandleCameraInteraction(xPos, yPos);
 		return true;
 	}
@@ -384,19 +384,27 @@ void CadApplication::BeginEditAction(int mouseX, int mouseY, bool shiftHeld)
 		m_groupEditCenter = center ? *center : float3(0.0f, 0.0f, 0.0f);
 	}
 
-	//Vec3f toPivot = Vec3f(m_groupEditCenter.x, m_groupEditCenter.y, m_groupEditCenter.z) - m_camera.GetPosition();
-	Vec3f toPivot = m_groupEditCenter.ToVec3f() - m_camera.GetPosition();
-	m_editAnchorDepth = Vec3f::dot(toPivot, m_camera.GetForwardVector());
 
-	//Vec4f pivotWorldPos = Vec4f(m_groupEditCenter.x, m_groupEditCenter.y, m_groupEditCenter.z, 1.0f);
 	Vec4f pivotWorldPos = m_groupEditCenter.ToVec4f(1.0f);
 	Vec4f pivotClipPos = m_camera.GetProjViewMatrix() * pivotWorldPos;
-	if (std::abs(pivotClipPos.w) > 0.0001f)
-		pivotClipPos /= pivotClipPos.w;
+	bool isVisible = pivotClipPos.w > m_camera.GetNearPlane();
 
-	m_editObjScreenX = (pivotClipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
-	m_editObjScreenY = (1.0f - pivotClipPos.y) * 0.5f * m_renderSize.cy;
-	m_startArcballVector = ScreenToObjectArcballVector(mouseX, mouseY, m_editObjScreenX, m_editObjScreenY, 150.0f);
+	if (isVisible)
+	{
+		pivotClipPos /= pivotClipPos.w;
+		m_editObjScreenX = (pivotClipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
+		m_editObjScreenY = (1.0f - pivotClipPos.y) * 0.5f * m_renderSize.cy;
+
+		Vec3f toPivot = m_groupEditCenter.ToVec3f() - m_camera.GetPosition();
+		m_editAnchorDepth = Vec3f::dot(toPivot, m_camera.GetForwardVector());
+		m_startArcballVector = ScreenToObjectArcballVector(mouseX, mouseY, m_editObjScreenX, m_editObjScreenY, 150.0f);
+	}
+	else
+	{
+		m_editObjScreenX = m_renderSize.cx / 2.0f;
+		m_editObjScreenY = m_renderSize.cy / 2.0f;
+		m_editAnchorDepth = m_camera.GetNearPlane();
+	}
 
 	auto prepareObject = [](SceneObject* obj)
 		{
@@ -869,7 +877,7 @@ void CadApplication::DrawPointMenu(SceneObject& selectedObj)
 }
 
 void CadApplication::DrawActionCombo()
-{	
+{
 	ImGui::Text("Interactive Action");
 	const char* actions[] = {
 		"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",
