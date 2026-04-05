@@ -6,7 +6,7 @@
 class DxDevice;
 
 
-struct Torus : public SceneObject
+struct Torus : public TransformableObject
 {
 	Torus(float3 position);
 

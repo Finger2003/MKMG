@@ -126,12 +126,27 @@ void CadApplication::ClearSelection()
 	for (auto& o : m_sceneObjects)
 		o->selected = false;
 	m_lastClickedIndex = std::nullopt;
+	m_lastCurveClickedIndex = std::nullopt;
 	m_selectionCenterCache = std::nullopt;
 	m_selectionDirty = false;
 }
 
 void CadApplication::HandleObjectSelection(size_t index, bool ctrlHeld, bool shiftHeld)
 {
+	auto setSelection = [&](size_t i, bool state) {
+		m_sceneObjects[i]->selected = state;
+
+		if (m_sceneObjects[i]->type == ObjectType::BezierCurve)
+		{
+			auto curve = static_cast<BezierCurve*>(m_sceneObjects[i].get());
+			for (const auto& cpWeak : curve->m_controlPoints)
+			{
+				if (auto cp = cpWeak.lock())
+					cp->selected = state;
+			}
+		}
+		};
+
 	if (ctrlHeld && shiftHeld)
 	{
 		if (m_lastClickedIndex.has_value())
@@ -139,7 +154,8 @@ void CadApplication::HandleObjectSelection(size_t index, bool ctrlHeld, bool shi
 			size_t start = std::min(index, *m_lastClickedIndex);
 			size_t end = std::max(index, *m_lastClickedIndex);
 			for (size_t j = start; j <= end; j++)
-				m_sceneObjects[j]->selected = true;
+				setSelection(j, true);
+				//m_sceneObjects[j]->selected = true;
 		}
 	}
 	else if (shiftHeld)
@@ -151,25 +167,90 @@ void CadApplication::HandleObjectSelection(size_t index, bool ctrlHeld, bool shi
 			size_t start = std::min(index, *anchor);
 			size_t end = std::max(index, *anchor);
 			for (size_t j = start; j <= end; j++)
-				m_sceneObjects[j]->selected = true;
+				setSelection(j, true);
 			m_lastClickedIndex = anchor;
 		}
 		else
 		{
-			m_sceneObjects[index]->selected = true;
+			setSelection(index, true);
 			m_lastClickedIndex = index;
 		}
 	}
 	else if (ctrlHeld)
 	{
-		m_sceneObjects[index]->selected = !m_sceneObjects[index]->selected;
+		//m_sceneObjects[index]->selected = !m_sceneObjects[index]->selected;
+		setSelection(index, !m_sceneObjects[index]->selected);
 		m_lastClickedIndex = index;
 	}
 	else
 	{
 		ClearSelection();
-		m_sceneObjects[index]->selected = true;
+		//m_sceneObjects[index]->selected = true;
+		setSelection(index, true);
 		m_lastClickedIndex = index;
+	}
+
+	//for (const auto& obj : m_sceneObjects)
+	//{
+	//	if (obj->selected && obj->type == ObjectType::BezierCurve)
+	//	{
+	//		auto curve = static_cast<BezierCurve*>(obj.get());
+	//		for (const auto& cpWeak : curve->m_controlPoints)
+	//		{
+	//			if (auto cp = cpWeak.lock())
+	//				cp->selected = true;
+	//		}
+	//	}
+	//}
+
+	m_selectionDirty = true;
+}
+
+void CadApplication::HandleCurveListSelection(BezierCurve* curve, size_t index, bool ctrlHeld, bool shiftHeld)
+{
+	auto setSelection = [&](size_t i, bool state) {
+		if (auto cp = curve->m_controlPoints[i].lock())
+			cp->selected = state;
+		};
+
+	if (ctrlHeld && shiftHeld)
+	{
+		if (m_lastCurveClickedIndex.has_value())
+		{
+			size_t start = std::min(index, *m_lastCurveClickedIndex);
+			size_t end = std::max(index, *m_lastCurveClickedIndex);
+			for (size_t j = start; j <= end; j++)
+				setSelection(j, true);
+		}
+	}
+	else if (shiftHeld)
+	{
+		auto anchor = m_lastCurveClickedIndex;
+		if (anchor.has_value())
+		{
+			size_t start = std::min(index, *anchor);
+			size_t end = std::max(index, *anchor);
+			for (size_t j = start; j <= end; j++)
+				setSelection(j, true);
+			m_lastCurveClickedIndex = anchor;
+		}
+		else
+		{
+			setSelection(index, true);
+			m_lastCurveClickedIndex = index;
+		}
+	}
+	else if (ctrlHeld)
+	{
+		if (auto cp = curve->m_controlPoints[index].lock())
+			cp->selected = !cp->selected;
+		m_lastCurveClickedIndex = index;
+	}
+	else
+	{
+		for (size_t i = 0; i < curve->m_controlPoints.size(); i++)
+			setSelection(i, i == index);
+		m_lastCurveClickedIndex = index;
 	}
 
 	m_selectionDirty = true;
@@ -186,7 +267,8 @@ std::optional<size_t> CadApplication::PickClosestPoint(int mouseX, int mouseY, f
 		if (obj->type != ObjectType::Point)
 			continue;
 
-		Vec4f worldPos = obj->m_position.ToVec4f(1.0f);
+		const auto transObj = static_cast<TransformableObject*>(obj.get());
+		Vec4f worldPos = transObj->m_position.ToVec4f(1.0f);
 		Vec4f clipPos = m_camera.GetProjViewMatrix() * worldPos;
 
 		if (clipPos.w <= 0.0f)
@@ -251,8 +333,9 @@ std::optional<float3> CadApplication::GetSelectionCenter() const
 	Vec4f sum; // .w counts the number of selected objects. Max possible count is 16 777 216 due to float precision.
 	for (const auto& obj : m_sceneObjects)
 	{
-		if (obj->selected)
-			sum += obj->m_position.ToVec4f(1.0f); //Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);
+		if (obj->selected && obj->type != ObjectType::BezierCurve)
+			sum += static_cast<TransformableObject*>(obj.get())->m_position.ToVec4f(1.0f);
+		//Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);
 	}
 
 	m_selectionCenterCache = sum.w < 1.0f ? std::nullopt : std::optional<float3>(float3::FromVec4f(sum / sum.w));
@@ -374,10 +457,16 @@ void CadApplication::BeginEditAction(int mouseX, int mouseY, bool shiftHeld)
 	m_lastMousePos = { mouseX, mouseY };
 	m_startMousePos = m_lastMousePos;
 
+	TransformableObject* editObj = nullptr;
 	if (shiftHeld)
 		m_groupEditCenter = m_cursorPosition;
 	else if (m_menuState == MenuState::Edit)
-		m_groupEditCenter = m_sceneObjects[m_lastClickedIndex.value()]->m_position;
+	{
+		if (!m_lastClickedIndex.has_value() || m_sceneObjects[m_lastClickedIndex.value()]->type == ObjectType::BezierCurve)
+			return;
+		editObj = static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get());
+		m_groupEditCenter = editObj->m_position;
+	}
 	else
 	{
 		auto center = GetSelectionCenter();
@@ -406,7 +495,7 @@ void CadApplication::BeginEditAction(int mouseX, int mouseY, bool shiftHeld)
 		m_editAnchorDepth = m_camera.GetNearPlane();
 	}
 
-	auto prepareObject = [](SceneObject* obj)
+	auto prepareObject = [](TransformableObject* obj)
 		{
 			obj->m_basePosition = obj->m_position;
 			if (obj->type == ObjectType::Torus)
@@ -418,11 +507,13 @@ void CadApplication::BeginEditAction(int mouseX, int mouseY, bool shiftHeld)
 		};
 
 	if (m_menuState == MenuState::Edit)
-		prepareObject(m_sceneObjects[m_lastClickedIndex.value()].get());
+		prepareObject(editObj);
 	else
 		for (auto& obj : m_sceneObjects)
-			if (obj->selected)
-				prepareObject(obj.get());
+		{
+			if (obj->selected && obj->type != ObjectType::BezierCurve)
+				prepareObject(static_cast<TransformableObject*>(obj.get()));
+		}
 
 	SetCapture(m_window.getHandle());
 }
@@ -486,7 +577,7 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 
 	if (isTranslating || isRotating || isScaling)
 	{
-		auto applyTransform = [&](const std::unique_ptr<SceneObject>& obj)
+		auto applyTransform = [&](TransformableObject* obj)
 			{
 				//Vec3f objBasePos = Vec3f(obj->m_basePosition.x, obj->m_basePosition.y, obj->m_basePosition.z);
 				Vec3f objBasePos = obj->m_basePosition.ToVec3f();
@@ -504,7 +595,7 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 
 					if (obj->type == ObjectType::Torus)
 					{
-						auto torus = static_cast<Torus*>(obj.get());
+						auto torus = static_cast<Torus*>(obj);
 						torus->SetScale(torus->m_baseScale * scaleFactor);
 					}
 				}
@@ -520,7 +611,7 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 
 					if (obj->type == ObjectType::Torus)
 					{
-						auto torus = static_cast<Torus*>(obj.get());
+						auto torus = static_cast<Torus*>(obj);
 						torus->m_rotationMatrix = deltaRot * torus->m_baseRotationMatrix;
 						Vec3f euler = Mat4f::ExtractEulerAngles(torus->m_rotationMatrix);
 						torus->m_eulerAngles = euler;
@@ -528,20 +619,21 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 				}
 
 				if (obj->type == ObjectType::Torus)
-					static_cast<Torus*>(obj.get())->UpdateModelMatrix();
+					static_cast<Torus*>(obj)->UpdateModelMatrix();
 			};
 
 		if (m_menuState == MenuState::EditGroup)
 		{
 			for (auto& obj : m_sceneObjects)
 			{
-				if (obj->selected)
-					applyTransform(obj);
+				if (obj->selected && obj->type != ObjectType::BezierCurve)
+					applyTransform(static_cast<TransformableObject*>(obj.get()));
 			}
 		}
 		else
 		{
-			applyTransform(m_sceneObjects[m_lastClickedIndex.value()]);
+			if (m_lastClickedIndex.has_value() && m_sceneObjects[m_lastClickedIndex.value()]->type != ObjectType::BezierCurve)
+				applyTransform(static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get()));
 		}
 		m_selectionDirty = true;
 	}
@@ -661,11 +753,46 @@ void CadApplication::DrawMenu()
 
 	ImGui::Begin("Menu", nullptr);
 
+	int selectedPoints = 0;
+	int selectedCount = 0;
+	int selectedCurves = 0;
+	std::weak_ptr<BezierCurve> selectedCurve;
 
-	int selectedCount = count_if(m_sceneObjects.cbegin(), m_sceneObjects.cend(), [](const auto& obj) { return obj->selected; });
+	for (const auto& obj : m_sceneObjects)
+	{
+		if (obj->selected)
+		{
+			selectedCount++;
+			if (obj->type == ObjectType::Point)
+				selectedPoints++;
+			else if (obj->type == ObjectType::BezierCurve)
+			{
+				selectedCurves++;
+				auto sharedCurve = std::static_pointer_cast<BezierCurve>(obj);
+				selectedCurve = sharedCurve;
+				sharedCurve->CleanExpiredPoints();
+			}
+		}
+	}
+
+	if (selectedCurves != 1)
+		selectedCurve.reset();
+
+	//int selectedCount = count_if(m_sceneObjects.cbegin(), m_sceneObjects.cend(), [](const auto& obj) { return obj->selected; });
 
 	if (m_menuState == MenuState::List)
-		DrawListMenu(selectedCount);
+	{
+		BezierCurve* activeCurve = nullptr;
+		if (auto curve = selectedCurve.lock())
+			activeCurve = curve.get();
+		DrawListMenu(selectedCount, selectedPoints, activeCurve);
+
+		if (auto curve = selectedCurve.lock())
+		{ 
+			if (curve->selected)
+				DrawCurveList(curve.get(), selectedCount);
+		}
+	}
 	else if (m_menuState == MenuState::Edit)
 		DrawEditMenu();
 	else if (m_menuState == MenuState::EditGroup)
@@ -679,21 +806,70 @@ void CadApplication::DrawMenu()
 	ImGui::Render();
 }
 
-void CadApplication::DrawListMenu(int selectedCount)
+void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, BezierCurve* activeCurve)
 {
 
 	if (ImGui::Button("Add Torus"))
 	{
-		m_sceneObjects.push_back(std::make_unique<Torus>(m_cursorPosition));
+		m_sceneObjects.push_back(std::make_shared<Torus>(m_cursorPosition));
 	}
 
 	if (ImGui::Button("Add Point"))
 	{
-		m_sceneObjects.push_back(std::make_unique<Point>(m_cursorPosition));
+		auto newPoint = std::make_shared<Point>(m_cursorPosition);
+		m_sceneObjects.push_back(newPoint);
+		if (activeCurve)
+			activeCurve->m_controlPoints.push_back(newPoint);
 	}
 
+	ImGui::BeginDisabled(selectedPoints == 0);
+	if (ImGui::Button("Add Bezier Curve"))
+	{
+		std::vector<std::weak_ptr<Point>> pts;
+		for (const auto& obj : m_sceneObjects)
+		{
+			if (obj->selected && obj->type == ObjectType::Point)
+				pts.push_back(std::static_pointer_cast<Point>(obj));
+		}
+		m_sceneObjects.push_back(std::make_shared<BezierCurve>(std::move(pts)));
+	}
+	ImGui::EndDisabled();
+
+	std::vector<std::shared_ptr<Point>> pointsToAdd;
+	if (activeCurve)
+	{
+		for (const auto& obj : m_sceneObjects)
+		{
+			if (obj->selected && obj->type == ObjectType::Point)
+			{
+				auto pt = std::static_pointer_cast<Point>(obj);
+				bool exists = false;
+
+				for (const auto& cpWeak : activeCurve->m_controlPoints)
+				{
+					if (cpWeak.lock() == pt)
+					{
+						exists = true;
+						break;
+					}
+				}
+
+				if (!exists)
+					pointsToAdd.push_back(pt);
+			}
+		}
+	}
+
+	ImGui::BeginDisabled(pointsToAdd.empty());
+	if (ImGui::Button("Add Points to Curve"))
+	{
+		activeCurve->m_controlPoints.insert(activeCurve->m_controlPoints.end(), pointsToAdd.begin(), pointsToAdd.end());
+	}
+	ImGui::EndDisabled();
+
 	ImGui::Separator();
-	ImGuiIO& io = ImGui::GetIO();
+	const ImGuiIO& io = ImGui::GetIO();
+	ImGui::BeginChild("##ObjectListRegion", ImVec2(0, 250), true);
 	for (int i = 0; i < m_sceneObjects.size(); i++)
 	{
 		ImGui::PushID(i);
@@ -732,9 +908,9 @@ void CadApplication::DrawListMenu(int selectedCount)
 
 		ImGui::PopID();
 	}
+	ImGui::EndChild();
 
 	ImGui::Separator();
-
 
 	ImGui::BeginDisabled(selectedCount == 0);
 	if (selectedCount == 1)
@@ -776,7 +952,91 @@ void CadApplication::DrawListMenu(int selectedCount)
 	}
 
 	ImGui::PopStyleColor(2);
+}
 
+void CadApplication::DrawCurveList(BezierCurve* curve, int selectedCount)
+{
+	ImGui::TextDisabled("Selected Curve Control Points:");
+	ImGui::Text("%s", curve->name.c_str());
+	const ImGuiIO& io = ImGui::GetIO();
+	if (ImGui::BeginListBox(("##PointsList_" + curve->name).c_str(), ImVec2(-1.0f, 0.0f)))
+	{
+		for (size_t i = 0; i < curve->m_controlPoints.size(); i++)
+		{
+			if (auto cp = curve->m_controlPoints[i].lock())
+			{
+				ImGui::PushID(static_cast<int>(i));
+				std::string label = std::to_string(i) + ": " + cp->name;
+
+				if (ImGui::Selectable(label.c_str(), cp->selected))
+				{
+					HandleCurveListSelection(curve, i,io.KeyCtrl, io.KeyShift);
+				}
+				ImGui::PopID();
+			}
+		}		
+		ImGui::EndListBox();
+	}
+
+	bool pointSelected = false;
+	for (const auto& cpWeak : curve->m_controlPoints)
+	{
+		if (auto cp = cpWeak.lock())
+		{
+			if (cp->selected)
+			{
+				pointSelected = true;
+				break;
+			}
+		}
+	}
+	ImGui::BeginDisabled(!pointSelected);
+	if (ImGui::Button("Remove Selected Points from Curve", ImVec2(-1, 0)))
+	{
+		std::erase_if(curve->m_controlPoints, [](const auto& cpWeak) {
+			if (auto cp = cpWeak.lock())
+			{
+				if (cp->selected)
+				{
+					cp->selected = false;
+					return true;
+				}
+				return false;
+			}
+			return true;
+			});
+		m_selectionDirty = true;
+	}
+	ImGui::EndDisabled();
+	ImGui::Separator();
+
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.1f, 0.1f, 1.0f));
+
+	if (ImGui::Button("Delete Curve Only", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f - 4, 0)))
+	{
+		std::erase_if(m_sceneObjects, [curve](const auto& obj) {
+			return obj.get() == curve;
+			});
+	}
+
+	ImGui::SameLine();
+	if (ImGui::Button("Delete Curve and Control Points", ImVec2(-1, 0)))
+	{
+		std::vector<Point*> pointsToDelete;
+		for (const auto& cpWeak : curve->m_controlPoints)
+		{
+			if (auto cp = cpWeak.lock())
+				pointsToDelete.push_back(cp.get());
+		}
+
+		std::erase_if(m_sceneObjects, [curve, &pointsToDelete](const auto& obj) {
+			if (obj.get() == curve)
+				return true;
+			return std::find(pointsToDelete.begin(), pointsToDelete.end(), obj.get()) != pointsToDelete.end();
+			});
+	}
+	ImGui::PopStyleColor(2);
 }
 
 void CadApplication::DrawEditMenu()
@@ -800,7 +1060,7 @@ void CadApplication::DrawEditMenu()
 
 		if (selectedObj->type == ObjectType::Point)
 		{
-			DrawPointMenu(*selectedObj);
+			DrawPointMenu(*static_cast<Point*>(selectedObj.get()));
 		}
 		else if (selectedObj->type == ObjectType::Torus)
 		{
@@ -867,7 +1127,7 @@ void CadApplication::DrawTorusMenu(Torus& torus)
 	DrawActionCombo();
 }
 
-void CadApplication::DrawPointMenu(SceneObject& selectedObj)
+void CadApplication::DrawPointMenu(Point& selectedObj)
 {
 	if (ImGui::DragFloat3("Position", &selectedObj.m_position.x, 0.01f))
 		m_selectionDirty = true;

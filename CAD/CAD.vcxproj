@@ -151,6 +151,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BezierCurve.cpp" />
     <ClCompile Include="CadApplication.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Cursor3D.cpp" />
@@ -172,6 +173,7 @@
     <ClCompile Include="WindowApplication.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BezierCurve.h" />
     <ClInclude Include="CadApplication.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Cursor3D.h" />

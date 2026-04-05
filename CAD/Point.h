@@ -4,7 +4,7 @@
 #include "../MathLib/Mat4f.h"
 
 class DxDevice;
-struct Point : public SceneObject
+struct Point : public TransformableObject
 {
 	//float3 m_position{ 0.0f, 0.0f, 0.0f };
 	static void InitSharedGeometry(const DxDevice& device);

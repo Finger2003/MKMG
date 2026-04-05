@@ -5,6 +5,7 @@
 #include "SceneObject.h"
 #include "Torus.h"
 #include "Point.h"
+#include "BezierCurve.h"
 #include "Cursor3D.h"
 #include "Camera.h"
 
@@ -117,7 +118,7 @@ private:
 	Camera m_camera;
 
 	MathLib::Vec3f m_startArcballVector{};	
-	std::vector<std::unique_ptr<SceneObject>> m_sceneObjects;
+	std::vector<std::shared_ptr<SceneObject>> m_sceneObjects;
 
 	InteractionMode m_interactionMode = InteractionMode::None;
 	POINT m_lastMousePos{};
@@ -127,6 +128,7 @@ private:
 	float3 m_cursorPosition{ 0.0f, 0.0f, 0.0f };
 
 	std::optional<size_t> m_lastClickedIndex = std::nullopt;
+	std::optional<size_t> m_lastCurveClickedIndex = std::nullopt;
 	std::optional<size_t> m_nameEditingIndex = std::nullopt;
 
 	MenuState m_menuState = MenuState::List;
@@ -145,10 +147,11 @@ private:
 #pragma region Menu Methods
 	void InitImGui();
 	void DrawMenu();
-	void DrawListMenu(int selectedCount);
+	void DrawListMenu(int selectedCount, int selectedPoints, BezierCurve* activeCurve);
+	void DrawCurveList(BezierCurve* curve, int selectedCount);
 	void DrawEditMenu();
 	void DrawTorusMenu(Torus& torus);
-	void DrawPointMenu(SceneObject& selectedObj);
+	void DrawPointMenu(Point& selectedObj);
 	void DrawActionCombo();
 	void DrawEditGroupMenu(int selectedCount);
 	void DrawCameraSettingsMenu();
@@ -168,6 +171,7 @@ private:
 
 	void ClearSelection();
 	void HandleObjectSelection(size_t index, bool ctrlHeld, bool shiftHeld);
+	void HandleCurveListSelection(BezierCurve* curve, size_t index, bool ctrlHeld, bool shiftHeld);
 	std::optional<size_t> PickClosestPoint(int mouseX, int mouseY, float toleranceSq = 100.0f);
 
 	void BeginEditAction(int xPos, int yPos, bool shiftHeld);

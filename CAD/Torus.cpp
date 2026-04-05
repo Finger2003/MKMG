@@ -7,7 +7,7 @@ using namespace MathLib;
 
 unsigned int Torus::s_nextId = 0;
 
-Torus::Torus(float3 position) : SceneObject(position, "Torus" + to_string(s_nextId++), ObjectType::Torus)//, m_position(position)
+Torus::Torus(float3 position) : TransformableObject(position, "Torus" + to_string(s_nextId++), ObjectType::Torus)//, m_position(position)
 {
 	UpdateModelMatrix();
 }
