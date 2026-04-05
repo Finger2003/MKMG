@@ -682,15 +682,71 @@ void CadApplication::Render()
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
+	DrawCursors(context);
+	DrawToruses(context);
 
-	UINT stride = sizeof(VertexPosition);
-	UINT offset = 0;
-	context->IASetVertexBuffers(0, 1, m_cursor.GetVertexBuffer().GetAddressOf(), &stride, &offset);
-	DrawCursor(m_cursorPosition, 0.1f);
-	auto selectionCenter = GetSelectionCenter();
-	if (selectionCenter)
-		DrawCursor(*selectionCenter, 0.06f);
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
+	DrawPolylines(context);
 
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+	//context->VSSetShader(m_pointVertexShader.Get(), nullptr, 0);
+	context->GSSetShader(m_pointGeometryShader.Get(), nullptr, 0);
+	context->PSSetShader(m_pointPixelShader.Get(), nullptr, 0);
+
+	DrawPoints(context);
+
+	context->GSSetShader(nullptr, nullptr, 0);
+
+	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+}
+
+void CadApplication::DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+{
+	for (auto& obj : m_sceneObjects)
+	{
+		if (obj->type == ObjectType::Point)
+		{
+			auto& point = *static_cast<Point*>(obj.get());
+			PerObjectBuffer objData;
+			objData.model = point.GetModelMatrix();
+			objData.color = point.selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+			m_device.UpdateBuffer(m_cbPerObject, objData);
+
+			UINT stride = sizeof(VertexPosition);
+			UINT offset = 0;
+			context->IASetVertexBuffers(0, 1, point.GetVertexBuffer().GetAddressOf(), &stride, &offset);
+			context->Draw(1, 0);
+		}
+	}
+}
+
+void CadApplication::DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+{
+	PerObjectBuffer objData;
+	objData.model = Mat4f::Identity();
+	objData.color = Vec4f(0.7f, 0.7f, 0.7f, 1.0f);
+	m_device.UpdateBuffer(m_cbPerObject, objData);
+
+	for (auto& obj : m_sceneObjects)
+	{
+		if (obj->selected && obj->type == ObjectType::BezierCurve)
+		{
+			auto& curve = *static_cast<BezierCurve*>(obj.get());
+			curve.UpdatePolyline(m_device);
+
+			if (curve.m_vertexBuffer)
+			{
+				UINT stride = sizeof(VertexPosition);
+				UINT offset = 0;
+				context->IASetVertexBuffers(0, 1, curve.m_vertexBuffer.GetAddressOf(), &stride, &offset);
+				context->Draw(static_cast<UINT>(curve.m_lastPositions.size()), 0);
+			}
+		}
+	}
+}
+
+void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+{
 	for (auto& obj : m_sceneObjects)
 	{
 		if (obj->type == ObjectType::Torus)
@@ -710,31 +766,17 @@ void CadApplication::Render()
 			context->DrawIndexed(static_cast<UINT>(torus.indices.size()), 0, 0);
 		}
 	}
+}
 
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-	//context->VSSetShader(m_pointVertexShader.Get(), nullptr, 0);
-	context->GSSetShader(m_pointGeometryShader.Get(), nullptr, 0);
-	context->PSSetShader(m_pointPixelShader.Get(), nullptr, 0);
-
-	for (auto& obj : m_sceneObjects)
-	{
-		if (obj->type == ObjectType::Point)
-		{
-			auto& point = *static_cast<Point*>(obj.get());
-			PerObjectBuffer objData;
-			objData.model = point.GetModelMatrix();
-			objData.color = point.selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-			m_device.UpdateBuffer(m_cbPerObject, objData);
-
-			UINT stride = sizeof(VertexPosition);
-			UINT offset = 0;
-			context->IASetVertexBuffers(0, 1, point.GetVertexBuffer().GetAddressOf(), &stride, &offset);
-			context->Draw(1, 0);
-		}
-	}
-	context->GSSetShader(nullptr, nullptr, 0);
-
-	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+void CadApplication::DrawCursors(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+{
+	UINT stride = sizeof(VertexPosition);
+	UINT offset = 0;
+	context->IASetVertexBuffers(0, 1, m_cursor.GetVertexBuffer().GetAddressOf(), &stride, &offset);
+	DrawCursor(m_cursorPosition, 0.1f);
+	auto selectionCenter = GetSelectionCenter();
+	if (selectionCenter)
+		DrawCursor(*selectionCenter, 0.06f);
 }
 
 

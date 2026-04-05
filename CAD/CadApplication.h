@@ -94,6 +94,14 @@ public:
 protected:
 	void Render() override; // Renders the scene to the window.
 
+	void DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+
+	void DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+
+	void DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+
+	void DrawCursors(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_depthBuffer;
 	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_vertexShader;
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_pixelShader;
