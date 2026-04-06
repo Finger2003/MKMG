@@ -25,6 +25,8 @@ struct PerPassBuffer
 {
 	MathLib::Mat4f viewProj;
 	float aspectRatio;
+	float renderSize[2];
+	float padding;
 };
 
 enum class InteractionMode
@@ -94,13 +96,6 @@ public:
 protected:
 	void Render() override; // Renders the scene to the window.
 
-	void DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-
-	void DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-
-	void DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-
-	void DrawCursors(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_depthBuffer;
 	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_vertexShader;
@@ -111,6 +106,9 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_pointPixelShader;
 	Microsoft::WRL::ComPtr<ID3D11GeometryShader> m_pointGeometryShader;
 	//Microsoft::WRL::ComPtr<ID3D11InputLayout> m_pointLayout;
+
+	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_bezierVertexShader;
+	Microsoft::WRL::ComPtr<ID3D11GeometryShader> m_bezierGeometryShader;
 
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerObject;
@@ -184,5 +182,14 @@ private:
 
 	void BeginEditAction(int xPos, int yPos, bool shiftHeld);
 	void ApplyEditTransform(int mouseX, int mouseY);
+
+
+#pragma region Rendering Methods
+	void DrawCursors(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+#pragma endregion
 };
 

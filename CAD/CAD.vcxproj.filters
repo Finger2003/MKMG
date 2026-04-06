@@ -130,5 +130,11 @@
     <FxCompile Include="PointGS.hlsl">
       <Filter>Pliki shaderów</Filter>
     </FxCompile>
+    <FxCompile Include="BezierGS.hlsl">
+      <Filter>Pliki shaderów</Filter>
+    </FxCompile>
+    <FxCompile Include="BezierVS.hlsl">
+      <Filter>Pliki shaderów</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

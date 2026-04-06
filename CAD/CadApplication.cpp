@@ -53,11 +53,16 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	const auto pointVsByteCode = DxDevice::LoadByteCode(L"PointVS.cso");
 	const auto pointPsByteCode = DxDevice::LoadByteCode(L"PointPS.cso");
 	const auto pointGsByteCode = DxDevice::LoadByteCode(L"PointGS.cso");
+	const auto bezierVsByteCode = DxDevice::LoadByteCode(L"BezierVS.cso");
+	const auto bezierGsByteCode = DxDevice::LoadByteCode(L"BezierGS.cso");
+
 	m_vertexShader = m_device.CreateVertexShader(vsByteCode);
 	m_pixelShader = m_device.CreatePixelShader(psByteCode);
 	m_pointVertexShader = m_device.CreateVertexShader(pointVsByteCode);
 	m_pointPixelShader = m_device.CreatePixelShader(pointPsByteCode);
 	m_pointGeometryShader = m_device.CreateGeometryShader(pointGsByteCode);
+	m_bezierVertexShader = m_device.CreateVertexShader(bezierVsByteCode);
+	m_bezierGeometryShader = m_device.CreateGeometryShader(bezierGsByteCode);
 
 	vector<D3D11_INPUT_ELEMENT_DESC> inputElements = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
@@ -117,6 +122,8 @@ void CadApplication::SyncPerPassBuffer()
 		PerPassBuffer perPassData;
 		perPassData.viewProj = m_camera.GetProjViewMatrix();
 		perPassData.aspectRatio = m_camera.GetAspectRatio();
+		perPassData.renderSize[0] = static_cast<float>(m_renderSize.cx);
+		perPassData.renderSize[1] = static_cast<float>(m_renderSize.cy);
 		m_device.UpdateBuffer(m_cbPerPass, perPassData);
 	}
 }
@@ -692,8 +699,13 @@ void CadApplication::Render()
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
 	DrawPolylines(context);
 
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST_ADJ);
+	context->VSSetShader(m_bezierVertexShader.Get(), nullptr, 0);
+	context->GSSetShader(m_bezierGeometryShader.Get(), nullptr, 0);
+	DrawBezierCurves(context);
+
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-	//context->VSSetShader(m_pointVertexShader.Get(), nullptr, 0);
+	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
 	context->GSSetShader(m_pointGeometryShader.Get(), nullptr, 0);
 	context->PSSetShader(m_pointPixelShader.Get(), nullptr, 0);
 
@@ -733,17 +745,41 @@ void CadApplication::DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceCont
 
 	for (auto& obj : m_sceneObjects)
 	{
-		if (obj->selected && obj->type == ObjectType::BezierCurve)
+		if (obj->type == ObjectType::BezierCurve)
 		{
 			auto& curve = *static_cast<BezierCurve*>(obj.get());
 			curve.UpdatePolyline(m_device);
 
-			if (curve.m_vertexBuffer)
+			if (curve.selected && curve.m_lineVertexBuffer)
 			{
 				UINT stride = sizeof(VertexPosition);
 				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, curve.m_vertexBuffer.GetAddressOf(), &stride, &offset);
-				context->Draw(static_cast<UINT>(curve.m_lastPositions.size()), 0);
+				context->IASetVertexBuffers(0, 1, curve.m_lineVertexBuffer.GetAddressOf(), &stride, &offset);
+				context->Draw(curve.m_lineVertexCount, 0);
+			}
+		}
+	}
+}
+
+void CadApplication::DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+{
+	PerObjectBuffer objData;
+	objData.model = Mat4f::Identity();
+
+	for (auto& obj : m_sceneObjects)
+	{
+		if (obj->type == ObjectType::BezierCurve)
+		{
+			auto& curve = *static_cast<BezierCurve*>(obj.get());
+			objData.color = curve.selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+			m_device.UpdateBuffer(m_cbPerObject, objData);
+
+			if (curve.m_curveVertexBuffer)
+			{
+				UINT stride = sizeof(VertexPosition);
+				UINT offset = 0;
+				context->IASetVertexBuffers(0, 1, curve.m_curveVertexBuffer.GetAddressOf(), &stride, &offset);
+				context->Draw(curve.m_curveVertexCount, 0);
 			}
 		}
 	}
