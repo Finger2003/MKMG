@@ -384,24 +384,31 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		bool ctrlHeld = (fwKeys & MK_CONTROL) != 0;
 		bool shiftHeld = (fwKeys & MK_SHIFT) != 0;
 
-		if ((m_menuState == MenuState::Edit || m_menuState == MenuState::EditGroup) && m_currentEditAction != EditAction::None)
-		{
-			BeginEditAction(xPos, yPos, shiftHeld);
-			return true;
-		}
-
 		auto pickedIndex = PickClosestPoint(xPos, yPos);
 		if (pickedIndex.has_value())
 		{
 			HandleObjectSelection(*pickedIndex, ctrlHeld, false);
+
+			if (m_currentEditAction != EditAction::None)
+				BeginEditAction(xPos, yPos, shiftHeld);
 		}
 		else
 		{
-			if (!ctrlHeld)
+			if (ctrlHeld)
+			{
+				auto [normX, normY] = CalculateCoordsFromPixel(static_cast<float>(xPos), static_cast<float>(yPos),
+					static_cast<float>(m_renderSize.cx), static_cast<float>(m_renderSize.cy));
+				m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
+			}
+			else if (m_currentEditAction != EditAction::None)
+				BeginEditAction(xPos, yPos, shiftHeld);
+			else
+			{
 				ClearSelection();
-
-			auto [normX, normY] = CalculateCoordsFromPixel(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
-			m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
+				auto [normX, normY] = CalculateCoordsFromPixel(static_cast<float>(xPos), static_cast<float>(yPos),
+					static_cast<float>(m_renderSize.cx), static_cast<float>(m_renderSize.cy));
+				m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
+			}
 		}
 	}
 	return true;
@@ -630,18 +637,32 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 					static_cast<Torus*>(obj)->UpdateModelMatrix();
 			};
 
-		if (m_menuState == MenuState::EditGroup)
+		//if (m_menuState == MenuState::EditGroup)
+		//{
+		//	for (auto& obj : m_sceneObjects)
+		//	{
+		//		if (obj->selected && obj->type != ObjectType::BezierCurve)
+		//			applyTransform(static_cast<TransformableObject*>(obj.get()));
+		//	}
+		//}
+		//else
+		//{
+		//	if (m_lastClickedIndex.has_value() && m_sceneObjects[m_lastClickedIndex.value()]->type != ObjectType::BezierCurve)
+		//		applyTransform(static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get()));
+		//}
+
+		if (m_menuState == MenuState::Edit)
+		{
+			if (m_lastClickedIndex.has_value() && m_sceneObjects[*m_lastClickedIndex]->type != ObjectType::BezierCurve)
+				applyTransform(static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get()));
+		}
+		else
 		{
 			for (auto& obj : m_sceneObjects)
 			{
 				if (obj->selected && obj->type != ObjectType::BezierCurve)
 					applyTransform(static_cast<TransformableObject*>(obj.get()));
 			}
-		}
-		else
-		{
-			if (m_lastClickedIndex.has_value() && m_sceneObjects[m_lastClickedIndex.value()]->type != ObjectType::BezierCurve)
-				applyTransform(static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get()));
 		}
 		m_selectionDirty = true;
 	}
@@ -871,6 +892,9 @@ void CadApplication::DrawMenu()
 		ImGuiWindowFlags_NoCollapse;
 
 	ImGui::Begin("Menu", nullptr);
+
+	DrawActionCombo();
+	ImGui::Separator();
 
 	int selectedPoints = 0;
 	int selectedCount = 0;
@@ -1242,8 +1266,8 @@ void CadApplication::DrawTorusMenu(Torus& torus)
 	if (transformChanged)
 		torus.UpdateModelMatrix();
 
-	ImGui::Separator();
-	DrawActionCombo();
+	//ImGui::Separator();
+	//DrawActionCombo();
 }
 
 void CadApplication::DrawPointMenu(Point& selectedObj)
@@ -1251,8 +1275,8 @@ void CadApplication::DrawPointMenu(Point& selectedObj)
 	if (ImGui::DragFloat3("Position", &selectedObj.m_position.x, 0.01f))
 		m_selectionDirty = true;
 
-	ImGui::Separator();
-	DrawActionCombo();
+	//ImGui::Separator();
+	//DrawActionCombo();
 }
 
 void CadApplication::DrawActionCombo()
@@ -1288,7 +1312,7 @@ void CadApplication::DrawEditGroupMenu(int selectedCount)
 		ImGui::Text("Center: %.2f, %.2f, %.2f", centerOpt->x, centerOpt->y, centerOpt->z);
 	}
 	ImGui::Spacing();
-	DrawActionCombo();
+	//DrawActionCombo();
 	//ImGui::Text("Interactive Group Action");
 	//const char* actions[] = {
 	//	"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",

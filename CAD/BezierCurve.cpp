@@ -86,13 +86,15 @@ void BezierCurve::UpdatePolyline(const DxDevice& device)
 			}
 			else if (i + 2 < n)
 			{
-				Vec3f c = m_lastPositions[i + 1].ToVec3f();
+				// p0=b0, b1, p3=b2
+				Vec3f b1 = m_lastPositions[i + 1].ToVec3f();
 				p3 = m_lastPositions[i + 2].ToVec3f();
-				p1 = (c - p0) * (2.0f / 3.0f) + p0;
-				p2 = (c - p3) * (2.0f / 3.0f) + p3;
+				p1 = (b1 - p0) * (2.0f / 3.0f) + p0;
+				p2 = (b1 - p3) * (2.0f / 3.0f) + p3;
 			}
 			else
 			{
+				// p0=b0, p3=b1
 				p3 = m_lastPositions[i + 1].ToVec3f();
 				p1 = (p3 - p0) * (1.0f / 3.0f) + p0;
 				p2 = (p3 - p0) * (2.0f / 3.0f) + p0;
