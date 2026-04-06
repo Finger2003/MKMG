@@ -21,15 +21,17 @@ struct VertexOut
 {
     float4 PosH : SV_POSITION; // Clip Space
     float4 PosW : POSITION; // World Space
+    uint InstanceID : SV_InstanceID; // Instance ID for instancing
 };
 
-VertexOut main(uint vid : SV_VertexID)
+VertexOut main(uint vid : SV_VertexID, uint instanceID : SV_InstanceID)
 {
     VertexOut vout;
 
     float4 posW = controlPoints[vid];
     vout.PosW = posW;
     vout.PosH = mul(posW, viewProj);
+    vout.InstanceID = instanceID;
 
     return vout;
 }

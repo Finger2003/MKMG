@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "CadApplication.h"
 #include "../MathLib/Mat4f.h"
+#include "../MathLib/Vec2f.h"
 #include "../ImGuiLib/imgui.h"
 #include "../ImGuiLib/imgui_impl_win32.h"
 #include "../ImGuiLib/imgui_impl_dx11.h"
@@ -768,13 +769,17 @@ void CadApplication::DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceC
 	ID3D11Buffer* nullBuffer = nullptr;
 	context->IASetVertexBuffers(0, 1, &nullBuffer, &stride, &offset);
 
-	PerCurveBuffer curveData;
+	Mat4f viewProj = m_camera.GetProjViewMatrix();
+	float halfRenderWidth = m_renderSize.cx * 0.5f;
+	float halfRenderHeight = m_renderSize.cy * 0.5f;
+
 
 	for (auto& obj : m_sceneObjects)
 	{
 		if (obj->type == ObjectType::BezierCurve)
 		{
 			auto& curve = *static_cast<BezierCurve*>(obj.get());
+			PerCurveBuffer curveData;
 			curveData.color = curve.selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
 
 			for (size_t i = 0; i + 3 < curve.m_segmentPoints.size(); i += 3)
@@ -782,25 +787,37 @@ void CadApplication::DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceC
 #pragma unroll
 				for (size_t j = 0; j < 4; j++)
 					curveData.controlPoints[j] = curve.m_segmentPoints[i + j].ToVec4f(1.0f);
-
-				//curveData.controlPoints[0] = curve.m_segmentPoints[i].ToVec4f(1.0f);
-				//curveData.controlPoints[1] = curve.m_segmentPoints[i + 1].ToVec4f(1.0f);
-				//curveData.controlPoints[2] = curve.m_segmentPoints[i + 2].ToVec4f(1.0f);
-				//curveData.controlPoints[3] = curve.m_segmentPoints[i + 3].ToVec4f(1.0f);
 				m_device.UpdateBuffer(m_cbPerObject, curveData);
-				context->Draw(4, 0);
+
+				int instancesToDraw = 1;
+				Vec4f c0 = viewProj * curveData.controlPoints[0];
+				Vec4f c1 = viewProj * curveData.controlPoints[1];
+				Vec4f c2 = viewProj * curveData.controlPoints[2];
+				Vec4f c3 = viewProj * curveData.controlPoints[3];
+
+				if (c0.w < 0.1f || c1.w < 0.1f || c2.w < 0.1f || c3.w < 0.1f)
+					instancesToDraw = 8;
+				else
+				{
+					auto toScreen = [&](const Vec4f& clip) {
+						Vec4f ndc = clip / clip.w;
+						return Vec2f(ndc.x * halfRenderWidth, ndc.y * halfRenderHeight);
+						};
+
+					Vec2f s0 = toScreen(c0);
+					Vec2f s1 = toScreen(c1);
+					Vec2f s2 = toScreen(c2);
+					Vec2f s3 = toScreen(c3);
+
+					float polyLength = (s0 - s1).length() + (s1 - s2).length() + (s2 - s3).length();
+					int totalSegments = std::max(1, static_cast<int>(std::ceil(polyLength / 3.0f)));
+					instancesToDraw = std::max(1, static_cast<int>(std::ceil(totalSegments / 127.0f)));
+
+					instancesToDraw = std::min(instancesToDraw, 64);
+				}
+
+				context->DrawInstanced(4, instancesToDraw, 0, 0);
 			}
-
-			//curveData.controlPoints[0]
-			//m_device.UpdateBuffer(m_cbPerObject, curveData);
-
-			//if (curve.m_curveVertexBuffer)
-			//{
-			//	UINT stride = sizeof(VertexPosition);
-			//	UINT offset = 0;
-			//	context->IASetVertexBuffers(0, 1, curve.m_curveVertexBuffer.GetAddressOf(), &stride, &offset);
-			//	context->Draw(curve.m_curveVertexCount, 0);
-			//}
 		}
 	}
 }

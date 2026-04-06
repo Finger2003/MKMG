@@ -10,6 +10,7 @@ struct VSOut
 {
     float4 PosH : SV_POSITION; // Clip Space
     float4 PosW : POSITION; // World Space
+    uint InstanceID : SV_InstanceID; // Instance ID for instancing
 };
 
 struct GSOut
@@ -27,12 +28,23 @@ void main(lineadj VSOut input[4], inout LineStream<GSOut> outputStream)
     
     float polyLength = length(p1 - p0) + length(p2 - p1) + length(p3 - p2);
        
-    int segments = clamp(ceil(polyLength / 3.0f), 1, 127);
+    int totalSegments = clamp(ceil(polyLength / 3.0f), 1, 8128);
+    uint instanceId = input[0].InstanceID;
+    int startSegment = instanceId * 127;
+    
+    if (startSegment >= totalSegments)
+        return;
+    
+    int segmentsInThisPass = min(127, totalSegments - startSegment);
+    
+    //int segments = clamp(ceil(polyLength / 3.0f), 1, 127);
+    
 
     GSOut v;
-    for (int i = 0; i <= segments; ++i)
+    for (int i = 0; i <= segmentsInThisPass; i++)
     {
-        float t = (float) i / (float) segments;
+        int globalSegment = startSegment + i;
+        float t = (float) globalSegment / (float) totalSegments;
         
         float4 q0 = lerp(input[0].PosW, input[1].PosW, t);
         float4 q1 = lerp(input[1].PosW, input[2].PosW, t);
