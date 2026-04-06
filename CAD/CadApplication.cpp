@@ -395,7 +395,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		{
 			if (ctrlHeld)
 			{
-				// Update 3D cursor position and exit without starting a transformation
 				auto [normX, normY] = CalculateCoordsFromPixel(static_cast<float>(xPos), static_cast<float>(yPos),
 					static_cast<float>(m_renderSize.cx), static_cast<float>(m_renderSize.cy));
 				m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
@@ -410,23 +409,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 				m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
 			}
 		}
-
-		//if ((m_menuState == MenuState::Edit || m_menuState == MenuState::EditGroup) && m_currentEditAction != EditAction::None)
-		//if (m_currentEditAction != EditAction::None)
-		//{
-		//	BeginEditAction(xPos, yPos, shiftHeld);
-		//	return true;
-		//}
-
-
-		//if (!pickedIndex.has_value())
-		//{
-		//	if (!ctrlHeld)
-		//		ClearSelection();
-
-		//	auto [normX, normY] = CalculateCoordsFromPixel(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
-		//	m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
-		//}
 	}
 	return true;
 	case WM_MBUTTONDOWN:
