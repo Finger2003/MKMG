@@ -383,26 +383,50 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		bool ctrlHeld = (fwKeys & MK_CONTROL) != 0;
 		bool shiftHeld = (fwKeys & MK_SHIFT) != 0;
 
-		//if ((m_menuState == MenuState::Edit || m_menuState == MenuState::EditGroup) && m_currentEditAction != EditAction::None)
-		if (m_currentEditAction != EditAction::None)
-		{
-			BeginEditAction(xPos, yPos, shiftHeld);
-			return true;
-		}
-
 		auto pickedIndex = PickClosestPoint(xPos, yPos);
 		if (pickedIndex.has_value())
 		{
 			HandleObjectSelection(*pickedIndex, ctrlHeld, false);
+
+			if (m_currentEditAction != EditAction::None)
+				BeginEditAction(xPos, yPos, shiftHeld);
 		}
 		else
 		{
-			if (!ctrlHeld)
+			if (ctrlHeld)
+			{
+				// Update 3D cursor position and exit without starting a transformation
+				auto [normX, normY] = CalculateCoordsFromPixel(static_cast<float>(xPos), static_cast<float>(yPos),
+					static_cast<float>(m_renderSize.cx), static_cast<float>(m_renderSize.cy));
+				m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
+			}
+			else if (m_currentEditAction != EditAction::None)
+				BeginEditAction(xPos, yPos, shiftHeld);
+			else
+			{
 				ClearSelection();
-
-			auto [normX, normY] = CalculateCoordsFromPixel(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
-			m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
+				auto [normX, normY] = CalculateCoordsFromPixel(static_cast<float>(xPos), static_cast<float>(yPos),
+					static_cast<float>(m_renderSize.cx), static_cast<float>(m_renderSize.cy));
+				m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
+			}
 		}
+
+		//if ((m_menuState == MenuState::Edit || m_menuState == MenuState::EditGroup) && m_currentEditAction != EditAction::None)
+		//if (m_currentEditAction != EditAction::None)
+		//{
+		//	BeginEditAction(xPos, yPos, shiftHeld);
+		//	return true;
+		//}
+
+
+		//if (!pickedIndex.has_value())
+		//{
+		//	if (!ctrlHeld)
+		//		ClearSelection();
+
+		//	auto [normX, normY] = CalculateCoordsFromPixel(xPos, yPos, m_renderSize.cx, m_renderSize.cy);
+		//	m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
+		//}
 	}
 	return true;
 	case WM_MBUTTONDOWN:
