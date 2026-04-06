@@ -9,10 +9,12 @@ struct BezierCurve : public SceneObject
 
 	std::vector<float3> m_lastPositions;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_lineVertexBuffer;
-	Microsoft::WRL::ComPtr<ID3D11Buffer> m_curveVertexBuffer;
+	//Microsoft::WRL::ComPtr<ID3D11Buffer> m_curveVertexBuffer;
 
 	UINT m_lineVertexCount = 0;
-	UINT m_curveVertexCount = 0;
+	//UINT m_curveVertexCount = 0;
+
+	std::vector<float3> m_segmentPoints;
 
 	BezierCurve(std::vector<std::weak_ptr<Point>>&& controlPoints);
 	void CleanExpiredPoints();

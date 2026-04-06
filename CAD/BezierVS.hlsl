@@ -8,14 +8,14 @@ cbuffer PerPassBuffer : register(b0)
 
 cbuffer PerObjectBuffer : register(b1)
 {
-    matrix model;
+    float4 controlPoints[4];
     float4 color;
 };
 
-struct VertexIn
-{
-    float3 PosL : POSITION; // Local space position
-};
+//struct VertexIn
+//{
+//    float3 PosL : POSITION; // Local space position
+//};
 
 struct VertexOut
 {
@@ -23,11 +23,11 @@ struct VertexOut
     float4 PosW : POSITION; // World Space
 };
 
-VertexOut main(VertexIn vin)
+VertexOut main(uint vid : SV_VertexID)
 {
     VertexOut vout;
 
-    float4 posW = mul(float4(vin.PosL, 1.0f), model);
+    float4 posW = controlPoints[vid];
     vout.PosW = posW;
     vout.PosH = mul(posW, viewProj);
 

@@ -162,7 +162,7 @@ void CadApplication::HandleObjectSelection(size_t index, bool ctrlHeld, bool shi
 			size_t end = std::max(index, *m_lastClickedIndex);
 			for (size_t j = start; j <= end; j++)
 				setSelection(j, true);
-				//m_sceneObjects[j]->selected = true;
+			//m_sceneObjects[j]->selected = true;
 		}
 	}
 	else if (shiftHeld)
@@ -763,24 +763,44 @@ void CadApplication::DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceCont
 
 void CadApplication::DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
 {
-	PerObjectBuffer objData;
-	objData.model = Mat4f::Identity();
+	UINT stride = 0;
+	UINT offset = 0;
+	ID3D11Buffer* nullBuffer = nullptr;
+	context->IASetVertexBuffers(0, 1, &nullBuffer, &stride, &offset);
+
+	PerCurveBuffer curveData;
 
 	for (auto& obj : m_sceneObjects)
 	{
 		if (obj->type == ObjectType::BezierCurve)
 		{
 			auto& curve = *static_cast<BezierCurve*>(obj.get());
-			objData.color = curve.selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-			m_device.UpdateBuffer(m_cbPerObject, objData);
+			curveData.color = curve.selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
 
-			if (curve.m_curveVertexBuffer)
+			for (size_t i = 0; i + 3 < curve.m_segmentPoints.size(); i += 3)
 			{
-				UINT stride = sizeof(VertexPosition);
-				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, curve.m_curveVertexBuffer.GetAddressOf(), &stride, &offset);
-				context->Draw(curve.m_curveVertexCount, 0);
+#pragma unroll
+				for (size_t j = 0; j < 4; j++)
+					curveData.controlPoints[j] = curve.m_segmentPoints[i + j].ToVec4f(1.0f);
+
+				//curveData.controlPoints[0] = curve.m_segmentPoints[i].ToVec4f(1.0f);
+				//curveData.controlPoints[1] = curve.m_segmentPoints[i + 1].ToVec4f(1.0f);
+				//curveData.controlPoints[2] = curve.m_segmentPoints[i + 2].ToVec4f(1.0f);
+				//curveData.controlPoints[3] = curve.m_segmentPoints[i + 3].ToVec4f(1.0f);
+				m_device.UpdateBuffer(m_cbPerObject, curveData);
+				context->Draw(4, 0);
 			}
+
+			//curveData.controlPoints[0]
+			//m_device.UpdateBuffer(m_cbPerObject, curveData);
+
+			//if (curve.m_curveVertexBuffer)
+			//{
+			//	UINT stride = sizeof(VertexPosition);
+			//	UINT offset = 0;
+			//	context->IASetVertexBuffers(0, 1, curve.m_curveVertexBuffer.GetAddressOf(), &stride, &offset);
+			//	context->Draw(curve.m_curveVertexCount, 0);
+			//}
 		}
 	}
 }
@@ -870,7 +890,7 @@ void CadApplication::DrawMenu()
 		DrawListMenu(selectedCount, selectedPoints, activeCurve);
 
 		if (auto curve = selectedCurve.lock())
-		{ 
+		{
 			if (curve->selected)
 				DrawCurveList(curve.get(), selectedCount);
 		}
@@ -1052,11 +1072,11 @@ void CadApplication::DrawCurveList(BezierCurve* curve, int selectedCount)
 
 				if (ImGui::Selectable(label.c_str(), cp->selected))
 				{
-					HandleCurveListSelection(curve, i,io.KeyCtrl, io.KeyShift);
+					HandleCurveListSelection(curve, i, io.KeyCtrl, io.KeyShift);
 				}
 				ImGui::PopID();
 			}
-		}		
+		}
 		ImGui::EndListBox();
 	}
 

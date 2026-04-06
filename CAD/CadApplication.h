@@ -21,6 +21,12 @@ struct PerObjectBuffer
 	MathLib::Vec4f color;
 };
 
+struct PerCurveBuffer
+{
+	MathLib::Vec4f controlPoints[4];
+	MathLib::Vec4f color;
+};
+
 struct PerPassBuffer
 {
 	MathLib::Mat4f viewProj;
