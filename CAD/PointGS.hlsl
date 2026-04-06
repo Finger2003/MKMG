@@ -1,15 +1,27 @@
+cbuffer perFrame : register(b0)
+{
+    matrix viewProj;
+    float aspectRatio;
+}
+
+cbuffer perObject : register(b1)
+{
+    matrix model;
+    float4 objectColor;
+}
+
 struct VSOut
 {
     float4 pos : SV_POSITION;
-    float4 color : COLOR;
-    float aspect : ASPECT;
+    //float4 color : COLOR;
+    //float aspect : ASPECT;
 };
 
 
 struct GSOut
 {
 	float4 pos : SV_POSITION;
-    float4 color : COLOR;
+    //float4 color : COLOR;
     float2 uv : TEXCOORD0;
 };
 
@@ -20,9 +32,9 @@ void main(
 )
 {
     GSOut output;
-    output.color = input[0].color;
+    //output.color = input[0].color;
     float radiusY = 0.005f;
-    float radiusX = radiusY / input[0].aspect;
+    float radiusX = radiusY / aspectRatio;
 	
     float4 center = input[0].pos;
 	

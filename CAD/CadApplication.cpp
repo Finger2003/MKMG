@@ -674,11 +674,15 @@ void CadApplication::Render()
 	context->OMSetRenderTargets(1, m_backBuffer.GetAddressOf(), m_depthBuffer.Get());
 
 	context->VSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
+	context->GSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
+	context->PSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
 
 	context->IASetInputLayout(m_layout.Get());
 	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
 	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
 	context->VSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
+	context->GSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
+	context->PSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 

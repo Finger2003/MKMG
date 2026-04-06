@@ -17,8 +17,8 @@ struct VSIn
 struct VSOut
 {
 	float4 pos : SV_POSITION;
-	float4 color : COLOR;
-    float aspect : ASPECT;
+	//float4 color : COLOR;
+ //   float aspect : ASPECT;
 };
 
 
@@ -26,7 +26,7 @@ VSOut main(VSIn i)
 {
     VSOut o;
     o.pos = mul(float4(i.pos, 1.0f), viewProj);
-    o.color = color;
-    o.aspect = aspectRatio;
+    //o.color = color;
+    //o.aspect = aspectRatio;
     return o;
 }
