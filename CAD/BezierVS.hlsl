@@ -27,11 +27,8 @@ VertexOut main(VertexIn vin)
 {
     VertexOut vout;
 
-    // Transform to world space
     float4 posW = mul(float4(vin.PosL, 1.0f), model);
     vout.PosW = posW;
-
-    // Transform to homogeneous clip space for screen presence calculations
     vout.PosH = mul(posW, viewProj);
 
     return vout;
