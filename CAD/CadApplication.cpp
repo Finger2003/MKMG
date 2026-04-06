@@ -162,7 +162,7 @@ void CadApplication::HandleObjectSelection(size_t index, bool ctrlHeld, bool shi
 			size_t end = std::max(index, *m_lastClickedIndex);
 			for (size_t j = start; j <= end; j++)
 				setSelection(j, true);
-				//m_sceneObjects[j]->selected = true;
+			//m_sceneObjects[j]->selected = true;
 		}
 	}
 	else if (shiftHeld)
@@ -383,7 +383,8 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		bool ctrlHeld = (fwKeys & MK_CONTROL) != 0;
 		bool shiftHeld = (fwKeys & MK_SHIFT) != 0;
 
-		if ((m_menuState == MenuState::Edit || m_menuState == MenuState::EditGroup) && m_currentEditAction != EditAction::None)
+		//if ((m_menuState == MenuState::Edit || m_menuState == MenuState::EditGroup) && m_currentEditAction != EditAction::None)
+		if (m_currentEditAction != EditAction::None)
 		{
 			BeginEditAction(xPos, yPos, shiftHeld);
 			return true;
@@ -629,18 +630,32 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 					static_cast<Torus*>(obj)->UpdateModelMatrix();
 			};
 
-		if (m_menuState == MenuState::EditGroup)
+		//if (m_menuState == MenuState::EditGroup)
+		//{
+		//	for (auto& obj : m_sceneObjects)
+		//	{
+		//		if (obj->selected && obj->type != ObjectType::BezierCurve)
+		//			applyTransform(static_cast<TransformableObject*>(obj.get()));
+		//	}
+		//}
+		//else
+		//{
+		//	if (m_lastClickedIndex.has_value() && m_sceneObjects[m_lastClickedIndex.value()]->type != ObjectType::BezierCurve)
+		//		applyTransform(static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get()));
+		//}
+
+		if (m_menuState == MenuState::Edit)
+		{
+			if (m_lastClickedIndex.has_value() && m_sceneObjects[*m_lastClickedIndex]->type != ObjectType::BezierCurve)
+				applyTransform(static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get()));
+		}
+		else
 		{
 			for (auto& obj : m_sceneObjects)
 			{
 				if (obj->selected && obj->type != ObjectType::BezierCurve)
 					applyTransform(static_cast<TransformableObject*>(obj.get()));
 			}
-		}
-		else
-		{
-			if (m_lastClickedIndex.has_value() && m_sceneObjects[m_lastClickedIndex.value()]->type != ObjectType::BezierCurve)
-				applyTransform(static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get()));
 		}
 		m_selectionDirty = true;
 	}
@@ -835,6 +850,9 @@ void CadApplication::DrawMenu()
 
 	ImGui::Begin("Menu", nullptr);
 
+	DrawActionCombo();
+	ImGui::Separator();
+
 	int selectedPoints = 0;
 	int selectedCount = 0;
 	int selectedCurves = 0;
@@ -870,7 +888,7 @@ void CadApplication::DrawMenu()
 		DrawListMenu(selectedCount, selectedPoints, activeCurve);
 
 		if (auto curve = selectedCurve.lock())
-		{ 
+		{
 			if (curve->selected)
 				DrawCurveList(curve.get(), selectedCount);
 		}
@@ -1052,11 +1070,11 @@ void CadApplication::DrawCurveList(BezierCurve* curve, int selectedCount)
 
 				if (ImGui::Selectable(label.c_str(), cp->selected))
 				{
-					HandleCurveListSelection(curve, i,io.KeyCtrl, io.KeyShift);
+					HandleCurveListSelection(curve, i, io.KeyCtrl, io.KeyShift);
 				}
 				ImGui::PopID();
 			}
-		}		
+		}
 		ImGui::EndListBox();
 	}
 
@@ -1205,8 +1223,8 @@ void CadApplication::DrawTorusMenu(Torus& torus)
 	if (transformChanged)
 		torus.UpdateModelMatrix();
 
-	ImGui::Separator();
-	DrawActionCombo();
+	//ImGui::Separator();
+	//DrawActionCombo();
 }
 
 void CadApplication::DrawPointMenu(Point& selectedObj)
@@ -1214,8 +1232,8 @@ void CadApplication::DrawPointMenu(Point& selectedObj)
 	if (ImGui::DragFloat3("Position", &selectedObj.m_position.x, 0.01f))
 		m_selectionDirty = true;
 
-	ImGui::Separator();
-	DrawActionCombo();
+	//ImGui::Separator();
+	//DrawActionCombo();
 }
 
 void CadApplication::DrawActionCombo()
@@ -1251,7 +1269,7 @@ void CadApplication::DrawEditGroupMenu(int selectedCount)
 		ImGui::Text("Center: %.2f, %.2f, %.2f", centerOpt->x, centerOpt->y, centerOpt->z);
 	}
 	ImGui::Spacing();
-	DrawActionCombo();
+	//DrawActionCombo();
 	//ImGui::Text("Interactive Group Action");
 	//const char* actions[] = {
 	//	"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",
