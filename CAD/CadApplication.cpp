@@ -383,6 +383,33 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		WORD fwKeys = LOWORD(msg.wParam);
 		bool ctrlHeld = (fwKeys & MK_CONTROL) != 0;
 		bool shiftHeld = (fwKeys & MK_SHIFT) != 0;
+		bool pPressed = (GetAsyncKeyState('P') & 0x8000) != 0;
+
+		if (pPressed)
+		{
+			auto [normX, normY] = CalculateCoordsFromPixel(static_cast<float>(xPos), static_cast<float>(yPos),
+				static_cast<float>(m_renderSize.cx), static_cast<float>(m_renderSize.cy));
+			m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
+
+			auto newPoint = std::make_shared<Point>(m_cursorPosition);
+			m_sceneObjects.push_back(newPoint);
+
+			std::shared_ptr<BezierCurve> activeCurve;
+			int selectedCurves = 0;
+			for (const auto& obj : m_sceneObjects)
+			{
+				if (obj->selected && obj->type == ObjectType::BezierCurve)
+				{
+					selectedCurves++;
+					activeCurve = std::static_pointer_cast<BezierCurve>(obj);
+				}
+			}
+
+			if (selectedCurves == 1 && activeCurve)
+				activeCurve->m_controlPoints.push_back(newPoint);
+
+			return true;
+		}
 
 		auto pickedIndex = PickClosestPoint(xPos, yPos);
 		if (pickedIndex.has_value())
@@ -1101,6 +1128,27 @@ void CadApplication::DrawCurveList(BezierCurve* curve, int selectedCount)
 {
 	ImGui::TextDisabled("Selected Curve Control Points:");
 	ImGui::Text("%s", curve->name.c_str());
+
+	if (ImGui::Button("Select All Points", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f - 4, 0)))
+	{
+		for (const auto& cpWeak : curve->m_controlPoints)
+		{
+			if (auto cp = cpWeak.lock())
+				cp->selected = true;
+		}
+		m_selectionDirty = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Deselect All Points", ImVec2(-1, 0)))
+	{
+		for (const auto& cpWeak : curve->m_controlPoints)
+		{
+			if (auto cp = cpWeak.lock())
+				cp->selected = false;
+		}
+		m_selectionDirty = true;
+	}
+
 	const ImGuiIO& io = ImGui::GetIO();
 	if (ImGui::BeginListBox(("##PointsList_" + curve->name).c_str(), ImVec2(-1.0f, 0.0f)))
 	{
