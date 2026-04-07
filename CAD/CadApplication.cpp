@@ -500,20 +500,37 @@ void CadApplication::BeginEditAction(int mouseX, int mouseY, bool shiftHeld)
 	m_startMousePos = m_lastMousePos;
 
 	TransformableObject* editObj = nullptr;
-	if (shiftHeld)
-		m_groupEditCenter = m_cursorPosition;
-	else if (m_menuState == MenuState::Edit)
+	if (m_menuState == MenuState::Edit)
 	{
 		if (!m_lastClickedIndex.has_value() || m_sceneObjects[m_lastClickedIndex.value()]->type == ObjectType::BezierCurve)
 			return;
 		editObj = static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get());
-		m_groupEditCenter = editObj->m_position;
 	}
+
+	if (shiftHeld)
+		m_groupEditCenter = m_cursorPosition;
+	else if (m_menuState == MenuState::Edit)
+		m_groupEditCenter = editObj->m_position;
 	else
 	{
 		auto center = GetSelectionCenter();
 		m_groupEditCenter = center ? *center : float3(0.0f, 0.0f, 0.0f);
 	}
+
+	//if (shiftHeld)
+	//	m_groupEditCenter = m_cursorPosition;
+	//else if (m_menuState == MenuState::Edit)
+	//{
+	//	if (!m_lastClickedIndex.has_value() || m_sceneObjects[m_lastClickedIndex.value()]->type == ObjectType::BezierCurve)
+	//		return;
+	//	editObj = static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get());
+	//	m_groupEditCenter = editObj->m_position;
+	//}
+	//else
+	//{
+	//	auto center = GetSelectionCenter();
+	//	m_groupEditCenter = center ? *center : float3(0.0f, 0.0f, 0.0f);
+	//}
 
 
 	Vec4f pivotWorldPos = m_groupEditCenter.ToVec4f(1.0f);
@@ -1088,7 +1105,7 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, BezierC
 		if (ImGui::Button("Edit Selected", ImVec2(-1, 0)))
 		{
 			m_menuState = MenuState::Edit;
-			m_currentEditAction = EditAction::None;
+			//m_currentEditAction = EditAction::None;
 		}
 	}
 	else
@@ -1096,7 +1113,7 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, BezierC
 		if (ImGui::Button("Edit Group", ImVec2(-1, 0)))
 		{
 			m_menuState = MenuState::EditGroup;
-			m_currentEditAction = EditAction::None;
+			//m_currentEditAction = EditAction::None;
 		}
 	}
 	ImGui::EndDisabled();
