@@ -23,7 +23,8 @@ void BezierCurve::UpdatePolyline(const DxDevice& device)
 
 	if (m_controlPoints.size() < 2)
 	{
-		m_lineVertexBuffer.Reset();
+		m_lineVertexCount = 0;
+		m_curveVertexCount = 0;
 		return;
 	}
 
@@ -99,33 +100,30 @@ void BezierCurve::UpdatePolyline(const DxDevice& device)
 			vertices.push_back({ p3.x, p3.y, p3.z });
 		}
 
-		//m_vertexCount = static_cast<UINT>(lineVertices.size());
-
 		m_lineVertexCount = static_cast<UINT>(lineVertices.size());
 		if (lineVertices.size() >= 2)
-			m_lineVertexBuffer = device.CreateVertexBuffer(lineVertices);
+			UpdateDynamicBuffer(device, m_lineVertexBuffer, m_lineBufferCapacity, lineVertices);
 		else
-			m_lineVertexBuffer.Reset();
+			m_lineVertexCount = 0;
 
 
 		m_curveVertexCount = static_cast<UINT>(vertices.size());
 		if (vertices.size() >= 4)
-			m_curveVertexBuffer = device.CreateVertexBuffer(vertices);
+			UpdateDynamicBuffer(device, m_curveVertexBuffer, m_curveBufferCapacity, vertices);
 		else
-			m_curveVertexBuffer.Reset();
-
-		//for (const auto& wp : m_controlPoints)
-		//{
-		//	if (auto sp = wp.lock())
-		//	{
-		//		m_lastPositions.push_back(sp->m_position);
-		//		vertices.push_back({ sp->m_position.x, sp->m_position.y, sp->m_position.z });
-		//	}
-		//}
-
-		//if (vertices.size() >= 2)
-		//	m_vertexBuffer = device.CreateVertexBuffer(vertices);
-		//else 
-		//	m_vertexBuffer.Reset();
+			m_curveVertexCount = 0;
 	}
+}
+
+void BezierCurve::UpdateDynamicBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data)
+{
+	UINT requiredCount = static_cast<UINT>(data.size());
+	
+	if (requiredCount > capacity)
+	{
+		capacity = std::max({ requiredCount, static_cast<UINT>(capacity * 1.5), 16u });
+		buffer = device.CreateDynamicVertexBuffer<VertexPosition>(capacity);
+	}
+
+	device.UpdateBuffer(buffer, data.data(), requiredCount * sizeof(VertexPosition));
 }

@@ -143,7 +143,7 @@ Microsoft::WRL::ComPtr<ID3D11InputLayout> DxDevice::CreateInputLayout(const std:
 	return inputLayout;
 }
 
-void DxDevice::UpdateBuffer(const Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, const void* data, size_t count)
+void DxDevice::UpdateBuffer(const Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, const void* data, size_t count) const
 {
 	D3D11_MAPPED_SUBRESOURCE res;
 	auto hr = m_context->Map(buffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &res);

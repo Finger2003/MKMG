@@ -29,9 +29,9 @@ public:
 	Microsoft::WRL::ComPtr<ID3D11InputLayout> CreateInputLayout(const std::vector<D3D11_INPUT_ELEMENT_DESC>& elements, const std::vector<BYTE>& vsCode) const;
 #pragma endregion
 
-	void UpdateBuffer(const Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, const void* data, size_t count);
+	void UpdateBuffer(const Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, const void* data, size_t count) const;
 	template<typename T>
-	void UpdateBuffer(const Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, const T& data)
+	void UpdateBuffer(const Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, const T& data) const
 	{
 		UpdateBuffer(buffer, &data, sizeof(T));
 	}
@@ -42,6 +42,16 @@ public:
 		D3D11_BUFFER_DESC desc = BufferDescription::VertexBufferDescription(sizeof(T) * vertices.size());
 		return CreateBuffer(desc, vertices.data());
 	}
+
+	template<typename T>
+	Microsoft::WRL::ComPtr<ID3D11Buffer> CreateDynamicVertexBuffer(UINT capacity) const
+	{
+		auto desc = BufferDescription::VertexBufferDescription(capacity * sizeof(T));
+		desc.Usage = D3D11_USAGE_DYNAMIC;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		return CreateBuffer(desc);
+	}
+
 	template<typename T>
 	Microsoft::WRL::ComPtr<ID3D11Buffer> CreateIndexBuffer(const std::vector<T>& indices) const
 	{

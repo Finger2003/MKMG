@@ -816,7 +816,7 @@ void CadApplication::DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceCont
 			auto& curve = *static_cast<BezierCurve*>(obj.get());
 			curve.UpdatePolyline(m_device);
 
-			if (curve.selected && curve.m_lineVertexBuffer)
+			if (curve.selected && curve.m_lineVertexCount > 0)
 			{
 				UINT stride = sizeof(VertexPosition);
 				UINT offset = 0;
@@ -840,7 +840,7 @@ void CadApplication::DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceC
 			objData.color = curve.selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
 			m_device.UpdateBuffer(m_cbPerObject, objData);
 
-			if (curve.m_curveVertexBuffer)
+			if (curve.m_curveVertexCount > 0)
 			{
 				UINT stride = sizeof(VertexPosition);
 				UINT offset = 0;
