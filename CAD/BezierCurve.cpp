@@ -61,10 +61,12 @@ void BezierCurve::UpdatePolyline(const DxDevice& device)
 
 		size_t polylinePoints = (n % 3 == 2) ? (n - 1) : n;
 		std::vector<VertexPosition> lineVertices;
+		lineVertices.reserve(polylinePoints);
 		for (size_t i = 0; i < polylinePoints; i++)
 			lineVertices.push_back({ m_lastPositions[i].x, m_lastPositions[i].y, m_lastPositions[i].z });
 
 		std::vector<VertexPosition> vertices;
+		vertices.reserve(n + (n / 3) * 3);
 		for (size_t i = 0; i + 1 < n; i += 3)
 		{
 			Vec3f p0 = m_lastPositions[i].ToVec3f();

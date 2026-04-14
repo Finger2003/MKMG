@@ -17,8 +17,13 @@ struct GSOut
     float4 PosH : SV_POSITION; // Clip Space
 };
 
+#define GS_INSTANCES 4
+#define MAX_VERTS_PER_INSTANCE 128
+#define SEGMENTS_PER_INSTANCE (MAX_VERTS_PER_INSTANCE - 1) // 127
+
+[instance(GS_INSTANCES)]
 [maxvertexcount(128)]
-void main(lineadj VSOut input[4], inout LineStream<GSOut> outputStream)
+void main(lineadj VSOut input[4], uint instanceID : SV_GSInstanceID, inout LineStream<GSOut> outputStream)
 {    
     float2 p0 = (input[0].PosH.xy / input[0].PosH.w) * renderSize * 0.5f;
     float2 p1 = (input[1].PosH.xy / input[1].PosH.w) * renderSize * 0.5f;
@@ -27,12 +32,23 @@ void main(lineadj VSOut input[4], inout LineStream<GSOut> outputStream)
     
     float polyLength = length(p1 - p0) + length(p2 - p1) + length(p3 - p2);
        
-    int segments = clamp(ceil(polyLength / 3.0f), 1, 127);
+    int totalSegments = clamp(ceil(polyLength / 3.0f), 1, SEGMENTS_PER_INSTANCE * GS_INSTANCES);
+    int startIdx = instanceID * SEGMENTS_PER_INSTANCE;
+    int endIdx = (instanceID + 1) * SEGMENTS_PER_INSTANCE;
+    
+    if (endIdx > totalSegments)
+        endIdx = totalSegments;
+    //int totalSegments = clamp(ceil(polyLength / 3.0f), 1, 511);
+    //int segmentsPerInstance = (int) ceil((float) totalSegments / (float) GS_INSTANCES);
+    //int segments = clamp(ceil(polyLength / 3.0f), 1, 127);
 
+    if (startIdx >= totalSegments)
+        return;
+    
     GSOut v;
-    for (int i = 0; i <= segments; ++i)
+    for (int i = startIdx; i <= endIdx; ++i)
     {
-        float t = (float) i / (float) segments;
+        float t = (float) i / (float) totalSegments;
         
         float4 q0 = lerp(input[0].PosW, input[1].PosW, t);
         float4 q1 = lerp(input[1].PosW, input[2].PosW, t);
@@ -43,8 +59,7 @@ void main(lineadj VSOut input[4], inout LineStream<GSOut> outputStream)
         
         float4 worldPos = lerp(r0, r1, t);
        
-        v.PosH = mul(worldPos, viewProj);
-        
+        v.PosH = mul(worldPos, viewProj);        
         outputStream.Append(v);
     }
     outputStream.RestartStrip();
