@@ -9,13 +9,13 @@ using namespace MathLib;
 unsigned int BezierCurve::s_nextId = 0;
 
 BezierCurve::BezierCurve(std::vector<std::weak_ptr<Point>>&& controlPoints)
-	: SceneObject("BezierCurve" + to_string(s_nextId++), ObjectType::BezierCurve), m_controlPoints(std::move(controlPoints))
+	: Curve("BezierCurve" + to_string(s_nextId++), ObjectType::BezierCurve, std::move(controlPoints))
 {}
 
-void BezierCurve::CleanExpiredPoints()
-{
-	erase_if(m_controlPoints, [](const weak_ptr<Point>& wp) { return wp.expired(); });
-}
+//void BezierCurve::CleanExpiredPoints()
+//{
+//	erase_if(m_controlPoints, [](const weak_ptr<Point>& wp) { return wp.expired(); });
+//}
 
 void BezierCurve::UpdatePolyline(const DxDevice& device)
 {
@@ -115,15 +115,15 @@ void BezierCurve::UpdatePolyline(const DxDevice& device)
 	}
 }
 
-void BezierCurve::UpdateDynamicBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data)
-{
-	UINT requiredCount = static_cast<UINT>(data.size());
-	
-	if (requiredCount > capacity)
-	{
-		capacity = std::max({ requiredCount, static_cast<UINT>(capacity * 1.5), 16u });
-		buffer = device.CreateDynamicVertexBuffer<VertexPosition>(capacity);
-	}
-
-	device.UpdateBuffer(buffer, data.data(), requiredCount * sizeof(VertexPosition));
-}
+//void BezierCurve::UpdateDynamicBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data)
+//{
+//	UINT requiredCount = static_cast<UINT>(data.size());
+//	
+//	if (requiredCount > capacity)
+//	{
+//		capacity = std::max({ requiredCount, static_cast<UINT>(capacity * 1.5), 16u });
+//		buffer = device.CreateDynamicVertexBuffer<VertexPosition>(capacity);
+//	}
+//
+//	device.UpdateBuffer(buffer, data.data(), requiredCount * sizeof(VertexPosition));
+//}

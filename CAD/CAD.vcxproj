@@ -156,6 +156,7 @@
     <ClCompile Include="CadApplication.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Cursor3D.cpp" />
+    <ClCompile Include="Curve.cpp" />
     <ClCompile Include="DxApplication.cpp" />
     <ClCompile Include="DxDevice.cpp" />
     <ClCompile Include="DxStructures.cpp" />
@@ -179,6 +180,7 @@
     <ClInclude Include="CadApplication.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Cursor3D.h" />
+    <ClInclude Include="Curve.h" />
     <ClInclude Include="DxApplication.h" />
     <ClInclude Include="DxDevice.h" />
     <ClInclude Include="DxStructures.h" />

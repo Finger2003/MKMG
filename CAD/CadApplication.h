@@ -149,13 +149,14 @@ private:
 
 	mutable bool m_selectionDirty = true;
 	bool m_isEditing = false;
+	bool m_showBernsteinPoints = false;
 
 	Cursor3D m_cursor;
 #pragma region Menu Methods
 	void InitImGui();
 	void DrawMenu();
-	void DrawListMenu(int selectedCount, int selectedPoints, BezierCurve* activeCurve);
-	void DrawCurveList(BezierCurve* curve, int selectedCount);
+	void DrawListMenu(int selectedCount, int selectedPoints, Curve* activeCurve);
+	void DrawCurveList(Curve* curve, int selectedCount);
 	void DrawEditMenu();
 	void DrawTorusMenu(Torus& torus);
 	void DrawPointMenu(Point& selectedObj);
@@ -178,7 +179,7 @@ private:
 
 	void ClearSelection();
 	void HandleObjectSelection(size_t index, bool ctrlHeld, bool shiftHeld);
-	void HandleCurveListSelection(BezierCurve* curve, size_t index, bool ctrlHeld, bool shiftHeld);
+	void HandleCurveListSelection(Curve* curve, size_t index, bool ctrlHeld, bool shiftHeld);
 	std::optional<size_t> PickClosestPoint(int mouseX, int mouseY, float toleranceSq = 100.0f);
 
 	void BeginEditAction(int xPos, int yPos, bool shiftHeld);
@@ -191,6 +192,7 @@ private:
 	void DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 #pragma endregion
 };
 

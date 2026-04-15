@@ -9,13 +9,13 @@ using namespace MathLib;
 unsigned int BSplineCurve::s_nextId = 0;
 
 BSplineCurve::BSplineCurve(std::vector<std::weak_ptr<Point>>&& controlPoints)
-    : SceneObject("BSplineCurve" + to_string(s_nextId++), ObjectType::BSplineCurve), m_controlPoints(std::move(controlPoints))
+    : Curve("BSplineCurve" + to_string(s_nextId++), ObjectType::BSplineCurve, std::move(controlPoints))
 {}
 
-void BSplineCurve::CleanExpiredPoints()
-{
-    erase_if(m_controlPoints, [](const weak_ptr<Point>& wp) { return wp.expired(); });
-}
+//void BSplineCurve::CleanExpiredPoints()
+//{
+//    erase_if(m_controlPoints, [](const weak_ptr<Point>& wp) { return wp.expired(); });
+//}
 
 void BSplineCurve::UpdatePolyline(const DxDevice& device)
 {
@@ -60,12 +60,15 @@ void BSplineCurve::UpdatePolyline(const DxDevice& device)
 
         // 1. Control Polygon (Straight lines between De Boor points)
         std::vector<VertexPosition> lineVertices;
-        lineVertices.reserve(n);
-        for (size_t i = 0; i < n; i++)
-            lineVertices.push_back({ m_lastPositions[i].x, m_lastPositions[i].y, m_lastPositions[i].z });
-
+        if (n > 2)
+        {
+            lineVertices.reserve(n);
+            for (size_t i = 0; i < n; i++)
+                lineVertices.push_back({ m_lastPositions[i].x, m_lastPositions[i].y, m_lastPositions[i].z });
+        }
         // 2. Convert De Boor to Bernstein for the GS Pipeline
         std::vector<VertexPosition> vertices;
+        std::vector<VertexPosition> bernsteinPts;
 
         std::vector<Vec3f> augPoints;
         augPoints.reserve(n + 2);
@@ -78,9 +81,11 @@ void BSplineCurve::UpdatePolyline(const DxDevice& device)
         Vec3f pPrev = m_lastPositions[n - 2].ToVec3f();
         augPoints.push_back(pLast * 2.0f - pPrev);
         size_t augN = augPoints.size();
-        vertices.reserve((augN - 3) * 4);
 
-        for (size_t i = 0; i <= augN - 4; ++i)
+        vertices.reserve((augN - 3) * 4);
+        bernsteinPts.reserve((augN - 3) * 3 + 1);
+
+        for (size_t i = 0; i <= augN - 4; i++)
         {
             Vec3f p0 = augPoints[i];
             Vec3f p1 = augPoints[i + 1];
@@ -97,6 +102,12 @@ void BSplineCurve::UpdatePolyline(const DxDevice& device)
             vertices.push_back({ b1.x, b1.y, b1.z });
             vertices.push_back({ b2.x, b2.y, b2.z });
             vertices.push_back({ b3.x, b3.y, b3.z });
+
+            bernsteinPts.push_back({ b0.x, b0.y, b0.z });
+            bernsteinPts.push_back({ b1.x, b1.y, b1.z });
+            bernsteinPts.push_back({ b2.x, b2.y, b2.z });
+            if (i == augN - 4)
+                bernsteinPts.push_back({ b3.x, b3.y, b3.z });
         }
 
         //if (n == 2)
@@ -166,16 +177,22 @@ void BSplineCurve::UpdatePolyline(const DxDevice& device)
             UpdateDynamicBuffer(device, m_curveVertexBuffer, m_curveBufferCapacity, vertices);
         else
             m_curveVertexCount = 0;
+
+        m_bernsteinVertexCount = static_cast<UINT>(bernsteinPts.size());
+        if (m_bernsteinVertexCount >= 2)
+            UpdateDynamicBuffer(device, m_bernsteinVertexBuffer, m_bernsteinBufferCapacity, bernsteinPts);
+        else
+            m_bernsteinVertexCount = 0;
     }
 }
 
-void BSplineCurve::UpdateDynamicBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data)
-{
-    UINT requiredCount = static_cast<UINT>(data.size());
-    if (requiredCount > capacity)
-    {
-        capacity = std::max({ requiredCount, static_cast<UINT>(capacity * 1.5), 16u });
-        buffer = device.CreateDynamicVertexBuffer<VertexPosition>(capacity);
-    }
-    device.UpdateBuffer(buffer, data.data(), requiredCount * sizeof(VertexPosition));
-}
+//void BSplineCurve::UpdateDynamicBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data)
+//{
+//    UINT requiredCount = static_cast<UINT>(data.size());
+//    if (requiredCount > capacity)
+//    {
+//        capacity = std::max({ requiredCount, static_cast<UINT>(capacity * 1.5), 16u });
+//        buffer = device.CreateDynamicVertexBuffer<VertexPosition>(capacity);
+//    }
+//    device.UpdateBuffer(buffer, data.data(), requiredCount * sizeof(VertexPosition));
+//}

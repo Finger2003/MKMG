@@ -143,9 +143,9 @@ void CadApplication::HandleObjectSelection(size_t index, bool ctrlHeld, bool shi
 	auto setSelection = [&](size_t i, bool state) {
 		m_sceneObjects[i]->selected = state;
 
-		if (m_sceneObjects[i]->type == ObjectType::BezierCurve)
+		if (m_sceneObjects[i]->type == ObjectType::BezierCurve || m_sceneObjects[i]->type == ObjectType::BSplineCurve)
 		{
-			auto curve = static_cast<BezierCurve*>(m_sceneObjects[i].get());
+			auto curve = static_cast<Curve*>(m_sceneObjects[i].get());
 			for (const auto& cpWeak : curve->m_controlPoints)
 			{
 				if (auto cp = cpWeak.lock())
@@ -213,7 +213,7 @@ void CadApplication::HandleObjectSelection(size_t index, bool ctrlHeld, bool shi
 	m_selectionDirty = true;
 }
 
-void CadApplication::HandleCurveListSelection(BezierCurve* curve, size_t index, bool ctrlHeld, bool shiftHeld)
+void CadApplication::HandleCurveListSelection(Curve* curve, size_t index, bool ctrlHeld, bool shiftHeld)
 {
 	auto setSelection = [&](size_t i, bool state) {
 		if (auto cp = curve->m_controlPoints[i].lock())
@@ -393,14 +393,14 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			auto newPoint = std::make_shared<Point>(m_cursorPosition);
 			m_sceneObjects.push_back(newPoint);
 
-			std::shared_ptr<BezierCurve> activeCurve;
+			std::shared_ptr<Curve> activeCurve;
 			int selectedCurves = 0;
 			for (const auto& obj : m_sceneObjects)
 			{
-				if (obj->selected && obj->type == ObjectType::BezierCurve)
+				if (obj->selected && (obj->type == ObjectType::BezierCurve || obj->type == ObjectType::BSplineCurve))
 				{
 					selectedCurves++;
-					activeCurve = std::static_pointer_cast<BezierCurve>(obj);
+					activeCurve = std::static_pointer_cast<Curve>(obj);
 				}
 			}
 
@@ -776,6 +776,7 @@ void CadApplication::Render()
 	context->PSSetShader(m_pointPixelShader.Get(), nullptr, 0);
 
 	DrawPoints(context);
+	DrawVirtualBernsteinPoints(context);
 
 	context->GSSetShader(nullptr, nullptr, 0);
 
@@ -811,32 +812,32 @@ void CadApplication::DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceCont
 
 	for (auto& obj : m_sceneObjects)
 	{
-		if (obj->type == ObjectType::BezierCurve)
+		if (obj->type == ObjectType::BezierCurve || obj->type == ObjectType::BSplineCurve)
 		{
-			auto& curve = *static_cast<BezierCurve*>(obj.get());
+			auto& curve = *static_cast<Curve*>(obj.get());
 			curve.UpdatePolyline(m_device);
 
-			if (curve.selected && curve.m_lineVertexCount > 0)
+			if (curve.selected)
 			{
-				UINT stride = sizeof(VertexPosition);
-				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, curve.m_lineVertexBuffer.GetAddressOf(), &stride, &offset);
-				context->Draw(curve.m_lineVertexCount, 0);
-			}
-		}
-		else if (obj->type == ObjectType::BSplineCurve)
-		{
-			auto& curve = *static_cast<BSplineCurve*>(obj.get());
-			curve.UpdatePolyline(m_device);
+				ID3D11Buffer** bufferToDraw = curve.m_lineVertexBuffer.GetAddressOf();
+				UINT countToDraw = curve.m_lineVertexCount;
 
-			if (curve.selected && curve.m_lineVertexCount > 0)
-			{
-				UINT stride = sizeof(VertexPosition);
-				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, curve.m_lineVertexBuffer.GetAddressOf(), &stride, &offset);
-				context->Draw(curve.m_lineVertexCount, 0);
+				if (m_showBernsteinPoints && obj->type == ObjectType::BSplineCurve)
+				{
+					auto bsplineCurve = static_cast<BSplineCurve*>(obj.get());
+					bufferToDraw = bsplineCurve->m_bernsteinVertexBuffer.GetAddressOf();
+					countToDraw = bsplineCurve->m_bernsteinVertexCount;
+				}
+
+				if (countToDraw > 0)
+				{
+					UINT stride = sizeof(VertexPosition);
+					UINT offset = 0;
+					context->IASetVertexBuffers(0, 1, bufferToDraw, &stride, &offset);
+					context->Draw(countToDraw, 0);
+				}
 			}
-		}
+		}		
 	}
 }
 
@@ -847,9 +848,9 @@ void CadApplication::DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceC
 
 	for (auto& obj : m_sceneObjects)
 	{
-		if (obj->type == ObjectType::BezierCurve)
+		if (obj->type == ObjectType::BezierCurve || obj->type == ObjectType::BSplineCurve)
 		{
-			auto& curve = *static_cast<BezierCurve*>(obj.get());
+			auto& curve = *static_cast<Curve*>(obj.get());
 			objData.color = curve.selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
 			m_device.UpdateBuffer(m_cbPerObject, objData);
 
@@ -861,17 +862,29 @@ void CadApplication::DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceC
 				context->Draw(curve.m_curveVertexCount, 0);
 			}
 		}
-		else if (obj->type == ObjectType::BSplineCurve)
+	}
+}
+
+void CadApplication::DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+{
+	if (!m_showBernsteinPoints) return;
+
+	PerObjectBuffer objData;
+	objData.model = Mat4f::Identity();
+	objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
+	m_device.UpdateBuffer(m_cbPerObject, objData);
+
+	for (auto& obj : m_sceneObjects)
+	{
+		if (obj->selected && obj->type == ObjectType::BSplineCurve)
 		{
-			auto& curve = *static_cast<BSplineCurve*>(obj.get());
-			objData.color = curve.selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-			m_device.UpdateBuffer(m_cbPerObject, objData);
-			if (curve.m_curveVertexCount > 0)
+			auto bspline = static_cast<BSplineCurve*>(obj.get());
+			if (bspline->m_bernsteinVertexCount > 0)
 			{
 				UINT stride = sizeof(VertexPosition);
 				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, curve.m_curveVertexBuffer.GetAddressOf(), &stride, &offset);
-				context->Draw(curve.m_curveVertexCount, 0);
+				context->IASetVertexBuffers(0, 1, bspline->m_bernsteinVertexBuffer.GetAddressOf(), &stride, &offset);
+				context->Draw(bspline->m_bernsteinVertexCount, 0);
 			}
 		}
 	}
@@ -933,7 +946,7 @@ void CadApplication::DrawMenu()
 	int selectedPoints = 0;
 	int selectedCount = 0;
 	int selectedCurves = 0;
-	std::weak_ptr<BezierCurve> selectedCurve;
+	std::weak_ptr<Curve> selectedCurve;
 
 	for (const auto& obj : m_sceneObjects)
 	{
@@ -942,10 +955,10 @@ void CadApplication::DrawMenu()
 			selectedCount++;
 			if (obj->type == ObjectType::Point)
 				selectedPoints++;
-			else if (obj->type == ObjectType::BezierCurve)
+			else if (obj->type == ObjectType::BezierCurve || obj->type == ObjectType::BSplineCurve)
 			{
 				selectedCurves++;
-				auto sharedCurve = std::static_pointer_cast<BezierCurve>(obj);
+				auto sharedCurve = std::static_pointer_cast<Curve>(obj);
 				selectedCurve = sharedCurve;
 				sharedCurve->CleanExpiredPoints();
 			}
@@ -959,7 +972,7 @@ void CadApplication::DrawMenu()
 
 	if (m_menuState == MenuState::List)
 	{
-		BezierCurve* activeCurve = nullptr;
+		Curve* activeCurve = nullptr;
 		if (auto curve = selectedCurve.lock())
 			activeCurve = curve.get();
 		DrawListMenu(selectedCount, selectedPoints, activeCurve);
@@ -983,7 +996,7 @@ void CadApplication::DrawMenu()
 	ImGui::Render();
 }
 
-void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, BezierCurve* activeCurve)
+void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* activeCurve)
 {
 
 	if (ImGui::Button("Add Torus"))
@@ -1143,9 +1156,11 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, BezierC
 	}
 
 	ImGui::PopStyleColor(2);
+
+	ImGui::Checkbox("Show Bernstein", &m_showBernsteinPoints);
 }
 
-void CadApplication::DrawCurveList(BezierCurve* curve, int selectedCount)
+void CadApplication::DrawCurveList(Curve* curve, int selectedCount)
 {
 	ImGui::TextDisabled("Selected Curve Control Points:");
 	ImGui::Text("%s", curve->name.c_str());
