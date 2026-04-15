@@ -6,6 +6,7 @@ enum class ObjectType
 	Point,
 	Torus,
 	BezierCurve,
+	BSplineCurve,
 };
 
 

@@ -340,7 +340,7 @@ std::optional<float3> CadApplication::GetSelectionCenter() const
 	Vec4f sum; // .w counts the number of selected objects. Max possible count is 16 777 216 due to float precision.
 	for (const auto& obj : m_sceneObjects)
 	{
-		if (obj->selected && obj->type != ObjectType::BezierCurve)
+		if (obj->selected && obj->type != ObjectType::BezierCurve && obj->type != ObjectType::BSplineCurve)
 			sum += static_cast<TransformableObject*>(obj.get())->m_position.ToVec4f(1.0f);
 		//Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);
 	}
@@ -501,7 +501,7 @@ void CadApplication::BeginEditAction(int mouseX, int mouseY, bool shiftHeld)
 	TransformableObject* editObj = nullptr;
 	if (m_menuState == MenuState::Edit)
 	{
-		if (!m_lastClickedIndex.has_value() || m_sceneObjects[*m_lastClickedIndex]->type == ObjectType::BezierCurve)
+		if (!m_lastClickedIndex.has_value() || m_sceneObjects[*m_lastClickedIndex]->type == ObjectType::BezierCurve || m_sceneObjects[*m_lastClickedIndex]->type == ObjectType::BSplineCurve)
 			return;
 		editObj = static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get());
 	}
@@ -570,7 +570,7 @@ void CadApplication::BeginEditAction(int mouseX, int mouseY, bool shiftHeld)
 	else
 		for (auto& obj : m_sceneObjects)
 		{
-			if (obj->selected && obj->type != ObjectType::BezierCurve)
+			if (obj->selected && obj->type != ObjectType::BezierCurve && obj->type != ObjectType::BSplineCurve)
 				prepareObject(static_cast<TransformableObject*>(obj.get()));
 		}
 
@@ -704,7 +704,7 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 		{
 			for (auto& obj : m_sceneObjects)
 			{
-				if (obj->selected && obj->type != ObjectType::BezierCurve)
+				if (obj->selected && obj->type != ObjectType::BezierCurve && obj->type != ObjectType::BSplineCurve)
 					applyTransform(static_cast<TransformableObject*>(obj.get()));
 			}
 		}
@@ -824,6 +824,19 @@ void CadApplication::DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceCont
 				context->Draw(curve.m_lineVertexCount, 0);
 			}
 		}
+		else if (obj->type == ObjectType::BSplineCurve)
+		{
+			auto& curve = *static_cast<BSplineCurve*>(obj.get());
+			curve.UpdatePolyline(m_device);
+
+			if (curve.selected && curve.m_lineVertexCount > 0)
+			{
+				UINT stride = sizeof(VertexPosition);
+				UINT offset = 0;
+				context->IASetVertexBuffers(0, 1, curve.m_lineVertexBuffer.GetAddressOf(), &stride, &offset);
+				context->Draw(curve.m_lineVertexCount, 0);
+			}
+		}
 	}
 }
 
@@ -840,6 +853,19 @@ void CadApplication::DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceC
 			objData.color = curve.selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
 			m_device.UpdateBuffer(m_cbPerObject, objData);
 
+			if (curve.m_curveVertexCount > 0)
+			{
+				UINT stride = sizeof(VertexPosition);
+				UINT offset = 0;
+				context->IASetVertexBuffers(0, 1, curve.m_curveVertexBuffer.GetAddressOf(), &stride, &offset);
+				context->Draw(curve.m_curveVertexCount, 0);
+			}
+		}
+		else if (obj->type == ObjectType::BSplineCurve)
+		{
+			auto& curve = *static_cast<BSplineCurve*>(obj.get());
+			objData.color = curve.selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+			m_device.UpdateBuffer(m_cbPerObject, objData);
 			if (curve.m_curveVertexCount > 0)
 			{
 				UINT stride = sizeof(VertexPosition);
@@ -1010,6 +1036,20 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, BezierC
 			}
 		}
 	}
+
+	//ImGui::BeginDisabled(selectedPoints < 4);
+	ImGui::BeginDisabled(selectedPoints == 0);
+	if (ImGui::Button("Add B-Spline (C2) Curve"))
+	{
+		std::vector<std::weak_ptr<Point>> pts;
+		for (const auto& obj : m_sceneObjects)
+		{
+			if (obj->selected && obj->type == ObjectType::Point)
+				pts.push_back(std::static_pointer_cast<Point>(obj));
+		}
+		m_sceneObjects.push_back(std::make_shared<BSplineCurve>(std::move(pts)));
+	}
+	ImGui::EndDisabled();
 
 	ImGui::BeginDisabled(pointsToAdd.empty());
 	if (ImGui::Button("Add Points to Curve"))

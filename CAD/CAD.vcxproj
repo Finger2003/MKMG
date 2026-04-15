@@ -152,6 +152,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BezierCurve.cpp" />
+    <ClCompile Include="BSplineCurve.cpp" />
     <ClCompile Include="CadApplication.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Cursor3D.cpp" />
@@ -174,6 +175,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BezierCurve.h" />
+    <ClInclude Include="BSplineCurve.h" />
     <ClInclude Include="CadApplication.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Cursor3D.h" />
