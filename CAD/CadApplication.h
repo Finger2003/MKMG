@@ -150,8 +150,15 @@ private:
 	mutable bool m_selectionDirty = true;
 	bool m_isEditing = false;
 	bool m_showBernsteinPoints = false;
+	bool m_enableVirtualEdit = false;
 
 	Cursor3D m_cursor;
+
+
+	std::optional<VirtualPointMapping> m_activeVirtualEdit = std::nullopt;
+	std::optional<VirtualPointMapping> PickVirtualPoint(int mouseX, int mouseY, float toleranceSq = 100.0f);
+	void BeginVirtualEditAction(int mouseX, int mouseY, const VirtualPointMapping& mapping);
+	void ApplyVirtualEditTransform(int mouseX, int mouseY);
 #pragma region Menu Methods
 	void InitImGui();
 	void DrawMenu();

@@ -2,26 +2,23 @@
 #include "Curve.h"
 #include "Point.h"
 
+struct VirtualPointMapping
+{
+    std::weak_ptr<Point> targetPoint;
+    float weight;
+	float3 virtualPosition;
+};
+
+
 struct BSplineCurve : public Curve
 {
     static unsigned int s_nextId;
-    //std::vector<std::weak_ptr<Point>> m_controlPoints;
-
-    //std::vector<float3> m_lastPositions;
-    //Microsoft::WRL::ComPtr<ID3D11Buffer> m_lineVertexBuffer;
-    //Microsoft::WRL::ComPtr<ID3D11Buffer> m_curveVertexBuffer;
-
-    //UINT m_lineVertexCount = 0;
-    //UINT m_curveVertexCount = 0;
-
-    //UINT m_lineBufferCapacity = 0;
-    //UINT m_curveBufferCapacity = 0;
     Microsoft::WRL::ComPtr<ID3D11Buffer> m_bernsteinVertexBuffer;
     UINT m_bernsteinVertexCount = 0;
     UINT m_bernsteinBufferCapacity = 0;
 
+	std::vector<VirtualPointMapping> m_virtualPoints;
+
     BSplineCurve(std::vector<std::weak_ptr<Point>>&& controlPoints);
-    //void CleanExpiredPoints();
     void UpdatePolyline(const DxDevice& device) override;
-    //void UpdateDynamicBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data);
 };

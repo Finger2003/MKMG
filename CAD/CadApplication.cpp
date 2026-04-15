@@ -79,6 +79,79 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	Cursor3D::InitSharedGeometry(m_device);
 }
 
+std::optional<VirtualPointMapping> CadApplication::PickVirtualPoint(int mouseX, int mouseY, float toleranceSq)
+{
+	std::optional<VirtualPointMapping> closestMapping = std::nullopt;
+	float minZ = std::numeric_limits<float>::max();
+
+	for (const auto& obj : m_sceneObjects)
+	{
+		if (obj->selected && obj->type == ObjectType::BSplineCurve)
+		{
+			auto curve = static_cast<BSplineCurve*>(obj.get());
+			for (const auto& mapping : curve->m_virtualPoints)
+			{
+				Vec4f worldPos = mapping.virtualPosition.ToVec4f(1.0f);
+				Vec4f clipPos = m_camera.GetProjViewMatrix() * worldPos;
+				if (clipPos.w <= 0.0f)
+					continue;
+				clipPos /= clipPos.w; 
+
+				float screenX = (clipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
+				float screenY = (1.0f - clipPos.y) * 0.5f * m_renderSize.cy;
+				float distSq = (screenX - mouseX) * (screenX - mouseX) + (screenY - mouseY) * (screenY - mouseY);
+
+				if (distSq < toleranceSq && clipPos.z < minZ)
+				{
+					minZ = clipPos.z;
+					closestMapping = mapping;
+				}
+			}
+		}
+	}
+
+	return closestMapping;
+}
+
+void CadApplication::BeginVirtualEditAction(int mouseX, int mouseY, const VirtualPointMapping& mapping)
+{
+	m_lastMousePos = { mouseX, mouseY };
+	m_startMousePos = m_lastMousePos;
+
+	Vec4f pivotWorldPos = mapping.virtualPosition.ToVec4f(1.0f);
+	Vec4f pivotClipPos = m_camera.GetProjViewMatrix() * pivotWorldPos;
+
+	if (pivotClipPos.w > 0.0f)
+	{
+		Vec3f toPivot = mapping.virtualPosition.ToVec3f() - m_camera.GetPosition();
+		m_editAnchorDepth = Vec3f::dot(toPivot, m_camera.GetForwardVector());
+	}
+
+	if (auto pt = mapping.targetPoint.lock())
+		pt->m_basePosition = pt->m_position;
+
+	SetCapture(m_window.getHandle());
+}
+
+void CadApplication::ApplyVirtualEditTransform(int mouseX, int mouseY)
+{
+	if (!m_activeVirtualEdit.has_value()) return;
+
+	int totalDx = mouseX - m_startMousePos.x;
+	int totalDy = mouseY - m_startMousePos.y;
+
+	float unitsPerPixel = m_camera.GetPanScaleFactor() * std::abs(m_editAnchorDepth);
+	Vec3f worldDelta = (m_camera.GetRightVector() * totalDx - m_camera.GetUpVector() * totalDy) * unitsPerPixel;
+
+	worldDelta = worldDelta * (1.0f / m_activeVirtualEdit->weight);
+
+	if (auto pt = m_activeVirtualEdit->targetPoint.lock())
+	{
+		pt->m_position = pt->m_basePosition.ToVec3f() + worldDelta;
+		//m_selectionDirty = true;
+	}
+}
+
 void CadApplication::InitImGui()
 {
 	IMGUI_CHECKVERSION();
@@ -384,6 +457,14 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		bool shiftHeld = (fwKeys & MK_SHIFT) != 0;
 		bool pPressed = (GetAsyncKeyState('P') & 0x8000) != 0;
 
+		if (m_enableVirtualEdit)
+		{
+			m_activeVirtualEdit = PickVirtualPoint(xPos, yPos);
+			if (m_activeVirtualEdit.has_value())
+				BeginVirtualEditAction(xPos, yPos, *m_activeVirtualEdit);
+			return true;
+		}
+
 		if (pPressed)
 		{
 			auto [normX, normY] = CalculateCoordsFromPixel(static_cast<float>(xPos), static_cast<float>(yPos),
@@ -452,12 +533,17 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 	case WM_RBUTTONUP:
 	case WM_MBUTTONUP:
 		m_isEditing = false;
+		m_activeVirtualEdit = std::nullopt;
 		m_interactionMode = InteractionMode::None;
 		ReleaseCapture();
 		return true;
 	case WM_MOUSEMOVE:
 	{
-		ApplyEditTransform(xPos, yPos);
+		if (m_enableVirtualEdit)
+			ApplyVirtualEditTransform(xPos, yPos);
+		else
+			ApplyEditTransform(xPos, yPos);
+
 		HandleCameraInteraction(xPos, yPos);
 		return true;
 	}
@@ -1157,7 +1243,20 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 
 	ImGui::PopStyleColor(2);
 
-	ImGui::Checkbox("Show Bernstein", &m_showBernsteinPoints);
+	if (ImGui::Checkbox("Show Bernstein", &m_showBernsteinPoints))
+	{
+		m_enableVirtualEdit = false;
+		m_activeVirtualEdit = std::nullopt;
+		m_isEditing = false;		
+	}
+
+	ImGui::BeginDisabled(!m_showBernsteinPoints);
+	if (ImGui::Checkbox("Enable Virtual Edit", &m_enableVirtualEdit))
+	{
+		m_activeVirtualEdit = std::nullopt;
+		m_isEditing = false;		
+	}
+	ImGui::EndDisabled();
 }
 
 void CadApplication::DrawCurveList(Curve* curve, int selectedCount)

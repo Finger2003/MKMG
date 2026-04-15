@@ -12,11 +12,6 @@ BSplineCurve::BSplineCurve(std::vector<std::weak_ptr<Point>>&& controlPoints)
     : Curve("BSplineCurve" + to_string(s_nextId++), ObjectType::BSplineCurve, std::move(controlPoints))
 {}
 
-//void BSplineCurve::CleanExpiredPoints()
-//{
-//    erase_if(m_controlPoints, [](const weak_ptr<Point>& wp) { return wp.expired(); });
-//}
-
 void BSplineCurve::UpdatePolyline(const DxDevice& device)
 {
     CleanExpiredPoints();
@@ -84,6 +79,8 @@ void BSplineCurve::UpdatePolyline(const DxDevice& device)
 
         vertices.reserve((augN - 3) * 4);
         bernsteinPts.reserve((augN - 3) * 3 + 1);
+        m_virtualPoints.clear();
+		m_virtualPoints.reserve((augN - 3) * 3 + 1);
 
         for (size_t i = 0; i <= augN - 4; i++)
         {
@@ -108,6 +105,15 @@ void BSplineCurve::UpdatePolyline(const DxDevice& device)
             bernsteinPts.push_back({ b2.x, b2.y, b2.z });
             if (i == augN - 4)
                 bernsteinPts.push_back({ b3.x, b3.y, b3.z });
+
+
+            auto& real_p_i = m_controlPoints[i];
+            auto& real_p_i_plus_1 = m_controlPoints[i + 1];
+            m_virtualPoints.push_back({ real_p_i, (i == 0) ? 1.0f : (2.0f / 3.0f), b0 });
+            m_virtualPoints.push_back({ real_p_i, 2.0f / 3.0f, b1 });
+            m_virtualPoints.push_back({ real_p_i_plus_1, 2.0f / 3.0f, b2 });
+            if (i == augN - 4)
+                m_virtualPoints.push_back({ real_p_i_plus_1, 1.0f, b3 });
         }
 
         //if (n == 2)
@@ -166,33 +172,39 @@ void BSplineCurve::UpdatePolyline(const DxDevice& device)
         //        vertices.push_back({ b3.x, b3.y, b3.z });
         //    }
         //}
-        m_lineVertexCount = static_cast<UINT>(lineVertices.size());
-        if (lineVertices.size() >= 2)
-            UpdateDynamicBuffer(device, m_lineVertexBuffer, m_lineBufferCapacity, lineVertices);
-        else
-            m_lineVertexCount = 0;
 
-        m_curveVertexCount = static_cast<UINT>(vertices.size());
-        if (vertices.size() >= 4)
-            UpdateDynamicBuffer(device, m_curveVertexBuffer, m_curveBufferCapacity, vertices);
-        else
-            m_curveVertexCount = 0;
+        auto updateBuffer = [&device, this](Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data, UINT& vertexCount, UINT minCount)
+            {
+                if (data.size() >= minCount)
+                {
+                    vertexCount = static_cast<UINT>(data.size());
+                    UpdateDynamicBuffer(device, buffer, capacity, data);
+                }
+                else
+					vertexCount = 0;
+            };
 
-        m_bernsteinVertexCount = static_cast<UINT>(bernsteinPts.size());
-        if (m_bernsteinVertexCount >= 2)
-            UpdateDynamicBuffer(device, m_bernsteinVertexBuffer, m_bernsteinBufferCapacity, bernsteinPts);
-        else
-            m_bernsteinVertexCount = 0;
+		updateBuffer(m_lineVertexBuffer, m_lineBufferCapacity, lineVertices, m_lineVertexCount, 2);
+        updateBuffer(m_curveVertexBuffer, m_curveBufferCapacity, vertices, m_curveVertexCount, 4);
+		updateBuffer(m_bernsteinVertexBuffer, m_bernsteinBufferCapacity, bernsteinPts, m_bernsteinVertexCount, 2);
+
+
+        //m_lineVertexCount = static_cast<UINT>(lineVertices.size());
+        //if (lineVertices.size() >= 2)
+        //    UpdateDynamicBuffer(device, m_lineVertexBuffer, m_lineBufferCapacity, lineVertices);
+        //else
+        //    m_lineVertexCount = 0;
+
+        //m_curveVertexCount = static_cast<UINT>(vertices.size());
+        //if (vertices.size() >= 4)
+        //    UpdateDynamicBuffer(device, m_curveVertexBuffer, m_curveBufferCapacity, vertices);
+        //else
+        //    m_curveVertexCount = 0;
+
+        //m_bernsteinVertexCount = static_cast<UINT>(bernsteinPts.size());
+        //if (m_bernsteinVertexCount >= 2)
+        //    UpdateDynamicBuffer(device, m_bernsteinVertexBuffer, m_bernsteinBufferCapacity, bernsteinPts);
+        //else
+        //    m_bernsteinVertexCount = 0;
     }
 }
-
-//void BSplineCurve::UpdateDynamicBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data)
-//{
-//    UINT requiredCount = static_cast<UINT>(data.size());
-//    if (requiredCount > capacity)
-//    {
-//        capacity = std::max({ requiredCount, static_cast<UINT>(capacity * 1.5), 16u });
-//        buffer = device.CreateDynamicVertexBuffer<VertexPosition>(capacity);
-//    }
-//    device.UpdateBuffer(buffer, data.data(), requiredCount * sizeof(VertexPosition));
-//}
