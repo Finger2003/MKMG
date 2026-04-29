@@ -7,6 +7,7 @@
 #include "Point.h"
 #include "BezierCurve.h"
 #include "BSplineCurve.h"
+#include "InterpolatingCurve.h"
 #include "Cursor3D.h"
 #include "Camera.h"
 

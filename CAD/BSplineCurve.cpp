@@ -116,62 +116,6 @@ void BSplineCurve::UpdatePolyline(const DxDevice& device)
                 m_virtualPoints.push_back({ real_p_i_plus_1, 1.0f, b3 });
         }
 
-        //if (n == 2)
-        //{
-        //    // Degree elevation: Line (Degree 1) -> Cubic (Degree 3)
-        //    Vec3f p0 = m_lastPositions[0].ToVec3f();
-        //    Vec3f p1 = m_lastPositions[1].ToVec3f();
-
-        //    Vec3f b0 = p0;
-        //    Vec3f b1 = p0 * (2.0f / 3.0f) + p1 * (1.0f / 3.0f);
-        //    Vec3f b2 = p0 * (1.0f / 3.0f) + p1 * (2.0f / 3.0f);
-        //    Vec3f b3 = p1;
-
-        //    vertices.push_back({ b0.x, b0.y, b0.z });
-        //    vertices.push_back({ b1.x, b1.y, b1.z });
-        //    vertices.push_back({ b2.x, b2.y, b2.z });
-        //    vertices.push_back({ b3.x, b3.y, b3.z });
-        //}
-        //else if (n == 3)
-        //{
-        //    // Degree elevation: Quadratic Bezier (Degree 2) -> Cubic (Degree 3)
-        //    Vec3f p0 = m_lastPositions[0].ToVec3f();
-        //    Vec3f p1 = m_lastPositions[1].ToVec3f();
-        //    Vec3f p2 = m_lastPositions[2].ToVec3f();
-
-        //    Vec3f b0 = p0;
-        //    Vec3f b1 = p0 * (1.0f / 3.0f) + p1 * (2.0f / 3.0f);
-        //    Vec3f b2 = p1 * (2.0f / 3.0f) + p2 * (1.0f / 3.0f);
-        //    Vec3f b3 = p2;
-
-        //    vertices.push_back({ b0.x, b0.y, b0.z });
-        //    vertices.push_back({ b1.x, b1.y, b1.z });
-        //    vertices.push_back({ b2.x, b2.y, b2.z });
-        //    vertices.push_back({ b3.x, b3.y, b3.z });
-        //}
-        //else if (n >= 4)
-        //{
-        //    // Standard C2 B-Spline segments
-        //    vertices.reserve((n - 3) * 4);
-        //    for (size_t i = 0; i <= n - 4; ++i)
-        //    {
-        //        Vec3f p0 = m_lastPositions[i].ToVec3f();
-        //        Vec3f p1 = m_lastPositions[i + 1].ToVec3f();
-        //        Vec3f p2 = m_lastPositions[i + 2].ToVec3f();
-        //        Vec3f p3 = m_lastPositions[i + 3].ToVec3f();
-
-        //        // Convert B-Spline segment to Bezier segment
-        //        Vec3f b0 = (p0 + p1 * 4.0f + p2) * (1.0f / 6.0f);
-        //        Vec3f b1 = (p1 * 2.0f + p2) * (1.0f / 3.0f);
-        //        Vec3f b2 = (p1 + p2 * 2.0f) * (1.0f / 3.0f);
-        //        Vec3f b3 = (p1 + p2 * 4.0f + p3) * (1.0f / 6.0f);
-
-        //        vertices.push_back({ b0.x, b0.y, b0.z });
-        //        vertices.push_back({ b1.x, b1.y, b1.z });
-        //        vertices.push_back({ b2.x, b2.y, b2.z });
-        //        vertices.push_back({ b3.x, b3.y, b3.z });
-        //    }
-        //}
 
         auto updateBuffer = [&device, this](Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data, UINT& vertexCount, UINT minCount)
             {
@@ -187,24 +131,5 @@ void BSplineCurve::UpdatePolyline(const DxDevice& device)
 		updateBuffer(m_lineVertexBuffer, m_lineBufferCapacity, lineVertices, m_lineVertexCount, 2);
         updateBuffer(m_curveVertexBuffer, m_curveBufferCapacity, vertices, m_curveVertexCount, 4);
 		updateBuffer(m_bernsteinVertexBuffer, m_bernsteinBufferCapacity, bernsteinPts, m_bernsteinVertexCount, 2);
-
-
-        //m_lineVertexCount = static_cast<UINT>(lineVertices.size());
-        //if (lineVertices.size() >= 2)
-        //    UpdateDynamicBuffer(device, m_lineVertexBuffer, m_lineBufferCapacity, lineVertices);
-        //else
-        //    m_lineVertexCount = 0;
-
-        //m_curveVertexCount = static_cast<UINT>(vertices.size());
-        //if (vertices.size() >= 4)
-        //    UpdateDynamicBuffer(device, m_curveVertexBuffer, m_curveBufferCapacity, vertices);
-        //else
-        //    m_curveVertexCount = 0;
-
-        //m_bernsteinVertexCount = static_cast<UINT>(bernsteinPts.size());
-        //if (m_bernsteinVertexCount >= 2)
-        //    UpdateDynamicBuffer(device, m_bernsteinVertexBuffer, m_bernsteinBufferCapacity, bernsteinPts);
-        //else
-        //    m_bernsteinVertexCount = 0;
     }
 }

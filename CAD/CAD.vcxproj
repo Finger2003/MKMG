@@ -161,6 +161,7 @@
     <ClCompile Include="DxDevice.cpp" />
     <ClCompile Include="DxStructures.cpp" />
     <ClCompile Include="exceptions.cpp" />
+    <ClCompile Include="InterpolatingCurve.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -186,6 +187,7 @@
     <ClInclude Include="DxStructures.h" />
     <ClInclude Include="exceptions.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="InterpolatingCurve.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Point.h" />
     <ClInclude Include="SceneObject.h" />
