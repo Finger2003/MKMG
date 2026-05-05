@@ -50,22 +50,35 @@ void InterpolatingCurve::UpdatePolyline(const DxDevice & device)
 				m_lastPositions.push_back(sp->m_position);
 		}
 
+		size_t raw_n = m_lastPositions.size();
+		std::vector<Vec3f> P;
+		P.reserve(raw_n);
+
+		for (size_t i = 0; i < raw_n; i++)
+		{
+			Vec3f pt = m_lastPositions[i].ToVec3f();
+			if (P.empty() || (pt - P.back()).length_sqr() > 1e-8f)
+				P.push_back(pt);
+		}
+		size_t n = P.size();
+
+		if (n < 2)
+		{
+			m_lineVertexCount = 0;
+			m_curveVertexCount = 0;
+			return;
+		}
+
 		// Control polygon
-		size_t n = m_lastPositions.size();
 		std::vector<VertexPosition> lineVertices;
 		lineVertices.reserve(n);
 		for (size_t i = 0; i < n; i++)
 			lineVertices.push_back({ m_lastPositions[i].x, m_lastPositions[i].y, m_lastPositions[i].z });
 
-
-		std::vector<Vec3f> P(n);
-		for (size_t i = 0; i < n; i++)
-			P[i] = m_lastPositions[i].ToVec3f();
-
 		// Calculate chordal lengths
 		std::vector<float> h(n - 1);
 		for (size_t i = 0; i < n - 1; i++)
-			h[i] = std::max((P[i + 1] - P[i]).length(), 1e-6f); // Avoid division by zero
+			h[i] = (P[i + 1] - P[i]).length(); // Avoid division by zero
 
 		std::vector<float> a(n), b(n), c(n);
 		std::vector<Vec3f> d(n);
