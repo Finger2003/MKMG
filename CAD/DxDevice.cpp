@@ -152,3 +152,12 @@ void DxDevice::UpdateBuffer(const Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, 
 	memcpy(res.pData, data, count);
 	m_context->Unmap(buffer.Get(), 0);
 }
+
+Microsoft::WRL::ComPtr<ID3D11BlendState> DxDevice::CreateBlendState(const BlendDescription& desc) const
+{
+	ComPtr<ID3D11BlendState> state;
+	auto hr = m_device->CreateBlendState(&desc, state.GetAddressOf());
+	if (FAILED(hr))
+		THROW_DX(hr);
+	return state;
+}

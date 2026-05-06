@@ -4,6 +4,7 @@ cbuffer PerPassBuffer : register(b0)
     float aspectRatio;
     float2 renderSize;
     float padding; // Ensures 16-byte alignment
+    float4 stereoTint;
 };
 
 cbuffer PerObjectBuffer : register(b1)

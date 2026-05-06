@@ -2,7 +2,10 @@ cbuffer perFrame : register(b0)
 {
     matrix viewProj;
     float aspectRatio;
-}
+    float2 renderSize;
+    float padding;
+    float4 stereoTint;
+};
 
 cbuffer perObject : register(b1)
 {
@@ -27,5 +30,5 @@ float4 main(GSOut input) : SV_TARGET
         discard;
     }
     
-    return objectColor;
+    return objectColor * stereoTint;
 }

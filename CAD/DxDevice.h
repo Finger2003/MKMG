@@ -72,6 +72,8 @@ public:
 		return CreateBuffer(desc);
 	}
 
+	Microsoft::WRL::ComPtr<ID3D11BlendState> CreateBlendState(const BlendDescription& desc = {}) const;
+
 private:
 	Microsoft::WRL::ComPtr<ID3D11Device> m_device;
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_context;

@@ -4,6 +4,7 @@ cbuffer PerPassBuffer : register(b0)
     float aspectRatio;
     float2 renderSize;
     float padding;
+    float4 stereoTint;
 };
 
 struct VSOut

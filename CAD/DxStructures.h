@@ -33,3 +33,10 @@ struct BufferDescription : D3D11_BUFFER_DESC
 
 	static BufferDescription ConstantBufferDescription(size_t byteWidth);
 };
+
+struct BlendDescription : D3D11_BLEND_DESC
+{
+	BlendDescription();
+
+	static BlendDescription MaxBlendDescription();
+};

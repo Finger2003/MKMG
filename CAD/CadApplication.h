@@ -29,6 +29,7 @@ struct PerPassBuffer
 	float aspectRatio;
 	float renderSize[2];
 	float padding;
+	MathLib::Vec4f stereoTint;
 };
 
 enum class InteractionMode
@@ -116,6 +117,8 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerObject;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerPass;
 
+	Microsoft::WRL::ComPtr<ID3D11BlendState> m_blendStateAnaglyph;
+	Microsoft::WRL::ComPtr<ID3D11BlendState> m_blendStateDefault;
 private:
 #pragma region Constants
 	static constexpr float cMenuWidth = 400.0f;
@@ -202,5 +205,19 @@ private:
 	void DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 #pragma endregion
+
+#pragma region stereoscopy
+	bool m_enableStereo = false;
+	float m_eyeSeparation = 0.2f;
+	float m_focalLength = 5.0f;
+	//MathLib::Vec4f m_leftEyeColor = { 1.0f, 0.0f, 0.0f, 1.0f };
+	//MathLib::Vec4f m_rightEyeColor = { 0.0f, 1.0f, 1.0f, 1.0f };
+	MathLib::Vec4f m_leftEyeColor = { 98.0f / 255.0f, 8.0f / 255.0f, 8.0f / 255.0f, 1.0f };
+	MathLib::Vec4f m_rightEyeColor = { 0.0f, 58.0f / 255.0f, 58.0f / 255.0f, 1.0f };
+	void InitStereoBlendStates();
+	void SetupStereoCamera(bool isLeftEye, const MathLib::Vec4f& eyeTint);
+#pragma endregion
+
+	void DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 };
 

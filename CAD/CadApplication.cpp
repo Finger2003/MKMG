@@ -73,6 +73,7 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	// Create the constant buffers for MVP matrices
 	m_cbPerPass = m_device.CreateConstantBuffer<PerPassBuffer>();
 	m_cbPerObject = m_device.CreateConstantBuffer<PerObjectBuffer>();
+	InitStereoBlendStates();
 	InitImGui();
 
 
@@ -197,6 +198,7 @@ void CadApplication::SyncPerPassBuffer()
 		perPassData.aspectRatio = m_camera.GetAspectRatio();
 		perPassData.renderSize[0] = static_cast<float>(m_renderSize.cx);
 		perPassData.renderSize[1] = static_cast<float>(m_renderSize.cy);
+		perPassData.stereoTint = { 1.0f, 1.0f, 1.0f, 1.0f };
 		m_device.UpdateBuffer(m_cbPerPass, perPassData);
 	}
 }
@@ -828,43 +830,67 @@ void CadApplication::Render()
 
 	const float clear_color[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
 	context->ClearRenderTargetView(m_backBuffer.Get(), clear_color);
-	context->ClearDepthStencilView(m_depthBuffer.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
-
 	context->OMSetRenderTargets(1, m_backBuffer.GetAddressOf(), m_depthBuffer.Get());
 
-	context->VSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
-	context->GSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
-	context->PSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
+	if (!m_enableStereo)
+	{
+		context->OMSetBlendState(m_blendStateDefault.Get(), nullptr, 0xFFFFFFFF);
+		context->ClearDepthStencilView(m_depthBuffer.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
+		SyncPerPassBuffer();
+		//SetupStereoCamera(false, { 1.0f, 1.0f, 1.0f, 1.0f });
+		DrawScene(context);
+	}
+	else
+	{
+		context->OMSetBlendState(m_blendStateAnaglyph.Get(), nullptr, 0xFFFFFFFF);
 
-	context->IASetInputLayout(m_layout.Get());
-	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
-	context->VSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
-	context->GSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
-	context->PSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
+		// Left eye
+		context->ClearDepthStencilView(m_depthBuffer.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
+		SetupStereoCamera(true, m_leftEyeColor);
+		DrawScene(context);
 
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+		// Right eye
+		context->ClearDepthStencilView(m_depthBuffer.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
+		SetupStereoCamera(false, m_rightEyeColor);
+		DrawScene(context);
+		context->OMSetBlendState(m_blendStateDefault.Get(), nullptr, 0xFFFFFFFF);
+	}
 
-	DrawCursors(context);
-	DrawToruses(context);
 
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
-	DrawPolylines(context);
 
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST_ADJ);
-	context->VSSetShader(m_bezierVertexShader.Get(), nullptr, 0);
-	context->GSSetShader(m_bezierGeometryShader.Get(), nullptr, 0);
-	DrawBezierCurves(context);
+	//context->VSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
+	//context->GSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
+	//context->PSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
+	//context->VSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
+	//context->GSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
+	//context->PSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
 
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-	context->GSSetShader(m_pointGeometryShader.Get(), nullptr, 0);
-	context->PSSetShader(m_pointPixelShader.Get(), nullptr, 0);
+	//context->IASetInputLayout(m_layout.Get());
+	//context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
+	//context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
 
-	DrawPoints(context);
-	DrawVirtualBernsteinPoints(context);
+	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
-	context->GSSetShader(nullptr, nullptr, 0);
+	//DrawCursors(context);
+	//DrawToruses(context);
+
+	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
+	//DrawPolylines(context);
+
+	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST_ADJ);
+	//context->VSSetShader(m_bezierVertexShader.Get(), nullptr, 0);
+	//context->GSSetShader(m_bezierGeometryShader.Get(), nullptr, 0);
+	//DrawBezierCurves(context);
+
+	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+	//context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
+	//context->GSSetShader(m_pointGeometryShader.Get(), nullptr, 0);
+	//context->PSSetShader(m_pointPixelShader.Get(), nullptr, 0);
+
+	//DrawPoints(context);
+	//DrawVirtualBernsteinPoints(context);
+
+	//context->GSSetShader(nullptr, nullptr, 0);
 
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
@@ -974,6 +1000,86 @@ void CadApplication::DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3
 			}
 		}
 	}
+}
+
+void CadApplication::InitStereoBlendStates()
+{
+	m_blendStateDefault = m_device.CreateBlendState();
+	m_blendStateAnaglyph = m_device.CreateBlendState(BlendDescription::MaxBlendDescription());
+}
+
+void CadApplication::SetupStereoCamera(bool isLeftEye, const MathLib::Vec4f& eyeTint)
+{
+	float E = m_eyeSeparation * 0.5f;
+	float shiftMultiplier = isLeftEye ? 1.0f : -1.0f;
+	float E_shift = E * shiftMultiplier;
+
+	Mat4f stereoView = Mat4f::Translation(E_shift, 0.0f, 0.0f) * m_camera.GetViewMatrix();
+	float aspect = m_camera.GetAspectRatio();
+	float fov = m_camera.GetFovY();
+	float n = m_camera.GetNearPlane();
+	float f = m_camera.GetFarPlane();
+
+	float top = n * std::tan(fov / 2.0f);
+	float bottom = -top;
+
+	float frustumShift = E_shift * (n / m_focalLength);
+	float width = aspect * top;
+
+	float left = -width + frustumShift;
+	float right = width + frustumShift;
+
+	Mat4f stereoProj = Mat4f::Frustum(left, right, bottom, top, n, f);
+
+	PerPassBuffer perPassData;
+	perPassData.viewProj = stereoProj * stereoView;
+	perPassData.aspectRatio = aspect;
+	perPassData.renderSize[0] = static_cast<float>(m_renderSize.cx);
+	perPassData.renderSize[1] = static_cast<float>(m_renderSize.cy);
+	perPassData.stereoTint = eyeTint;
+	m_device.UpdateBuffer(m_cbPerPass, perPassData);
+}
+
+void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+{
+	//context->VSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
+	//context->GSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
+	//context->PSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
+	//context->VSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
+	//context->GSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
+	//context->PSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
+
+	ID3D11Buffer* buffers[] = { m_cbPerPass.Get(), m_cbPerObject.Get() };
+	context->VSSetConstantBuffers(0, 2, buffers);
+	context->GSSetConstantBuffers(0, 2, buffers);
+	context->PSSetConstantBuffers(0, 2, buffers);
+
+	context->IASetInputLayout(m_layout.Get());
+	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
+	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+
+	DrawCursors(context);
+	DrawToruses(context);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
+	DrawPolylines(context);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST_ADJ);
+	context->VSSetShader(m_bezierVertexShader.Get(), nullptr, 0);
+	context->GSSetShader(m_bezierGeometryShader.Get(), nullptr, 0);
+	DrawBezierCurves(context);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
+	context->GSSetShader(m_pointGeometryShader.Get(), nullptr, 0);
+	context->PSSetShader(m_pointPixelShader.Get(), nullptr, 0);
+
+	DrawPoints(context);
+	DrawVirtualBernsteinPoints(context);
+
+	context->GSSetShader(nullptr, nullptr, 0);
 }
 
 void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
@@ -1535,6 +1641,17 @@ void CadApplication::DrawCameraSettingsMenu()
 	if (ImGui::DragFloat("Near Plane", &tempNear, 0.01f, 0.001f, 10.0f) ||
 		ImGui::DragFloat("Far Plane", &tempFar, 0.1f, 10.0f, 1000.0f))
 		m_camera.SetPlanes(tempNear, tempFar);
+
+	ImGui::Separator();
+	ImGui::Text("Stereoscopy (Anaglyph 3D)");
+	ImGui::Checkbox("Enable Stereoscopy", &m_enableStereo);
+
+	ImGui::BeginDisabled(!m_enableStereo);
+	ImGui::SliderFloat("Eye Separation", &m_eyeSeparation, 0.01f, 1.0f);
+	ImGui::SliderFloat("Focal Distance", &m_focalLength, 0.1f, 100.0f);
+	ImGui::ColorEdit3("Left Eye Tint", &m_leftEyeColor.x);
+	ImGui::ColorEdit3("Right Eye Tint", &m_rightEyeColor.x);
+	ImGui::EndDisabled();
 
 	UpdateProjectionMatrix();
 }

@@ -195,5 +195,15 @@ namespace MathLib
 
 			return { x, y, z };
 		}
+
+		static Mat4f Frustum(float l, float r, float b, float t, float n, float f)
+		{
+			return Mat4f(
+				Vec4f(2.0f * n / (r - l), 0.0f, (r + l) / (r - l), 0.0f),
+				Vec4f(0.0f, 2.0f * n / (t - b), (t + b) / (t - b), 0.0f),
+				Vec4f(0.0f, 0.0f, f / (n - f), (f * n) / (n - f)),
+				Vec4f(0.0f, 0.0f, -1.0f, 0.0f)
+			);
+		}
 	};
 }

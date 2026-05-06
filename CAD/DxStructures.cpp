@@ -67,3 +67,26 @@ BufferDescription BufferDescription::ConstantBufferDescription(size_t byteWidth)
 	desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	return desc;
 }
+
+BlendDescription::BlendDescription()
+{
+	ZeroMemory(this, sizeof(BlendDescription));
+	//AlphaToCoverageEnable = FALSE;
+	//IndependentBlendEnable = FALSE;
+	//RenderTarget[0].BlendEnable = FALSE;
+	RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+}
+
+BlendDescription BlendDescription::MaxBlendDescription()
+{
+	BlendDescription desc;
+	desc.RenderTarget[0].BlendEnable = TRUE;
+	desc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+	desc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+	desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_MAX;
+	desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+	desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+	desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+	//blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+	return desc;
+}
