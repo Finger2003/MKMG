@@ -4,6 +4,7 @@
 
 struct Curve : public SceneObject
 {
+	DEFINE_TYPE(SceneObject, ObjectType::Curve)
     std::vector<std::weak_ptr<Point>> m_controlPoints;
     std::vector<float3> m_lastPositions;
 
@@ -22,6 +23,7 @@ struct Curve : public SceneObject
 
     virtual void UpdatePolyline(const DxDevice& device) = 0;
 
+	//IMPLEMENT_CAST_TYPE(Curve)
 protected:
     void UpdateDynamicBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data);
 };

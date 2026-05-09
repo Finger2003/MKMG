@@ -4,6 +4,7 @@
 
 struct BezierCurve : public Curve
 {
+	DEFINE_TYPE(Curve, ObjectType::BezierCurve)
 	static unsigned int s_nextId;
 	//std::vector<std::weak_ptr<Point>> m_controlPoints;
 

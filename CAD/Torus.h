@@ -8,6 +8,7 @@ class DxDevice;
 
 struct Torus : public TransformableObject
 {
+	DEFINE_TYPE(TransformableObject, ObjectType::Torus)
 	Torus(float3 position);
 
 	std::vector<VertexPosition> vertices;

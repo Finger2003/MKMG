@@ -6,6 +6,7 @@
 class DxDevice;
 struct Point : public TransformableObject
 {
+	DEFINE_TYPE(TransformableObject, ObjectType::Point)
 	//float3 m_position{ 0.0f, 0.0f, 0.0f };
 	static void InitSharedGeometry(const DxDevice& device);
 	static void ReleaseSharedGeometry();

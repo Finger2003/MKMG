@@ -1,0 +1,5 @@
+#define DECLARE_CAST_TYPE(Type) virtual Type* As##Type() { return nullptr; } virtual const Type* As##Type() const { return nullptr; }
+#define IMPLEMENT_CAST_TYPE(Type) Type* As##Type() override { return this; } const Type* As##Type() const override { return this; }
+#define DEFINE_TYPE(BaseType, EnumVal) static constexpr ObjectType ClassType =EnumVal; bool IsA(ObjectType t) const override { return t == ClassType || BaseType::IsA(t); }
+#define SCENE_OBJECT_LIST(X) X(TransformableObject) X(Point) X(Torus) X(Curve) X(BezierCurve) X(BSplineCurve) X(InterpolatingCurve)
+#define AS_ENUM(Name)

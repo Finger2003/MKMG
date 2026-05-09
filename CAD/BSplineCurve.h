@@ -12,6 +12,7 @@ struct VirtualPointMapping
 
 struct BSplineCurve : public Curve
 {
+	DEFINE_TYPE(Curve, ObjectType::BSplineCurve)
     static unsigned int s_nextId;
     Microsoft::WRL::ComPtr<ID3D11Buffer> m_bernsteinVertexBuffer;
     UINT m_bernsteinVertexCount = 0;
@@ -22,3 +23,5 @@ struct BSplineCurve : public Curve
     BSplineCurve(std::vector<std::weak_ptr<Point>>&& controlPoints);
     void UpdatePolyline(const DxDevice& device) override;
 };
+
+
