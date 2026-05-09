@@ -4,24 +4,24 @@
 
 struct VirtualPointMapping
 {
-    std::weak_ptr<Point> targetPoint;
-    float weight;
+	std::weak_ptr<Point> targetPoint;
+	float weight;
 	float3 virtualPosition;
 };
 
 
 struct BSplineCurve : public Curve
 {
-	DEFINE_TYPE(Curve, ObjectType::BSplineCurve)
-    static unsigned int s_nextId;
-    Microsoft::WRL::ComPtr<ID3D11Buffer> m_bernsteinVertexBuffer;
-    UINT m_bernsteinVertexCount = 0;
-    UINT m_bernsteinBufferCapacity = 0;
+	DEFINE_TYPE(Curve, ObjectType::BSplineCurve);
+	static unsigned int s_nextId;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_bernsteinVertexBuffer;
+	UINT m_bernsteinVertexCount = 0;
+	UINT m_bernsteinBufferCapacity = 0;
 
 	std::vector<VirtualPointMapping> m_virtualPoints;
 
-    BSplineCurve(std::vector<std::weak_ptr<Point>>&& controlPoints);
-    void UpdatePolyline(const DxDevice& device) override;
+	BSplineCurve(std::vector<std::weak_ptr<Point>>&& controlPoints);
+	void UpdatePolyline(const DxDevice& device) override;
 };
 
 
