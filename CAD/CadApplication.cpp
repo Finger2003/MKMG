@@ -601,18 +601,12 @@ void CadApplication::BeginEditAction(int mouseX, int mouseY, bool shiftHeld)
 	TransformableObject* editObj = nullptr;
 	if (m_menuState == MenuState::Edit)
 	{
-		if (!m_lastClickedIndex.has_value())// || m_sceneObjects[*m_lastClickedIndex]->type == ObjectType::BezierCurve || m_sceneObjects[*m_lastClickedIndex]->type == ObjectType::BSplineCurve || m_sceneObjects[*m_lastClickedIndex]->type == ObjectType::InterpolatingCurve)
+		if (!m_lastClickedIndex.has_value())
 			return;
 
 		editObj = m_sceneObjects[*m_lastClickedIndex]->As<TransformableObject>();
 		if (!editObj) 
 			return;
-
-		//if (auto transObj = m_sceneObjects[*m_lastClickedIndex]->As<TransformableObject>())
-		//	editObj = transObj;
-		//else
-		//	return;
-		//editObj = static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get());
 	}
 
 	if (shiftHeld)
@@ -624,23 +618,6 @@ void CadApplication::BeginEditAction(int mouseX, int mouseY, bool shiftHeld)
 		auto center = GetSelectionCenter();
 		m_groupEditCenter = center ? *center : float3(0.0f, 0.0f, 0.0f);
 	}
-
-	//TransformableObject* editObj = nullptr;
-	//if (shiftHeld)
-	//	m_groupEditCenter = m_cursorPosition;
-	//else if (m_menuState == MenuState::Edit)
-	//{
-	//	if (!m_lastClickedIndex.has_value() || m_sceneObjects[m_lastClickedIndex.value()]->type == ObjectType::BezierCurve)
-	//		return;
-	//	editObj = static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get());
-	//	m_groupEditCenter = editObj->m_position;
-	//}
-	//else
-	//{
-	//	auto center = GetSelectionCenter();
-	//	m_groupEditCenter = center ? *center : float3(0.0f, 0.0f, 0.0f);
-	//}
-
 
 	Vec4f pivotWorldPos = m_groupEditCenter.ToVec4f(1.0f);
 	Vec4f pivotClipPos = m_camera.GetProjViewMatrix() * pivotWorldPos;
@@ -666,9 +643,6 @@ void CadApplication::BeginEditAction(int mouseX, int mouseY, bool shiftHeld)
 	auto prepareObject = [](TransformableObject* obj)
 		{
 			obj->m_basePosition = obj->m_position;
-			//if (obj->type == ObjectType::Torus)
-			//{
-			//	auto torus = static_cast<Torus*>(obj);
 			if (auto torus = obj->As<Torus>())
 			{
 				torus->m_baseRotationMatrix = torus->m_rotationMatrix;
@@ -686,8 +660,6 @@ void CadApplication::BeginEditAction(int mouseX, int mouseY, bool shiftHeld)
 
 			if (auto transObj = obj->As<TransformableObject>())
 				prepareObject(transObj);
-			//if (obj->selected && obj->type != ObjectType::BezierCurve && obj->type != ObjectType::BSplineCurve && obj->type != ObjectType::InterpolatingCurve)
-			//	prepareObject(static_cast<TransformableObject*>(obj.get()));
 		}
 
 	SetCapture(m_window.getHandle());
@@ -754,7 +726,6 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 	{
 		auto applyTransform = [&](TransformableObject* obj)
 			{
-				//Vec3f objBasePos = Vec3f(obj->m_basePosition.x, obj->m_basePosition.y, obj->m_basePosition.z);
 				Vec3f objBasePos = obj->m_basePosition.ToVec3f();
 
 				if (isTranslating)
@@ -768,27 +739,19 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 					Vec3f newPos = editPivot + offset * scaleFactor;
 					obj->m_position = newPos;
 
-					//if (obj->type == ObjectType::Torus)
-					//{
-					//	auto torus = static_cast<Torus*>(obj);
-					//}
 					if (auto torus = obj->As<Torus>())
 						torus->SetScale(torus->m_baseScale * scaleFactor);
 				}
 				else if (isRotating)
 				{
 					Vec3f offset = objBasePos - editPivot;
-					Vec4f rotatedOffset4 = deltaRot * offset.ToVec4f(); //Vec4f(offset.x, offset.y, offset.z, 1.0f);
-					//Vec3f rotatedOffset(rotatedOffset4.x, rotatedOffset4.y, rotatedOffset4.z);
+					Vec4f rotatedOffset4 = deltaRot * offset.ToVec4f();
 					Vec3f rotatedOffset = Vec3f::FromVec4f(rotatedOffset4);
 					Vec3f newPos = editPivot + rotatedOffset;
 
 					obj->m_position = newPos;
 
-					//if (obj->type == ObjectType::Torus)
-					//{
-					//	auto torus = static_cast<Torus*>(obj);
-					//}
+
 					if (auto torus = obj->As<Torus>())
 					{
 						torus->m_rotationMatrix = deltaRot * torus->m_baseRotationMatrix;
@@ -799,34 +762,16 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 
 				if (auto torus = obj->As<Torus>())
 					torus->UpdateModelMatrix();
-
-				//if (obj->type == ObjectType::Torus)
-				//	static_cast<Torus*>(obj)->UpdateModelMatrix();
 			};
 
-		//if (m_menuState == MenuState::EditGroup)
-		//{
-		//	for (auto& obj : m_sceneObjects)
-		//	{
-		//		if (obj->selected && obj->type != ObjectType::BezierCurve)
-		//			applyTransform(static_cast<TransformableObject*>(obj.get()));
-		//	}
-		//}
-		//else
-		//{
-		//	if (m_lastClickedIndex.has_value() && m_sceneObjects[m_lastClickedIndex.value()]->type != ObjectType::BezierCurve)
-		//		applyTransform(static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get()));
-		//}
 
 		if (m_menuState == MenuState::Edit)
 		{
-			if (m_lastClickedIndex.has_value())
+			if (m_lastClickedIndex)
 			{
 				if (auto transObj = m_sceneObjects[*m_lastClickedIndex]->As<TransformableObject>())				
 					applyTransform(transObj);				
-			}
-			//if (m_lastClickedIndex.has_value() && m_sceneObjects[*m_lastClickedIndex]->type != ObjectType::BezierCurve && m_sceneObjects[*m_lastClickedIndex]->type != ObjectType::BSplineCurve && m_sceneObjects[*m_lastClickedIndex]->type != ObjectType::InterpolatingCurve)
-			//	applyTransform(static_cast<TransformableObject*>(m_sceneObjects[*m_lastClickedIndex].get()));
+			}			
 		}
 		else
 		{
@@ -835,9 +780,7 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 				if (!obj->selected)
 					continue;
 				if (auto transObj = obj->As<TransformableObject>())
-					applyTransform(transObj);
-				//if (obj->selected && obj->type != ObjectType::BezierCurve && obj->type != ObjectType::BSplineCurve && obj->type != ObjectType::InterpolatingCurve)
-				//	applyTransform(static_cast<TransformableObject*>(obj.get()));
+					applyTransform(transObj);				
 			}
 		}
 		m_selectionDirty = true;
@@ -881,7 +824,6 @@ void CadApplication::Render()
 		context->OMSetBlendState(m_blendStateDefault.Get(), nullptr, 0xFFFFFFFF);
 		context->ClearDepthStencilView(m_depthBuffer.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 		SyncPerPassBuffer();
-		//SetupStereoCamera(false, { 1.0f, 1.0f, 1.0f, 1.0f });
 		DrawScene(context);
 	}
 	else
@@ -900,42 +842,6 @@ void CadApplication::Render()
 		context->OMSetBlendState(m_blendStateDefault.Get(), nullptr, 0xFFFFFFFF);
 	}
 
-
-
-	//context->VSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
-	//context->GSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
-	//context->PSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
-	//context->VSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
-	//context->GSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
-	//context->PSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
-
-	//context->IASetInputLayout(m_layout.Get());
-	//context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-	//context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
-
-	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
-
-	//DrawCursors(context);
-	//DrawToruses(context);
-
-	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
-	//DrawPolylines(context);
-
-	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST_ADJ);
-	//context->VSSetShader(m_bezierVertexShader.Get(), nullptr, 0);
-	//context->GSSetShader(m_bezierGeometryShader.Get(), nullptr, 0);
-	//DrawBezierCurves(context);
-
-	//context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-	//context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-	//context->GSSetShader(m_pointGeometryShader.Get(), nullptr, 0);
-	//context->PSSetShader(m_pointPixelShader.Get(), nullptr, 0);
-
-	//DrawPoints(context);
-	//DrawVirtualBernsteinPoints(context);
-
-	//context->GSSetShader(nullptr, nullptr, 0);
-
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
 
@@ -943,10 +849,6 @@ void CadApplication::DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext
 {
 	for (auto& obj : m_sceneObjects)
 	{
-		//if (obj->type == ObjectType::Point)
-		//{
-		//	auto& point = *static_cast<Point*>(obj.get());
-
 		if (auto point = obj->As<Point>())
 		{
 			PerObjectBuffer objData;
@@ -971,9 +873,6 @@ void CadApplication::DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceCont
 
 	for (auto& obj : m_sceneObjects)
 	{
-		//if (obj->type == ObjectType::BezierCurve || obj->type == ObjectType::BSplineCurve || obj->type == ObjectType::InterpolatingCurve)
-		//{
-		//	auto& curve = *static_cast<Curve*>(obj.get());
 		if (auto curve = obj->As<Curve>())
 		{
 			curve->UpdatePolyline(m_device);
@@ -982,9 +881,8 @@ void CadApplication::DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceCont
 				ID3D11Buffer** bufferToDraw = curve->m_lineVertexBuffer.GetAddressOf();
 				UINT countToDraw = curve->m_lineVertexCount;
 
-				if (m_showBernsteinPoints)// && obj->type == ObjectType::BSplineCurve)
+				if (m_showBernsteinPoints)
 				{
-					//auto bsplineCurve = static_cast<BSplineCurve*>(obj.get());
 					if (auto bsplineCurve = curve->As<BSplineCurve>())
 					{
 						bufferToDraw = bsplineCurve->m_bernsteinVertexBuffer.GetAddressOf();
@@ -1011,10 +909,6 @@ void CadApplication::DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceC
 
 	for (auto& obj : m_sceneObjects)
 	{
-		//if (obj->type == ObjectType::BezierCurve || obj->type == ObjectType::BSplineCurve || obj->type == ObjectType::InterpolatingCurve)
-		//{
-		//	auto& curve = *static_cast<Curve*>(obj.get());
-		//}
 		if (auto curve = obj->As<Curve>())
 		{
 			objData.color = curve->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
@@ -1045,9 +939,6 @@ void CadApplication::DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3
 		if (!obj->selected) 
 			continue;
 
-		//if (obj->selected && obj->type == ObjectType::BSplineCurve)
-		//{
-		//	auto bspline = static_cast<BSplineCurve*>(obj.get());
 		if (auto bspline = obj->As<BSplineCurve>())
 		{
 			if (bspline->m_bernsteinVertexCount > 0)
@@ -1101,13 +992,6 @@ void CadApplication::SetupStereoCamera(bool isLeftEye, const MathLib::Vec4f& eye
 
 void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
 {
-	//context->VSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
-	//context->GSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
-	//context->PSSetConstantBuffers(0, 1, m_cbPerPass.GetAddressOf());
-	//context->VSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
-	//context->GSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
-	//context->PSSetConstantBuffers(1, 1, m_cbPerObject.GetAddressOf());
-
 	ID3D11Buffer* buffers[] = { m_cbPerPass.Get(), m_cbPerObject.Get() };
 	context->VSSetConstantBuffers(0, 2, buffers);
 	context->GSSetConstantBuffers(0, 2, buffers);
@@ -1145,9 +1029,6 @@ void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContex
 {
 	for (auto& obj : m_sceneObjects)
 	{
-		//if (obj->type == ObjectType::Torus)
-		//{
-		//	auto& torus = *static_cast<Torus*>(obj.get());
 		if (auto torus = obj->As<Torus>())
 		{
 			torus->UpdateMesh(m_device);
@@ -1208,7 +1089,6 @@ void CadApplication::DrawMenu()
 			selectedCount++;
 			if (obj->type == ObjectType::Point)
 				selectedPoints++;
-			//else if (obj->type == ObjectType::BezierCurve || obj->type == ObjectType::BSplineCurve || obj->type == ObjectType::InterpolatingCurve)
 			else if (obj->IsA(ObjectType::Curve))
 			{
 				selectedCurves++;
@@ -1221,8 +1101,6 @@ void CadApplication::DrawMenu()
 
 	if (selectedCurves != 1)
 		selectedCurve.reset();
-
-	//int selectedCount = count_if(m_sceneObjects.cbegin(), m_sceneObjects.cend(), [](const auto& obj) { return obj->selected; });
 
 	if (m_menuState == MenuState::List)
 	{
@@ -1304,7 +1182,6 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 		}
 	}
 
-	//ImGui::BeginDisabled(selectedPoints < 4);
 	ImGui::BeginDisabled(selectedPoints == 0);
 	if (ImGui::Button("Add B-Spline (C2) Curve"))
 	{
@@ -1387,18 +1264,12 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 	if (selectedCount == 1)
 	{
 		if (ImGui::Button("Edit Selected", ImVec2(-1, 0)))
-		{
 			m_menuState = MenuState::Edit;
-			//m_currentEditAction = EditAction::None;
-		}
 	}
 	else
 	{
 		if (ImGui::Button("Edit Group", ImVec2(-1, 0)))
-		{
 			m_menuState = MenuState::EditGroup;
-			//m_currentEditAction = EditAction::None;
-		}
 	}
 	ImGui::EndDisabled();
 
@@ -1565,11 +1436,8 @@ void CadApplication::DrawEditMenu()
 		ImGui::Text("Editing: %s", selectedObj->name.c_str());
 		ImGui::Spacing();
 
-		//if (selectedObj->type == ObjectType::Point)
-		//{
 		if (auto point = selectedObj->As<Point>())
 			DrawPointMenu(*point);
-		//else if (selectedObj->type == ObjectType::Torus)
 		else if (auto torus = selectedObj->As<Torus>())
 			DrawTorusMenu(*torus);
 	}
@@ -1601,15 +1469,11 @@ void CadApplication::DrawTorusMenu(Torus& torus)
 		m_selectionDirty = true;
 	}
 
-	//Vec3f eulerDegrees = Vec3f(torus.m_eulerAngles.x, torus.m_eulerAngles.y, torus.m_eulerAngles.z) * (180.0f / std::numbers::pi_v<float>);
 	Vec3f eulerDegrees = torus.m_eulerAngles.ToVec3f() * (180.0f / std::numbers::pi_v<float>);
 	if (ImGui::DragFloat3("Rotation", eulerDegrees.f, 1.0f, 0.0f, 0.0f, "%.2f"))
 	{
 		eulerDegrees *= (std::numbers::pi_v<float> / 180.0f);
 		torus.m_eulerAngles = eulerDegrees;
-		//torus.m_eulerAngles.x = eulerDegrees.x;
-		//torus.m_eulerAngles.y = eulerDegrees.y;
-		//torus.m_eulerAngles.z = eulerDegrees.z;
 		MathLib::Mat4f rotX = MathLib::Mat4f::RotationX(torus.m_eulerAngles.x);
 		MathLib::Mat4f rotY = MathLib::Mat4f::RotationY(torus.m_eulerAngles.y);
 		MathLib::Mat4f rotZ = MathLib::Mat4f::RotationZ(torus.m_eulerAngles.z);
@@ -1628,18 +1492,12 @@ void CadApplication::DrawTorusMenu(Torus& torus)
 
 	if (transformChanged)
 		torus.UpdateModelMatrix();
-
-	//ImGui::Separator();
-	//DrawActionCombo();
 }
 
 void CadApplication::DrawPointMenu(Point& selectedObj)
 {
 	if (ImGui::DragFloat3("Position", &selectedObj.m_position.x, 0.01f))
 		m_selectionDirty = true;
-
-	//ImGui::Separator();
-	//DrawActionCombo();
 }
 
 void CadApplication::DrawActionCombo()
@@ -1675,17 +1533,6 @@ void CadApplication::DrawEditGroupMenu(int selectedCount)
 		ImGui::Text("Center: %.2f, %.2f, %.2f", centerOpt->x, centerOpt->y, centerOpt->z);
 	}
 	ImGui::Spacing();
-	//DrawActionCombo();
-	//ImGui::Text("Interactive Group Action");
-	//const char* actions[] = {
-	//	"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",
-	//	"Free Arcball", "Rotate X", "Rotate Y", "Rotate Z", "Scale"
-	//};
-	//int actionIndex = static_cast<int>(m_currentEditAction);
-	//if (ImGui::Combo("##GroupAction", &actionIndex, actions, IM_ARRAYSIZE(actions)))
-	//{
-	//	m_currentEditAction = static_cast<EditAction>(actionIndex);
-	//}
 }
 
 void CadApplication::DrawCameraSettingsMenu()
