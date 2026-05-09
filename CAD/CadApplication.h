@@ -210,9 +210,7 @@ private:
 	bool m_enableStereo = false;
 	float m_eyeSeparation = 0.2f;
 	float m_focalLength = 5.0f;
-	//MathLib::Vec4f m_leftEyeColor = { 1.0f, 0.0f, 0.0f, 1.0f };
-	//MathLib::Vec4f m_rightEyeColor = { 0.0f, 1.0f, 1.0f, 1.0f };
-	MathLib::Vec4f m_leftEyeColor = { 98.0f / 255.0f, 8.0f / 255.0f, 8.0f / 255.0f, 1.0f };
+	MathLib::Vec4f m_leftEyeColor = { 114.0f / 255.0f, 0.0f, 0.0f, 1.0f };
 	MathLib::Vec4f m_rightEyeColor = { 0.0f, 58.0f / 255.0f, 58.0f / 255.0f, 1.0f };
 	void InitStereoBlendStates();
 	void SetupStereoCamera(bool isLeftEye, const MathLib::Vec4f& eyeTint);
