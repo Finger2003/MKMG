@@ -23,5 +23,5 @@ struct Curve : public SceneObject
 
 	virtual void UpdatePolyline(const DxDevice& device) = 0;
 protected:
-	void UpdateDynamicBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data);
+	void UpdateBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data, UINT& vertexCount, UINT minCount);
 };

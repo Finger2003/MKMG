@@ -139,18 +139,7 @@ void InterpolatingCurve::UpdatePolyline(const DxDevice & device)
 			vertices.push_back({ b3.x, b3.y, b3.z });
 		}
 
-
-		auto updateBuffer = [&device, this](Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data, UINT& vertexCount, UINT minCount)
-			{
-				if (data.size() >= minCount)
-				{
-					vertexCount = static_cast<UINT>(data.size());
-					UpdateDynamicBuffer(device, buffer, capacity, data);
-				}
-				else vertexCount = 0;
-			};
-
-		updateBuffer(m_lineVertexBuffer, m_lineBufferCapacity, lineVertices, m_lineVertexCount, 2);
-		updateBuffer(m_curveVertexBuffer, m_curveBufferCapacity, vertices, m_curveVertexCount, 4);
+		UpdateBuffer(device, m_lineVertexBuffer, m_lineBufferCapacity, lineVertices, m_lineVertexCount, 2);
+		UpdateBuffer(device, m_curveVertexBuffer, m_curveBufferCapacity, vertices, m_curveVertexCount, 4);
 	}	
 }

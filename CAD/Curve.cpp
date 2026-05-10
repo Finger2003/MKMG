@@ -11,13 +11,18 @@ void Curve::CleanExpiredPoints()
     std::erase_if(m_controlPoints, [](const std::weak_ptr<Point>& wp) { return wp.expired(); });
 }
 
-void Curve::UpdateDynamicBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data)
+void Curve::UpdateBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data, UINT& vertexCount, UINT minCount)
 {
-    UINT requiredCount = static_cast<UINT>(data.size());
-    if (requiredCount > capacity)
+    if (data.size() >= minCount)
     {
-        capacity = std::max({ requiredCount, static_cast<UINT>(capacity * 1.5), 16u });
-        buffer = device.CreateDynamicVertexBuffer<VertexPosition>(capacity);
+        vertexCount = static_cast<UINT>(data.size());
+        if (vertexCount > capacity)
+        {
+            capacity = std::max({ vertexCount, static_cast<UINT>(capacity * 1.5), 16u });
+            buffer = device.CreateDynamicVertexBuffer<VertexPosition>(capacity);
+        }
+        device.UpdateBuffer(buffer, data.data(), vertexCount * sizeof(VertexPosition));
     }
-    device.UpdateBuffer(buffer, data.data(), requiredCount * sizeof(VertexPosition));
+    else
+        vertexCount = 0;
 }
