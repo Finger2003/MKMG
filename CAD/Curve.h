@@ -16,12 +16,11 @@ struct Curve : public SceneObject
 	UINT m_lineBufferCapacity = 0;
 	UINT m_curveBufferCapacity = 0;
 
+	void CleanExpiredPoints();
+	virtual void UpdatePolyline(const DxDevice& device) = 0;
+
+protected:
 	Curve(std::string name, ObjectType type, std::vector<std::weak_ptr<Point>>&& controlPoints);
 	virtual ~Curve() = default;
-
-	void CleanExpiredPoints();
-
-	virtual void UpdatePolyline(const DxDevice& device) = 0;
-protected:
 	void UpdateBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data, UINT& vertexCount, UINT minCount);
 };

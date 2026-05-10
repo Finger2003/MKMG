@@ -29,8 +29,6 @@ struct SceneObject
 	ObjectType type;
 	bool selected = false;
 
-	SceneObject(std::string&& name, ObjectType type) : name(std::move(name)), type(type) {}
-	virtual ~SceneObject() = default;
 
 	static constexpr ObjectType ClassType = ObjectType::SceneObject;
 	virtual bool IsA(ObjectType t) const { return t == ClassType; }
@@ -38,6 +36,9 @@ struct SceneObject
 	{
 		return IsA(T::ClassType) ? static_cast<T*>(this) : nullptr;
 	}
+protected:
+	virtual ~SceneObject() = default;
+	SceneObject(std::string&& name, ObjectType type) : name(std::move(name)), type(type) {}
 };
 
 struct TransformableObject : public SceneObject
@@ -47,6 +48,7 @@ struct TransformableObject : public SceneObject
 
 	DEFINE_TYPE(SceneObject, ObjectType::TransformableObject);
 
+protected:
 	TransformableObject(float3 position, std::string&& name, ObjectType type)
 		: SceneObject(std::move(name), type), m_position(position), m_basePosition(position)
 	{}
