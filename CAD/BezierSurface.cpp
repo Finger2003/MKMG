@@ -4,10 +4,15 @@
 
 unsigned int BezierSurface::s_nextId = 0;
 
-BezierSurface::BezierSurface(std::string&& name, int uSeg, int vSeg, SurfaceShape shape)
-	: SceneObject(std::move(name), ObjectType::BezierSurface),
+BezierSurface::BezierSurface(int uSeg, int vSeg, SurfaceShape shape, bool isPreview)
+	: SceneObject(isPreview ? "Preview Surface" : "Surface C0 - " + std::to_string(s_nextId++), ObjectType::BezierSurface),
 	segmentsU(uSeg), segmentsV(vSeg), shapeType(shape)
 {}
+
+void BezierSurface::Commit()
+{
+	name = "Surface C0 - " + std::to_string(s_nextId++);
+}
 
 std::shared_ptr<Point> BezierSurface::GetPoint(int u, int v) const
 {

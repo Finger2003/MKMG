@@ -105,7 +105,7 @@ std::optional<VirtualPointMapping> CadApplication::PickVirtualPoint(int mouseX, 
 				Vec4f clipPos = m_camera.GetProjViewMatrix() * worldPos;
 				if (clipPos.w <= 0.0f)
 					continue;
-				clipPos /= clipPos.w; 
+				clipPos /= clipPos.w;
 
 				float screenX = (clipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
 				float screenY = (1.0f - clipPos.y) * 0.5f * m_renderSize.cy;
@@ -234,6 +234,14 @@ void CadApplication::HandleObjectSelection(size_t index, bool ctrlHeld, bool shi
 		if (auto curve = m_sceneObjects[i]->As<Curve>())
 		{
 			for (const auto& cpWeak : curve->m_controlPoints)
+			{
+				if (auto cp = cpWeak.lock())
+					cp->selected = state;
+			}
+		}
+		else if (auto surface = m_sceneObjects[i]->As<BezierSurface>())
+		{
+			for (const auto& cpWeak : surface->m_controlPoints)
 			{
 				if (auto cp = cpWeak.lock())
 					cp->selected = state;
@@ -618,7 +626,7 @@ void CadApplication::BeginEditAction(int mouseX, int mouseY, bool shiftHeld)
 			return;
 
 		editObj = m_sceneObjects[*m_lastClickedIndex]->As<TransformableObject>();
-		if (!editObj) 
+		if (!editObj)
 			return;
 	}
 
@@ -782,9 +790,9 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 		{
 			if (m_lastClickedIndex)
 			{
-				if (auto transObj = m_sceneObjects[*m_lastClickedIndex]->As<TransformableObject>())				
-					applyTransform(transObj);				
-			}			
+				if (auto transObj = m_sceneObjects[*m_lastClickedIndex]->As<TransformableObject>())
+					applyTransform(transObj);
+			}
 		}
 		else
 		{
@@ -793,7 +801,7 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 				if (!obj->selected)
 					continue;
 				if (auto transObj = obj->As<TransformableObject>())
-					applyTransform(transObj);				
+					applyTransform(transObj);
 			}
 		}
 		m_selectionDirty = true;
@@ -924,7 +932,7 @@ void CadApplication::DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceCont
 					context->Draw(countToDraw, 0);
 				}
 			}
-		}		
+		}
 	}
 }
 
@@ -962,7 +970,7 @@ void CadApplication::DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3
 
 	for (auto& obj : m_sceneObjects)
 	{
-		if (!obj->selected) 
+		if (!obj->selected)
 			continue;
 
 		if (auto bspline = obj->As<BSplineCurve>())
@@ -1147,7 +1155,7 @@ void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>
 std::shared_ptr<BezierSurface> CadApplication::GenerateSurface(SurfaceShape shape, int segU, int segV, float dim1, float dim2)
 {
 	m_previewPoints.clear();
-	auto surface = std::make_shared<BezierSurface>("Preview", segU, segV, shape);
+	auto surface = std::make_shared<BezierSurface>(segU, segV, shape, true);
 	int pointsU = (shape == SurfaceShape::Cylinder) ? (3 * segU) : (3 * segU + 1);
 	int pointsV = 3 * segV + 1;
 
@@ -1270,7 +1278,9 @@ void CadApplication::DrawMenu()
 	int selectedPoints = 0;
 	int selectedCount = 0;
 	int selectedCurves = 0;
+	int selectedSurfaces = 0;
 	std::weak_ptr<Curve> selectedCurve;
+	std::weak_ptr<BezierSurface> selectedSurface;
 
 	for (const auto& obj : m_sceneObjects)
 	{
@@ -1285,6 +1295,11 @@ void CadApplication::DrawMenu()
 				auto sharedCurve = std::static_pointer_cast<Curve>(obj);
 				selectedCurve = sharedCurve;
 				sharedCurve->CleanExpiredPoints();
+			}
+			else if (obj->IsA(ObjectType::BezierSurface))
+			{
+				selectedSurfaces++;
+				selectedSurface = std::static_pointer_cast<BezierSurface>(obj);
 			}
 		}
 	}
@@ -1303,6 +1318,12 @@ void CadApplication::DrawMenu()
 		{
 			if (curve->selected)
 				DrawCurveList(curve.get(), selectedCount);
+		}
+
+		if (auto surface = selectedSurface.lock())
+		{
+			if (surface->selected && selectedSurfaces == 1)
+				DrawSurfaceList(surface.get(), selectedCount);
 		}
 	}
 	else if (m_menuState == MenuState::Edit)
@@ -1460,7 +1481,7 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 		if (ImGui::Button("Add to Scene"))
 		{
 			// 1. Rename and Add Surface
-			m_previewSurface->name = "Surface C0 - " + std::to_string(BezierSurface::s_nextId++);
+			m_previewSurface->Commit();
 			m_sceneObjects.push_back(m_previewSurface);
 
 			// 2. Add all its points to the scene so they render and can be edited
@@ -1561,14 +1582,14 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 	{
 		m_enableVirtualEdit = false;
 		m_activeVirtualEdit = std::nullopt;
-		m_isEditing = false;		
+		m_isEditing = false;
 	}
 
 	ImGui::BeginDisabled(!m_showBernsteinPoints);
 	if (ImGui::Checkbox("Enable Virtual Edit", &m_enableVirtualEdit))
 	{
 		m_activeVirtualEdit = std::nullopt;
-		m_isEditing = false;		
+		m_isEditing = false;
 	}
 	ImGui::EndDisabled();
 }
@@ -1677,6 +1698,150 @@ void CadApplication::DrawCurveList(Curve* curve, int selectedCount)
 			});
 	}
 	ImGui::PopStyleColor(2);
+}
+
+void CadApplication::DrawSurfaceList(BezierSurface* surface, int selectedCount)
+{
+	ImGui::TextDisabled("Selected Surface Control Points:");
+	ImGui::Text("%s", surface->name.c_str());
+
+	if (ImGui::Button("Select All Points", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f - 4, 0)))
+	{
+		for (const auto& cpWeak : surface->m_controlPoints)
+		{
+			if (auto cp = cpWeak.lock())
+				cp->selected = true;
+		}
+		m_selectionDirty = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Deselect All Points", ImVec2(-1, 0)))
+	{
+		for (const auto& cpWeak : surface->m_controlPoints)
+		{
+			if (auto cp = cpWeak.lock())
+				cp->selected = false;
+		}
+		m_selectionDirty = true;
+	}
+
+	const ImGuiIO& io = ImGui::GetIO();
+	if (ImGui::BeginListBox(("##SurfacePointsList_" + surface->name).c_str(), ImVec2(-1.0f, 0.0f)))
+	{
+		int pointsU = (surface->shapeType == SurfaceShape::Cylinder) ? (3 * surface->segmentsU) : (3 * surface->segmentsU + 1);
+
+		for (size_t i = 0; i < surface->m_controlPoints.size(); i++)
+		{
+			if (auto cp = surface->m_controlPoints[i].lock())
+			{
+				ImGui::PushID(static_cast<int>(i));
+
+				int u = i % pointsU;
+				int v = i / pointsU;
+				std::string label = "[" + std::to_string(u) + ", " + std::to_string(v) + "] " + cp->name;
+
+				if (ImGui::Selectable(label.c_str(), cp->selected))
+				{
+					HandleSurfaceListSelection(surface, i, io.KeyCtrl, io.KeyShift);
+				}
+				ImGui::PopID();
+			}
+		}
+		ImGui::EndListBox();
+	}
+
+	ImGui::Separator();
+
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.1f, 0.1f, 1.0f));
+
+	if (ImGui::Button("Delete Surface Only", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f - 4, 0)))
+	{
+		// Unlock the points so the user can delete them later
+		for (const auto& cpWeak : surface->m_controlPoints)
+		{
+			if (auto cp = cpWeak.lock())
+				cp->isLockedToSurface = false;
+		}
+
+		// Delete just the surface object
+		std::erase_if(m_sceneObjects, [surface](const auto& obj) {
+			return obj.get() == surface;
+			});
+
+		ClearSelection();
+	}
+
+	ImGui::SameLine();
+	if (ImGui::Button("Delete Surface and Control Points", ImVec2(-1, 0)))
+	{
+		std::vector<Point*> pointsToDelete;
+		for (const auto& cpWeak : surface->m_controlPoints)
+		{
+			if (auto cp = cpWeak.lock())
+				pointsToDelete.push_back(cp.get());
+		}
+
+		// delete the surface and the points
+		std::erase_if(m_sceneObjects, [surface, &pointsToDelete](const auto& obj) {
+			if (obj.get() == surface)
+				return true;
+			return std::find(pointsToDelete.begin(), pointsToDelete.end(), obj.get()) != pointsToDelete.end();
+			});
+
+		ClearSelection();
+	}
+	ImGui::PopStyleColor(2);
+}
+
+void CadApplication::HandleSurfaceListSelection(BezierSurface* surface, size_t index, bool ctrlHeld, bool shiftHeld)
+{
+	auto setSelection = [&](size_t i, bool state) {
+		if (auto cp = surface->m_controlPoints[i].lock())
+			cp->selected = state;
+		};
+
+	if (ctrlHeld && shiftHeld)
+	{
+		if (m_lastCurveClickedIndex.has_value())
+		{
+			size_t start = std::min(index, *m_lastCurveClickedIndex);
+			size_t end = std::max(index, *m_lastCurveClickedIndex);
+			for (size_t j = start; j <= end; j++)
+				setSelection(j, true);
+		}
+	}
+	else if (shiftHeld)
+	{
+		auto anchor = m_lastCurveClickedIndex;
+		if (anchor.has_value())
+		{
+			size_t start = std::min(index, *anchor);
+			size_t end = std::max(index, *anchor);
+			for (size_t j = start; j <= end; j++)
+				setSelection(j, true);
+			m_lastCurveClickedIndex = anchor;
+		}
+		else
+		{
+			setSelection(index, true);
+			m_lastCurveClickedIndex = index;
+		}
+	}
+	else if (ctrlHeld)
+	{
+		if (auto cp = surface->m_controlPoints[index].lock())
+			cp->selected = !cp->selected;
+		m_lastCurveClickedIndex = index;
+	}
+	else
+	{
+		for (size_t i = 0; i < surface->m_controlPoints.size(); i++)
+			setSelection(i, i == index);
+		m_lastCurveClickedIndex = index;
+	}
+
+	m_selectionDirty = true;
 }
 
 void CadApplication::DrawEditMenu()

@@ -174,6 +174,8 @@ private:
 	void DrawMenu();
 	void DrawListMenu(int selectedCount, int selectedPoints, Curve* activeCurve);
 	void DrawCurveList(Curve* curve, int selectedCount);
+	void DrawSurfaceList(BezierSurface* surface, int selectedCount);
+	void HandleSurfaceListSelection(BezierSurface* surface, size_t index, bool ctrlHeld, bool shiftHeld);
 	void DrawEditMenu();
 	void DrawTorusMenu(Torus& torus);
 	void DrawPointMenu(Point& selectedObj);

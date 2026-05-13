@@ -20,7 +20,8 @@ struct BezierSurface : public SceneObject
 	UINT m_patchBufferCapacity = 0;
 	bool m_isDirty = true;
 
-	BezierSurface(std::string&& name, int uSeg, int vSeg, SurfaceShape shape);
+	BezierSurface(int uSeg, int vSeg, SurfaceShape shape, bool isPreview = false);
+	void Commit();
 
 	std::shared_ptr<Point> GetPoint(int u, int v) const;
 	void UpdatePatches(const DxDevice& device);
