@@ -12,10 +12,11 @@ struct Point : public TransformableObject
 
 	const Microsoft::WRL::ComPtr<ID3D11Buffer>& GetVertexBuffer() const { return s_vertexBuffer; }
 
-	Point(float3 position);
+	Point(float3 position, bool isPreview = false, bool lockToSurface = false);
 	static unsigned int s_nextId;
+	bool isLockedToSurface = false;
 
-
+	void Commit();
 	MathLib::Mat4f GetModelMatrix() const;
 private:
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> s_vertexBuffer;

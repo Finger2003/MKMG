@@ -134,6 +134,24 @@ Microsoft::WRL::ComPtr<ID3D11GeometryShader> DxDevice::CreateGeometryShader(cons
 	return geometryShader;
 }
 
+Microsoft::WRL::ComPtr<ID3D11HullShader> DxDevice::CreateHullShader(const std::vector<BYTE>& bytecode) const
+{
+	ComPtr<ID3D11HullShader> hullShader;
+	auto hr = m_device->CreateHullShader(bytecode.data(), bytecode.size(), nullptr, hullShader.GetAddressOf());
+	if (FAILED(hr))
+		THROW_DX(hr);
+	return hullShader;
+}
+
+Microsoft::WRL::ComPtr<ID3D11DomainShader> DxDevice::CreateDomainShader(const std::vector<BYTE>& bytecode) const
+{
+	ComPtr<ID3D11DomainShader> domainShader;
+	auto hr = m_device->CreateDomainShader(bytecode.data(), bytecode.size(), nullptr, domainShader.GetAddressOf());
+	if (FAILED(hr))
+		THROW_DX(hr);
+	return domainShader;
+}
+
 Microsoft::WRL::ComPtr<ID3D11InputLayout> DxDevice::CreateInputLayout(const std::vector<D3D11_INPUT_ELEMENT_DESC>& elements, const std::vector<BYTE>& vsCode) const
 {
 	ComPtr<ID3D11InputLayout> inputLayout;

@@ -8,7 +8,8 @@
     X(Curve)                 \
     X(BezierCurve)           \
     X(BSplineCurve)          \
-    X(InterpolatingCurve)
+    X(InterpolatingCurve)	 \
+	X(BezierSurface)
 
 
 enum class ObjectType

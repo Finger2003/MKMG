@@ -55,6 +55,9 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	const auto pointGsByteCode = DxDevice::LoadByteCode(L"PointGS.cso");
 	const auto bezierVsByteCode = DxDevice::LoadByteCode(L"BezierVS.cso");
 	const auto bezierGsByteCode = DxDevice::LoadByteCode(L"BezierGS.cso");
+	const auto surfaceVsByteCode = DxDevice::LoadByteCode(L"SurfaceVS.cso");
+	const auto surfaceHsByteCode = DxDevice::LoadByteCode(L"SurfaceHS.cso");
+	const auto surfaceDsByteCode = DxDevice::LoadByteCode(L"SurfaceDS.cso");
 
 	m_vertexShader = m_device.CreateVertexShader(vsByteCode);
 	m_pixelShader = m_device.CreatePixelShader(psByteCode);
@@ -63,6 +66,9 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	m_pointGeometryShader = m_device.CreateGeometryShader(pointGsByteCode);
 	m_bezierVertexShader = m_device.CreateVertexShader(bezierVsByteCode);
 	m_bezierGeometryShader = m_device.CreateGeometryShader(bezierGsByteCode);
+	m_surfaceVertexShader = m_device.CreateVertexShader(surfaceVsByteCode);
+	m_surfaceDomainShader = m_device.CreateDomainShader(surfaceDsByteCode);
+	m_surfaceHullShader = m_device.CreateHullShader(surfaceHsByteCode);
 
 	vector<D3D11_INPUT_ELEMENT_DESC> inputElements = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
@@ -410,7 +416,14 @@ void CadApplication::DrawCursor(float3 position, float scale)
 
 void CadApplication::DeleteSelectedObjects()
 {
-	erase_if(m_sceneObjects, [](const auto& obj) { return obj->selected; });
+	erase_if(m_sceneObjects, [](const auto& obj) {
+		if (!obj->selected)
+			return false;
+		if (auto pt = obj->As<Point>())
+			if (pt->isLockedToSurface)
+				return false;
+		return true;
+		});
 	m_lastClickedIndex = std::nullopt;
 	m_selectionCenterCache = std::nullopt;
 	m_selectionDirty = false;
@@ -862,6 +875,19 @@ void CadApplication::DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext
 			context->Draw(1, 0);
 		}
 	}
+
+	for (auto& point : m_previewPoints)
+	{
+		PerObjectBuffer objData;
+		objData.model = point->GetModelMatrix();
+		objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
+		m_device.UpdateBuffer(m_cbPerObject, objData);
+
+		UINT stride = sizeof(VertexPosition);
+		UINT offset = 0;
+		context->IASetVertexBuffers(0, 1, point->GetVertexBuffer().GetAddressOf(), &stride, &offset);
+		context->Draw(1, 0);
+	}
 }
 
 void CadApplication::DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
@@ -952,6 +978,85 @@ void CadApplication::DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3
 	}
 }
 
+void CadApplication::DrawSurfaces(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+{
+
+	if (m_showSurfacePopup && m_previewSurface)
+	{
+		DrawSurface(context, m_previewSurface.get(), Vec4f(0.0f, 0.5f, 1.0f, 1.0f));
+		//m_previewSurface->UpdatePatches(m_device);
+		//if (m_previewSurface->m_patchVertexCount > 0)
+		//{
+		//	UINT stride = sizeof(VertexPosition);
+		//	UINT offset = 0;
+		//	context->IASetVertexBuffers(0, 1, m_previewSurface->m_patchBuffer.GetAddressOf(), &stride, &offset);
+
+		//	PerObjectBuffer objData;
+		//	objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
+		//	objData.surfaceParams.x = 0.0f;
+		//	m_device.UpdateBuffer(m_cbPerObject, objData);
+		//	context->Draw(m_previewSurface->m_patchVertexCount, 0);
+
+		//	objData.surfaceParams.x = 1.0f;
+		//	m_device.UpdateBuffer(m_cbPerObject, objData);
+		//	context->Draw(m_previewSurface->m_patchVertexCount, 0);
+		//}
+	}
+
+	for (auto& obj : m_sceneObjects)
+	{
+		if (auto surface = obj->As<BezierSurface>())
+		{
+			DrawSurface(context, surface, surface->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f));
+			//surface->UpdatePatches(m_device);
+			//if (surface->m_patchVertexCount > 0)
+			//{
+			//	UINT stride = sizeof(VertexPosition);
+			//	UINT offset = 0;
+			//	context->IASetVertexBuffers(0, 1, surface->m_patchBuffer.GetAddressOf(), &stride, &offset);
+			//	PerObjectBuffer objData;
+			//	objData.color = surface->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+			//	objData.surfaceParams.x = 0.0f;
+			//	m_device.UpdateBuffer(m_cbPerObject, objData);
+			//	context->Draw(surface->m_patchVertexCount, 0);
+			//	objData.surfaceParams.x = 1.0f;
+			//	m_device.UpdateBuffer(m_cbPerObject, objData);
+			//	context->Draw(surface->m_patchVertexCount, 0);
+			//}
+		}
+	}
+}
+
+void CadApplication::DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context, BezierSurface* surface, MathLib::Vec4f color)
+{
+	surface->UpdatePatches(m_device);
+	if (surface->m_patchVertexCount > 0)
+	{
+		UINT stride = sizeof(VertexPosition);
+		UINT offset = 0;
+		context->IASetVertexBuffers(0, 1, surface->m_patchBuffer.GetAddressOf(), &stride, &offset);
+		PerObjectBuffer objData;
+		objData.color = color;
+
+		auto updateAndDraw = [&](BezierSurface* surf, float xParam) {
+			objData.surfaceParams.x = xParam;
+			m_device.UpdateBuffer(m_cbPerObject, objData);
+			context->Draw(surf->m_patchVertexCount, 0);
+			};
+
+		updateAndDraw(surface, 0.0f);
+		updateAndDraw(surface, 1.0f);
+
+		//objData.surfaceParams.x = 0.0f;
+		//m_device.UpdateBuffer(m_cbPerObject, objData);
+		//context->Draw(surface->m_patchVertexCount, 0);
+
+		//objData.surfaceParams.x = 1.0f;
+		//m_device.UpdateBuffer(m_cbPerObject, objData);
+		//context->Draw(surface->m_patchVertexCount, 0);
+	}
+}
+
 void CadApplication::InitStereoBlendStates()
 {
 	m_blendStateDefault = m_device.CreateBlendState();
@@ -994,6 +1099,8 @@ void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>
 {
 	ID3D11Buffer* buffers[] = { m_cbPerPass.Get(), m_cbPerObject.Get() };
 	context->VSSetConstantBuffers(0, 2, buffers);
+	context->HSSetConstantBuffers(0, 2, buffers);
+	context->DSSetConstantBuffers(0, 2, buffers);
 	context->GSSetConstantBuffers(0, 2, buffers);
 	context->PSSetConstantBuffers(0, 2, buffers);
 
@@ -1023,6 +1130,89 @@ void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>
 	DrawVirtualBernsteinPoints(context);
 
 	context->GSSetShader(nullptr, nullptr, 0);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_16_CONTROL_POINT_PATCHLIST);
+
+	context->VSSetShader(m_surfaceVertexShader.Get(), nullptr, 0);
+	context->HSSetShader(m_surfaceHullShader.Get(), nullptr, 0);
+	context->DSSetShader(m_surfaceDomainShader.Get(), nullptr, 0);
+	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
+
+	DrawSurfaces(context);
+
+	context->HSSetShader(nullptr, nullptr, 0);
+	context->DSSetShader(nullptr, nullptr, 0);
+}
+
+std::shared_ptr<BezierSurface> CadApplication::GenerateSurface(SurfaceShape shape, int segU, int segV, float dim1, float dim2)
+{
+	m_previewPoints.clear();
+	auto surface = std::make_shared<BezierSurface>("Preview", segU, segV, shape);
+	int pointsU = (shape == SurfaceShape::Cylinder) ? (3 * segU) : (3 * segU + 1);
+	int pointsV = 3 * segV + 1;
+
+	for (int v = 0; v < pointsV; v++)
+	{
+		float vParam = static_cast<float>(v) / (pointsV - 1);
+		for (int u = 0; u < pointsU; u++)
+		{
+			float uParam = static_cast<float>(u) / (shape == SurfaceShape::Cylinder ? pointsU : (pointsU - 1));
+			float3 pos;
+
+			if (shape == SurfaceShape::Flat)
+			{
+				pos.x = uParam * dim1 + m_cursorPosition.x;
+				pos.y = m_cursorPosition.y;
+				pos.z = vParam * dim2 + m_cursorPosition.z;
+			}
+			else
+			{
+				float dTheta = 2.0f * std::numbers::pi_v<float> / segU;
+
+				float L = dim1 * (4.0f / 3.0f) * std::tan(dTheta / 4.0f);
+
+				constexpr float startAngle = -std::numbers::pi_v<float> / 2.0f;
+				int patchIndex = u / 3;
+				int pointType = u % 3;
+				float angle = patchIndex * dTheta + startAngle;
+
+				float cx, cy;
+				if (pointType == 0) // Anchor Point (On the circle)
+				{
+					float angle = patchIndex * dTheta;
+					cx = dim1 * std::cos(angle);
+					cy = dim1 * std::sin(angle);
+				}
+				else if (pointType == 1) // Forward Tangent Handle (Pushed out)
+				{
+					float angle = patchIndex * dTheta;
+					cx = dim1 * std::cos(angle) - L * std::sin(angle);
+					cy = dim1 * std::sin(angle) + L * std::cos(angle);
+				}
+				else // Backward Tangent Handle (Pushed out from the next anchor)
+				{
+					float nextAngle = (patchIndex + 1) * dTheta;
+					cx = dim1 * std::cos(nextAngle) + L * std::sin(nextAngle);
+					cy = dim1 * std::sin(nextAngle) - L * std::cos(nextAngle);
+				}
+
+				pos.x = cx + m_cursorPosition.x;
+				pos.y = (cy + dim1) + m_cursorPosition.y;
+				pos.z = vParam * dim2 + m_cursorPosition.z;
+				//pos.z = zOffset + m_cursorPosition.z;
+
+				//float angle = uParam * 2.0f * std::numbers::pi_v<float>;
+				//pos.x = std::cos(angle) * dim1; // Radius
+				//pos.y = (vParam - 0.5f) * dim2; // Height
+				//pos.z = std::sin(angle) * dim1; // Radius
+			}
+
+			auto pt = std::make_shared<Point>(pos, true, true);
+			m_previewPoints.push_back(pt);
+			surface->m_controlPoints.push_back(pt);
+		}
+	}
+	return surface;
 }
 
 void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
@@ -1214,6 +1404,78 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 		activeCurve->m_controlPoints.insert(activeCurve->m_controlPoints.end(), pointsToAdd.begin(), pointsToAdd.end());
 	}
 	ImGui::EndDisabled();
+
+	if (ImGui::Button("Create C0 Surface"))
+	{
+		m_showSurfacePopup = true;
+		m_previewSurface = GenerateSurface(static_cast<SurfaceShape>(m_previewShape), m_previewSegU, m_previewSegV, m_previewDim1, m_previewDim2);
+	}
+
+	if (m_showSurfacePopup)
+	{
+		ImGui::Begin("Surface Parameters", &m_showSurfacePopup);
+
+		bool changed = false;
+		//changed |= ImGui::RadioButton("Flat", &m_previewShape, 0);
+		if (ImGui::RadioButton("Flat", &m_previewShape, 0))
+		{
+			m_previewDim1 = m_previewRadius * 2.0f * std::numbers::pi_v<float>;
+			changed = true;
+		}
+		ImGui::SameLine();
+		//changed |= ImGui::RadioButton("Cylinder", &m_previewShape, 1);
+		if (ImGui::RadioButton("Cylinder", &m_previewShape, 1))
+		{
+			m_previewRadius = m_previewDim1 / (2.0f * std::numbers::pi_v<float>);
+			changed = true;
+		}
+
+		int minSegU = (m_previewShape == 1) ? 2 : 1;
+		if (m_previewSegU < minSegU)
+		{
+			m_previewSegU = minSegU;
+			changed = true;
+		}
+
+		changed |= ImGui::SliderInt("Segments U", &m_previewSegU, minSegU, 10);
+		changed |= ImGui::SliderInt("Segments V", &m_previewSegV, 1, 10);
+
+		if (m_previewShape == 0)
+		{
+			changed |= ImGui::DragFloat("Width", &m_previewDim1, 0.1f, 0.1f, 100.0f);
+			changed |= ImGui::DragFloat("Length", &m_previewDim2, 0.1f, 0.1f, 100.0f);
+		}
+		else
+		{
+			changed |= ImGui::DragFloat("Radius", &m_previewRadius, 0.1f, 0.1f, 100.0f);
+			changed |= ImGui::DragFloat("Height", &m_previewDim2, 0.1f, 0.1f, 100.0f);
+		}
+
+		if (changed)
+		{
+			float currentDim1 = (m_previewShape == 0) ? m_previewDim1 : m_previewRadius;
+			m_previewSurface = GenerateSurface(static_cast<SurfaceShape>(m_previewShape), m_previewSegU, m_previewSegV, currentDim1, m_previewDim2);
+		}
+
+		if (ImGui::Button("Add to Scene"))
+		{
+			// 1. Rename and Add Surface
+			m_previewSurface->name = "Surface C0 - " + std::to_string(BezierSurface::s_nextId++);
+			m_sceneObjects.push_back(m_previewSurface);
+
+			// 2. Add all its points to the scene so they render and can be edited
+			for (auto& pt : m_previewPoints)
+			{
+				pt->Commit();
+				m_sceneObjects.push_back(pt);
+			}
+			m_previewPoints.clear();
+
+			m_previewSurface = nullptr;
+			m_showSurfacePopup = false;
+		}
+		ImGui::End();
+	}
 
 	ImGui::Separator();
 	const ImGuiIO& io = ImGui::GetIO();

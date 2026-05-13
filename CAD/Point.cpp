@@ -22,9 +22,16 @@ void Point::ReleaseSharedGeometry()
 	s_vertexBuffer.Reset();
 }
 
-Point::Point(float3 position)
-	: TransformableObject(position, "Point" + to_string(s_nextId++), ObjectType::Point)//, m_position(position)
+Point::Point(float3 position, bool isPreview, bool lockToSurface)
+	: TransformableObject(position, 
+		isPreview ? "PreviewPoint" : "Point" + to_string(s_nextId++),
+		ObjectType::Point), isLockedToSurface(lockToSurface)
 {}
+
+void Point::Commit()
+{
+	name = "Point" + to_string(s_nextId++);
+}
 
 MathLib::Mat4f Point::GetModelMatrix() const
 {

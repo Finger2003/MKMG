@@ -26,6 +26,8 @@ public:
 	Microsoft::WRL::ComPtr<ID3D11VertexShader> CreateVertexShader(const std::vector<BYTE>& bytecode) const;
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> CreatePixelShader(const std::vector<BYTE>& bytecode) const;
 	Microsoft::WRL::ComPtr<ID3D11GeometryShader> CreateGeometryShader(const std::vector<BYTE>& bytecode) const;
+	Microsoft::WRL::ComPtr<ID3D11HullShader> CreateHullShader(const std::vector<BYTE>& bytecode) const;
+	Microsoft::WRL::ComPtr<ID3D11DomainShader> CreateDomainShader(const std::vector<BYTE>& bytecode) const;
 	Microsoft::WRL::ComPtr<ID3D11InputLayout> CreateInputLayout(const std::vector<D3D11_INPUT_ELEMENT_DESC>& elements, const std::vector<BYTE>& vsCode) const;
 #pragma endregion
 

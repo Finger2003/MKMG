@@ -96,6 +96,9 @@
     <ClCompile Include="exceptions.cpp">
       <Filter>Pliki źródłowe\utils</Filter>
     </ClCompile>
+    <ClCompile Include="BezierSurface.cpp">
+      <Filter>Pliki źródłowe\geometry</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -155,6 +158,9 @@
     <ClInclude Include="exceptions.h">
       <Filter>Pliki nagłówkowe\utils</Filter>
     </ClInclude>
+    <ClInclude Include="BezierSurface.h">
+      <Filter>Pliki nagłówkowe\geometry</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="VertexShader.hlsl">
@@ -176,6 +182,15 @@
       <Filter>Pliki shaderów</Filter>
     </FxCompile>
     <FxCompile Include="BezierVS.hlsl">
+      <Filter>Pliki shaderów</Filter>
+    </FxCompile>
+    <FxCompile Include="SurfaceHS.hlsl">
+      <Filter>Pliki shaderów</Filter>
+    </FxCompile>
+    <FxCompile Include="SurfaceDS.hlsl">
+      <Filter>Pliki shaderów</Filter>
+    </FxCompile>
+    <FxCompile Include="SurfaceVS.hlsl">
       <Filter>Pliki shaderów</Filter>
     </FxCompile>
   </ItemGroup>

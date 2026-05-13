@@ -8,6 +8,7 @@
 #include "BezierCurve.h"
 #include "BSplineCurve.h"
 #include "InterpolatingCurve.h"
+#include "BezierSurface.h"
 #include "Cursor3D.h"
 #include "Camera.h"
 
@@ -21,6 +22,7 @@ struct PerObjectBuffer
 {
 	MathLib::Mat4f model;
 	MathLib::Vec4f color;
+	MathLib::Vec4f surfaceParams;
 };
 
 struct PerPassBuffer
@@ -113,6 +115,10 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_bezierVertexShader;
 	Microsoft::WRL::ComPtr<ID3D11GeometryShader> m_bezierGeometryShader;
 
+	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_surfaceVertexShader;
+	Microsoft::WRL::ComPtr<ID3D11DomainShader> m_surfaceDomainShader;
+	Microsoft::WRL::ComPtr<ID3D11HullShader> m_surfaceHullShader;
+
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerObject;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerPass;
@@ -128,7 +134,7 @@ private:
 	char m_renameBuffer[128] = {};
 	Camera m_camera;
 
-	MathLib::Vec3f m_startArcballVector{};	
+	MathLib::Vec3f m_startArcballVector{};
 	std::vector<std::shared_ptr<SceneObject>> m_sceneObjects;
 
 	InteractionMode m_interactionMode = InteractionMode::None;
@@ -204,6 +210,8 @@ private:
 	void DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void DrawSurfaces(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context, BezierSurface* surface, MathLib::Vec4f color);
 #pragma endregion
 
 #pragma region stereoscopy
@@ -217,5 +225,20 @@ private:
 #pragma endregion
 
 	void DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+
+
+#pragma region SurfaceCreation
+	bool m_showSurfacePopup = false;
+	int m_previewSegU = 1;
+	int m_previewSegV = 1;
+	float m_previewDim1 = 1.0f; // Width
+	float m_previewDim2 = 1.0f; // Length or Height
+	float m_previewRadius = m_previewDim1 / (2.0f * std::numbers::pi_v<float>);
+	int m_previewShape = 0;     // 0 = Flat, 1 = Cylinder
+	std::shared_ptr<BezierSurface> m_previewSurface = nullptr;
+	std::vector<std::shared_ptr<Point>> m_previewPoints; 
+
+	std::shared_ptr<BezierSurface> GenerateSurface(SurfaceShape shape, int segU, int segV, float dim1, float dim2);
+#pragma endregion
 };
 
