@@ -884,17 +884,20 @@ void CadApplication::DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext
 		}
 	}
 
-	for (auto& point : m_previewPoints)
+	if (m_showSurfacePopup)
 	{
-		PerObjectBuffer objData;
-		objData.model = point->GetModelMatrix();
-		objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
-		m_device.UpdateBuffer(m_cbPerObject, objData);
+		for (auto& point : m_previewPoints)
+		{
+			PerObjectBuffer objData;
+			objData.model = point->GetModelMatrix();
+			objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
+			m_device.UpdateBuffer(m_cbPerObject, objData);
 
-		UINT stride = sizeof(VertexPosition);
-		UINT offset = 0;
-		context->IASetVertexBuffers(0, 1, point->GetVertexBuffer().GetAddressOf(), &stride, &offset);
-		context->Draw(1, 0);
+			UINT stride = sizeof(VertexPosition);
+			UINT offset = 0;
+			context->IASetVertexBuffers(0, 1, point->GetVertexBuffer().GetAddressOf(), &stride, &offset);
+			context->Draw(1, 0);
+		}
 	}
 }
 
@@ -1184,82 +1187,8 @@ SurfaceGenerationResult CadApplication::GenerateSurface() const
 {
 	if (static_cast<SurfaceShape>(m_previewShape) == SurfaceShape::Flat)
 		return BezierSurface::CreateFlat(m_previewSegU, m_previewSegV, m_previewWidth, m_previewDim2, m_cursorPosition, m_device);
-		//return BezierSurface::CreateFlat(segU, segV, dim1, dim2, m_cursorPosition, m_device);
 	else
 		return BezierSurface::CreateCylinder(m_previewSegU, m_previewSegV, m_previewRadius, m_previewDim2, m_cursorPosition, m_device);
-		//return BezierSurface::CreateCylinder(segU, segV, dim1, dim2, m_cursorPosition, m_device);
-	//auto result = shape == SurfaceShape::Flat ? BezierSurface::CreateFlat(segU, segV, dim1, dim2, m_cursorPosition, m_device) : BezierSurface::CreateCylinder(segU, segV, dim1, dim2, m_cursorPosition, m_device);
-	//m_previewPoints = std::move(result.points);
-	//return std::move(result.surface);
-
-	//m_previewPoints.clear();
-	//auto surface = std::make_shared<BezierSurface>(segU, segV, shape, true);
-	//int pointsU = (shape == SurfaceShape::Cylinder) ? (3 * segU) : (3 * segU + 1);
-	//int pointsV = 3 * segV + 1;
-
-	//for (int v = 0; v < pointsV; v++)
-	//{
-	//	float vParam = static_cast<float>(v) / (pointsV - 1);
-	//	for (int u = 0; u < pointsU; u++)
-	//	{
-	//		float uParam = static_cast<float>(u) / (shape == SurfaceShape::Cylinder ? pointsU : (pointsU - 1));
-	//		float3 pos{};
-
-	//		if (shape == SurfaceShape::Flat)
-	//		{
-	//			pos.x = uParam * dim1 + m_cursorPosition.x;
-	//			pos.y = m_cursorPosition.y;
-	//			pos.z = vParam * dim2 + m_cursorPosition.z;
-	//		}
-	//		else
-	//		{
-	//			float dTheta = 2.0f * std::numbers::pi_v<float> / segU;
-
-	//			float L = dim1 * (4.0f / 3.0f) * std::tan(dTheta / 4.0f);
-
-	//			constexpr float startAngle = -std::numbers::pi_v<float> / 2.0f;
-	//			int patchIndex = u / 3;
-	//			int pointType = u % 3;
-	//			float angle = patchIndex * dTheta + startAngle;
-
-	//			float cx, cy;
-	//			if (pointType == 0) // Anchor Point (On the circle)
-	//			{
-	//				//float angle = patchIndex * dTheta;
-	//				cx = dim1 * std::cos(angle);
-	//				cy = dim1 * std::sin(angle);
-	//			}
-	//			else if (pointType == 1) // Forward Tangent Handle (Pushed out)
-	//			{
-	//				//float angle = patchIndex * dTheta;
-	//				cx = dim1 * std::cos(angle) - L * std::sin(angle);
-	//				cy = dim1 * std::sin(angle) + L * std::cos(angle);
-	//			}
-	//			else // Backward Tangent Handle (Pushed out from the next anchor)
-	//			{
-	//				float nextAngle = (patchIndex + 1) * dTheta + startAngle;
-	//				cx = dim1 * std::cos(nextAngle) + L * std::sin(nextAngle);
-	//				cy = dim1 * std::sin(nextAngle) - L * std::cos(nextAngle);
-	//			}
-
-	//			pos.x = cx + m_cursorPosition.x;
-	//			pos.y = (cy + dim1) + m_cursorPosition.y;
-	//			pos.z = vParam * dim2 + m_cursorPosition.z;
-	//			//pos.z = zOffset + m_cursorPosition.z;
-
-	//			//float angle = uParam * 2.0f * std::numbers::pi_v<float>;
-	//			//pos.x = std::cos(angle) * dim1; // Radius
-	//			//pos.y = (vParam - 0.5f) * dim2; // Height
-	//			//pos.z = std::sin(angle) * dim1; // Radius
-	//		}
-
-	//		auto pt = std::make_shared<Point>(pos, true, true);
-	//		m_previewPoints.push_back(pt);
-	//		surface->m_controlPoints.push_back(pt);
-	//	}
-	//}
-
-	//surface->InitGeometry(m_device);
 }
 
 void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
@@ -1468,9 +1397,6 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 	if (ImGui::Button("Create C0 Surface"))
 	{
 		m_showSurfacePopup = true;
-		//auto [surface, points] = GenerateSurface(static_cast<SurfaceShape>(m_previewShape), m_previewSegU, m_previewSegV, m_previewDim1, m_previewDim2);
-		//m_previewSurface = std::move(surface);
-		//m_previewPoints = std::move(points);
 	}
 
 	if (m_showSurfacePopup)
@@ -1478,19 +1404,9 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 		ImGui::Begin("Surface Parameters", &m_showSurfacePopup);
 
 		bool changed = (m_previewSurface == nullptr);
-		//changed |= ImGui::RadioButton("Flat", &m_previewShape, 0);
-		if (ImGui::RadioButton("Flat", &m_previewShape, 0))
-		{
-			m_previewWidth = m_previewRadius * 2.0f * std::numbers::pi_v<float>;
-			changed = true;
-		}
+		changed |= ImGui::RadioButton("Flat", &m_previewShape, 0);
 		ImGui::SameLine();
-		//changed |= ImGui::RadioButton("Cylinder", &m_previewShape, 1);
-		if (ImGui::RadioButton("Cylinder", &m_previewShape, 1))
-		{
-			m_previewRadius = m_previewWidth / (2.0f * std::numbers::pi_v<float>);
-			changed = true;
-		}
+		changed |= ImGui::RadioButton("Cylinder", &m_previewShape, 1);
 
 		int minSegU = (m_previewShape == 1) ? 2 : 1;
 		if (m_previewSegU < minSegU)
@@ -1515,8 +1431,7 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 
 		if (changed)
 		{
-			//float currentDim1 = (m_previewShape == 0) ? m_previewWidth : m_previewRadius;
-			auto [surface, points] = GenerateSurface();// static_cast<SurfaceShape>(m_previewShape), m_previewSegU, m_previewSegV, currentDim1, m_previewDim2);
+			auto [surface, points] = GenerateSurface();
 			m_previewSurface = std::move(surface);
 			m_previewPoints = std::move(points);
 		}
