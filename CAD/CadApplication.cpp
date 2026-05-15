@@ -1180,77 +1180,86 @@ void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>
 	context->DSSetShader(nullptr, nullptr, 0);
 }
 
-std::shared_ptr<BezierSurface> CadApplication::GenerateSurface(SurfaceShape shape, int segU, int segV, float dim1, float dim2)
+SurfaceGenerationResult CadApplication::GenerateSurface() const
 {
-	m_previewPoints.clear();
-	auto surface = std::make_shared<BezierSurface>(segU, segV, shape, true);
-	int pointsU = (shape == SurfaceShape::Cylinder) ? (3 * segU) : (3 * segU + 1);
-	int pointsV = 3 * segV + 1;
+	if (static_cast<SurfaceShape>(m_previewShape) == SurfaceShape::Flat)
+		return BezierSurface::CreateFlat(m_previewSegU, m_previewSegV, m_previewWidth, m_previewDim2, m_cursorPosition, m_device);
+		//return BezierSurface::CreateFlat(segU, segV, dim1, dim2, m_cursorPosition, m_device);
+	else
+		return BezierSurface::CreateCylinder(m_previewSegU, m_previewSegV, m_previewRadius, m_previewDim2, m_cursorPosition, m_device);
+		//return BezierSurface::CreateCylinder(segU, segV, dim1, dim2, m_cursorPosition, m_device);
+	//auto result = shape == SurfaceShape::Flat ? BezierSurface::CreateFlat(segU, segV, dim1, dim2, m_cursorPosition, m_device) : BezierSurface::CreateCylinder(segU, segV, dim1, dim2, m_cursorPosition, m_device);
+	//m_previewPoints = std::move(result.points);
+	//return std::move(result.surface);
 
-	for (int v = 0; v < pointsV; v++)
-	{
-		float vParam = static_cast<float>(v) / (pointsV - 1);
-		for (int u = 0; u < pointsU; u++)
-		{
-			float uParam = static_cast<float>(u) / (shape == SurfaceShape::Cylinder ? pointsU : (pointsU - 1));
-			float3 pos{};
+	//m_previewPoints.clear();
+	//auto surface = std::make_shared<BezierSurface>(segU, segV, shape, true);
+	//int pointsU = (shape == SurfaceShape::Cylinder) ? (3 * segU) : (3 * segU + 1);
+	//int pointsV = 3 * segV + 1;
 
-			if (shape == SurfaceShape::Flat)
-			{
-				pos.x = uParam * dim1 + m_cursorPosition.x;
-				pos.y = m_cursorPosition.y;
-				pos.z = vParam * dim2 + m_cursorPosition.z;
-			}
-			else
-			{
-				float dTheta = 2.0f * std::numbers::pi_v<float> / segU;
+	//for (int v = 0; v < pointsV; v++)
+	//{
+	//	float vParam = static_cast<float>(v) / (pointsV - 1);
+	//	for (int u = 0; u < pointsU; u++)
+	//	{
+	//		float uParam = static_cast<float>(u) / (shape == SurfaceShape::Cylinder ? pointsU : (pointsU - 1));
+	//		float3 pos{};
 
-				float L = dim1 * (4.0f / 3.0f) * std::tan(dTheta / 4.0f);
+	//		if (shape == SurfaceShape::Flat)
+	//		{
+	//			pos.x = uParam * dim1 + m_cursorPosition.x;
+	//			pos.y = m_cursorPosition.y;
+	//			pos.z = vParam * dim2 + m_cursorPosition.z;
+	//		}
+	//		else
+	//		{
+	//			float dTheta = 2.0f * std::numbers::pi_v<float> / segU;
 
-				constexpr float startAngle = -std::numbers::pi_v<float> / 2.0f;
-				int patchIndex = u / 3;
-				int pointType = u % 3;
-				float angle = patchIndex * dTheta + startAngle;
+	//			float L = dim1 * (4.0f / 3.0f) * std::tan(dTheta / 4.0f);
 
-				float cx, cy;
-				if (pointType == 0) // Anchor Point (On the circle)
-				{
-					//float angle = patchIndex * dTheta;
-					cx = dim1 * std::cos(angle);
-					cy = dim1 * std::sin(angle);
-				}
-				else if (pointType == 1) // Forward Tangent Handle (Pushed out)
-				{
-					//float angle = patchIndex * dTheta;
-					cx = dim1 * std::cos(angle) - L * std::sin(angle);
-					cy = dim1 * std::sin(angle) + L * std::cos(angle);
-				}
-				else // Backward Tangent Handle (Pushed out from the next anchor)
-				{
-					float nextAngle = (patchIndex + 1) * dTheta + startAngle;
-					cx = dim1 * std::cos(nextAngle) + L * std::sin(nextAngle);
-					cy = dim1 * std::sin(nextAngle) - L * std::cos(nextAngle);
-				}
+	//			constexpr float startAngle = -std::numbers::pi_v<float> / 2.0f;
+	//			int patchIndex = u / 3;
+	//			int pointType = u % 3;
+	//			float angle = patchIndex * dTheta + startAngle;
 
-				pos.x = cx + m_cursorPosition.x;
-				pos.y = (cy + dim1) + m_cursorPosition.y;
-				pos.z = vParam * dim2 + m_cursorPosition.z;
-				//pos.z = zOffset + m_cursorPosition.z;
+	//			float cx, cy;
+	//			if (pointType == 0) // Anchor Point (On the circle)
+	//			{
+	//				//float angle = patchIndex * dTheta;
+	//				cx = dim1 * std::cos(angle);
+	//				cy = dim1 * std::sin(angle);
+	//			}
+	//			else if (pointType == 1) // Forward Tangent Handle (Pushed out)
+	//			{
+	//				//float angle = patchIndex * dTheta;
+	//				cx = dim1 * std::cos(angle) - L * std::sin(angle);
+	//				cy = dim1 * std::sin(angle) + L * std::cos(angle);
+	//			}
+	//			else // Backward Tangent Handle (Pushed out from the next anchor)
+	//			{
+	//				float nextAngle = (patchIndex + 1) * dTheta + startAngle;
+	//				cx = dim1 * std::cos(nextAngle) + L * std::sin(nextAngle);
+	//				cy = dim1 * std::sin(nextAngle) - L * std::cos(nextAngle);
+	//			}
 
-				//float angle = uParam * 2.0f * std::numbers::pi_v<float>;
-				//pos.x = std::cos(angle) * dim1; // Radius
-				//pos.y = (vParam - 0.5f) * dim2; // Height
-				//pos.z = std::sin(angle) * dim1; // Radius
-			}
+	//			pos.x = cx + m_cursorPosition.x;
+	//			pos.y = (cy + dim1) + m_cursorPosition.y;
+	//			pos.z = vParam * dim2 + m_cursorPosition.z;
+	//			//pos.z = zOffset + m_cursorPosition.z;
 
-			auto pt = std::make_shared<Point>(pos, true, true);
-			m_previewPoints.push_back(pt);
-			surface->m_controlPoints.push_back(pt);
-		}
-	}
+	//			//float angle = uParam * 2.0f * std::numbers::pi_v<float>;
+	//			//pos.x = std::cos(angle) * dim1; // Radius
+	//			//pos.y = (vParam - 0.5f) * dim2; // Height
+	//			//pos.z = std::sin(angle) * dim1; // Radius
+	//		}
 
-	surface->InitGeometry(m_device);
-	return surface;
+	//		auto pt = std::make_shared<Point>(pos, true, true);
+	//		m_previewPoints.push_back(pt);
+	//		surface->m_controlPoints.push_back(pt);
+	//	}
+	//}
+
+	//surface->InitGeometry(m_device);
 }
 
 void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
@@ -1459,25 +1468,27 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 	if (ImGui::Button("Create C0 Surface"))
 	{
 		m_showSurfacePopup = true;
-		m_previewSurface = GenerateSurface(static_cast<SurfaceShape>(m_previewShape), m_previewSegU, m_previewSegV, m_previewDim1, m_previewDim2);
+		//auto [surface, points] = GenerateSurface(static_cast<SurfaceShape>(m_previewShape), m_previewSegU, m_previewSegV, m_previewDim1, m_previewDim2);
+		//m_previewSurface = std::move(surface);
+		//m_previewPoints = std::move(points);
 	}
 
 	if (m_showSurfacePopup)
 	{
 		ImGui::Begin("Surface Parameters", &m_showSurfacePopup);
 
-		bool changed = false;
+		bool changed = (m_previewSurface == nullptr);
 		//changed |= ImGui::RadioButton("Flat", &m_previewShape, 0);
 		if (ImGui::RadioButton("Flat", &m_previewShape, 0))
 		{
-			m_previewDim1 = m_previewRadius * 2.0f * std::numbers::pi_v<float>;
+			m_previewWidth = m_previewRadius * 2.0f * std::numbers::pi_v<float>;
 			changed = true;
 		}
 		ImGui::SameLine();
 		//changed |= ImGui::RadioButton("Cylinder", &m_previewShape, 1);
 		if (ImGui::RadioButton("Cylinder", &m_previewShape, 1))
 		{
-			m_previewRadius = m_previewDim1 / (2.0f * std::numbers::pi_v<float>);
+			m_previewRadius = m_previewWidth / (2.0f * std::numbers::pi_v<float>);
 			changed = true;
 		}
 
@@ -1493,7 +1504,7 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 
 		if (m_previewShape == 0)
 		{
-			changed |= ImGui::DragFloat("Width", &m_previewDim1, 0.1f, 0.1f, 100.0f);
+			changed |= ImGui::DragFloat("Width", &m_previewWidth, 0.1f, 0.1f, 100.0f);
 			changed |= ImGui::DragFloat("Length", &m_previewDim2, 0.1f, 0.1f, 100.0f);
 		}
 		else
@@ -1504,15 +1515,17 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 
 		if (changed)
 		{
-			float currentDim1 = (m_previewShape == 0) ? m_previewDim1 : m_previewRadius;
-			m_previewSurface = GenerateSurface(static_cast<SurfaceShape>(m_previewShape), m_previewSegU, m_previewSegV, currentDim1, m_previewDim2);
+			//float currentDim1 = (m_previewShape == 0) ? m_previewWidth : m_previewRadius;
+			auto [surface, points] = GenerateSurface();// static_cast<SurfaceShape>(m_previewShape), m_previewSegU, m_previewSegV, currentDim1, m_previewDim2);
+			m_previewSurface = std::move(surface);
+			m_previewPoints = std::move(points);
 		}
 
 		if (ImGui::Button("Add to Scene"))
 		{
 			// 1. Rename and Add Surface
 			m_previewSurface->Commit();
-			m_sceneObjects.push_back(m_previewSurface);
+			m_sceneObjects.push_back(std::move(m_previewSurface));
 
 			// 2. Add all its points to the scene so they render and can be edited
 			for (auto& pt : m_previewPoints)

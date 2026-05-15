@@ -234,14 +234,14 @@ private:
 	bool m_showSurfacePopup = false;
 	int m_previewSegU = 1;
 	int m_previewSegV = 1;
-	float m_previewDim1 = 1.0f; // Width
+	float m_previewWidth = 1.0f; // Width
 	float m_previewDim2 = 1.0f; // Length or Height
-	float m_previewRadius = m_previewDim1 / (2.0f * std::numbers::pi_v<float>);
+	float m_previewRadius = m_previewWidth / (2.0f * std::numbers::pi_v<float>);
 	int m_previewShape = 0;     // 0 = Flat, 1 = Cylinder
-	std::shared_ptr<BezierSurface> m_previewSurface = nullptr;
+	std::unique_ptr<BezierSurface> m_previewSurface = nullptr;
 	std::vector<std::shared_ptr<Point>> m_previewPoints; 
 
-	std::shared_ptr<BezierSurface> GenerateSurface(SurfaceShape shape, int segU, int segV, float dim1, float dim2);
+	SurfaceGenerationResult GenerateSurface() const;
 #pragma endregion
 };
 

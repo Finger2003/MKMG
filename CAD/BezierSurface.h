@@ -4,6 +4,13 @@
 
 enum class SurfaceShape { Flat, Cylinder };
 
+struct BezierSurface;
+struct SurfaceGenerationResult
+{
+	std::unique_ptr<BezierSurface> surface;
+	std::vector<std::shared_ptr<Point>> points;
+};
+
 struct BezierSurface : public SceneObject
 {
 	DEFINE_TYPE(SceneObject, ObjectType::BezierSurface);
@@ -32,6 +39,8 @@ struct BezierSurface : public SceneObject
 	//void UpdatePatches(const DxDevice& device);
 	void InitGeometry(const DxDevice& device);
 	void UpdateVertices(const DxDevice& device);
+	static SurfaceGenerationResult CreateFlat(int segU, int segV, float width, float length, const float3& center, const DxDevice& device);
+	static SurfaceGenerationResult CreateCylinder(int segU, int segV, float radius, float height, const float3& center, const DxDevice& device);
 protected:
 	std::vector<unsigned int> GenerateLineIndices() const;
 	std::vector<unsigned int> GeneratePatchIndices() const;
@@ -40,3 +49,4 @@ protected:
 	unsigned int GetPointIndex(int u, int v) const;
 	//void UpdateDynamicBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data);
 };
+
