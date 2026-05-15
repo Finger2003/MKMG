@@ -361,5 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-/CAD/PixelShader.cso
-/CAD/VertexShader.cso
+
+
+*.cso
