@@ -1037,19 +1037,21 @@ void CadApplication::DrawSurfaces(const Microsoft::WRL::ComPtr<ID3D11DeviceConte
 
 void CadApplication::DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context, BezierSurface* surface, MathLib::Vec4f color)
 {
-	surface->UpdatePatches(m_device);
-	if (surface->m_patchVertexCount > 0)
+	//surface->UpdatePatches(m_device);
+	surface->UpdateVertices(m_device);
+	if (surface->m_patchIndexCount > 0)
 	{
 		UINT stride = sizeof(VertexPosition);
 		UINT offset = 0;
-		context->IASetVertexBuffers(0, 1, surface->m_patchBuffer.GetAddressOf(), &stride, &offset);
+		context->IASetVertexBuffers(0, 1, surface->m_vertexBuffer.GetAddressOf(), &stride, &offset);
+		context->IASetIndexBuffer(surface->m_patchIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 		PerObjectBuffer objData;
 		objData.color = color;
 
 		auto updateAndDraw = [&](BezierSurface* surf, float xParam) {
 			objData.surfaceParams.x = xParam;
 			m_device.UpdateBuffer(m_cbPerObject, objData);
-			context->Draw(surf->m_patchVertexCount, 0);
+			context->DrawIndexed(surf->m_patchIndexCount, 0, 0);
 			};
 
 		updateAndDraw(surface, 0.0f);
@@ -1062,6 +1064,30 @@ void CadApplication::DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContex
 		//objData.surfaceParams.x = 1.0f;
 		//m_device.UpdateBuffer(m_cbPerObject, objData);
 		//context->Draw(surface->m_patchVertexCount, 0);
+	}
+}
+
+void CadApplication::DrawSurfacesPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+{
+	PerObjectBuffer objData;
+	objData.model = Mat4f::Identity();
+	objData.color = Vec4f(0.7f, 0.7f, 0.7f, 1.0f);
+	m_device.UpdateBuffer(m_cbPerObject, objData);
+
+	for (auto& obj : m_sceneObjects)
+	{
+		if (auto surface = obj->As<BezierSurface>())
+		{
+			surface->UpdateVertices(m_device);
+			if (surface->selected && surface->m_polylineIndexCount > 0)
+			{
+				UINT stride = sizeof(VertexPosition);
+				UINT offset = 0;
+				context->IASetVertexBuffers(0, 1, surface->m_vertexBuffer.GetAddressOf(), &stride, &offset);
+				context->IASetIndexBuffer(surface->m_polylineIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+				context->DrawIndexed(surface->m_polylineIndexCount, 0, 0);
+			}
+		}
 	}
 }
 
@@ -1123,6 +1149,8 @@ void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
 	DrawPolylines(context);
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+	DrawSurfacesPolylines(context);
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST_ADJ);
 	context->VSSetShader(m_bezierVertexShader.Get(), nullptr, 0);
@@ -1165,7 +1193,7 @@ std::shared_ptr<BezierSurface> CadApplication::GenerateSurface(SurfaceShape shap
 		for (int u = 0; u < pointsU; u++)
 		{
 			float uParam = static_cast<float>(u) / (shape == SurfaceShape::Cylinder ? pointsU : (pointsU - 1));
-			float3 pos;
+			float3 pos{};
 
 			if (shape == SurfaceShape::Flat)
 			{
@@ -1187,19 +1215,19 @@ std::shared_ptr<BezierSurface> CadApplication::GenerateSurface(SurfaceShape shap
 				float cx, cy;
 				if (pointType == 0) // Anchor Point (On the circle)
 				{
-					float angle = patchIndex * dTheta;
+					//float angle = patchIndex * dTheta;
 					cx = dim1 * std::cos(angle);
 					cy = dim1 * std::sin(angle);
 				}
 				else if (pointType == 1) // Forward Tangent Handle (Pushed out)
 				{
-					float angle = patchIndex * dTheta;
+					//float angle = patchIndex * dTheta;
 					cx = dim1 * std::cos(angle) - L * std::sin(angle);
 					cy = dim1 * std::sin(angle) + L * std::cos(angle);
 				}
 				else // Backward Tangent Handle (Pushed out from the next anchor)
 				{
-					float nextAngle = (patchIndex + 1) * dTheta;
+					float nextAngle = (patchIndex + 1) * dTheta + startAngle;
 					cx = dim1 * std::cos(nextAngle) + L * std::sin(nextAngle);
 					cy = dim1 * std::sin(nextAngle) - L * std::cos(nextAngle);
 				}
@@ -1220,6 +1248,8 @@ std::shared_ptr<BezierSurface> CadApplication::GenerateSurface(SurfaceShape shap
 			surface->m_controlPoints.push_back(pt);
 		}
 	}
+
+	surface->InitGeometry(m_device);
 	return surface;
 }
 

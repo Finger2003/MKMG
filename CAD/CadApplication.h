@@ -214,6 +214,7 @@ private:
 	void DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawSurfaces(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context, BezierSurface* surface, MathLib::Vec4f color);
+	void DrawSurfacesPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 #pragma endregion
 
 #pragma region stereoscopy
