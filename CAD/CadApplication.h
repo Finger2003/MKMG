@@ -237,8 +237,9 @@ private:
 	float m_previewWidth = 1.0f; // Width
 	float m_previewDim2 = 1.0f; // Length or Height
 	float m_previewRadius = m_previewWidth / (2.0f * std::numbers::pi_v<float>);
+	int m_previewType = 0; // 0 = C0, 1 = C2
 	int m_previewShape = 0;     // 0 = Flat, 1 = Cylinder
-	std::unique_ptr<BezierSurface> m_previewSurface = nullptr;
+	std::unique_ptr<SceneObject> m_previewSurface = nullptr;
 	std::vector<std::shared_ptr<Point>> m_previewPoints; 
 
 	SurfaceGenerationResult GenerateSurface() const;

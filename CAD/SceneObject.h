@@ -9,7 +9,8 @@
     X(BezierCurve)           \
     X(BSplineCurve)          \
     X(InterpolatingCurve)	 \
-	X(BezierSurface)
+	X(BezierSurface)		 \
+	X(BSplineSurface)
 
 
 enum class ObjectType
@@ -37,9 +38,9 @@ struct SceneObject
 	{
 		return IsA(T::ClassType) ? static_cast<T*>(this) : nullptr;
 	}
-protected:
-	virtual ~SceneObject() = default;
 	SceneObject(std::string&& name, ObjectType type) : name(std::move(name)), type(type) {}
+	virtual ~SceneObject() = default;
+protected:
 };
 
 struct TransformableObject : public SceneObject
