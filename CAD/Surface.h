@@ -36,6 +36,7 @@ struct Surface : public SceneObject
 
 	virtual void InitGeometry(const DxDevice& device) = 0;
 	virtual void UpdateVertices(const DxDevice& device) = 0;
+	void MarkDirty() override { m_isDirty = true; }
 protected:
 	std::vector<unsigned int> GenerateLineIndices() const;
 	std::vector<unsigned int> GeneratePatchIndices() const;

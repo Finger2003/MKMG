@@ -125,7 +125,7 @@ void BSplineSurface::UpdateVertices(const DxDevice& device)
 	}
 	device.UpdateBuffer(m_patchVertexBuffer, bernsteinPositions.data(), bernsteinCount * sizeof(VertexPosition));
 
-	//m_isDirty = false;
+	m_isDirty = false;
 }
 
 SurfaceGenerationResult BSplineSurface::CreateFlat(int segU, int segV, float width, float length, const float3& center, const DxDevice& device)

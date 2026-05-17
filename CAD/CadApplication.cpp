@@ -776,6 +776,8 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 
 				if (auto torus = obj->As<Torus>())
 					torus->UpdateModelMatrix();
+				if (auto pt = obj->As<Point>())
+					pt->NotifyDependents();
 			};
 
 
@@ -1039,13 +1041,11 @@ void CadApplication::DrawSurfacesPolylines(const Microsoft::WRL::ComPtr<ID3D11De
 			surface->UpdateVertices(m_device);
 			if (surface->selected && surface->m_polylineIndexCount > 0)
 			{
-
 				UINT stride = sizeof(VertexPosition);
 				UINT offset = 0;
 				context->IASetVertexBuffers(0, 1, surface->m_polylineIndexBuffer.GetAddressOf(), &stride, &offset);
 				context->IASetIndexBuffer(surface->m_polylineIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 				context->DrawIndexed(surface->m_polylineIndexCount, 0, 0);
-
 			}
 		}		
 	}
@@ -1385,15 +1385,18 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 		ImGui::SameLine();
 		changed |= ImGui::RadioButton("Cylinder", &m_previewShape, 1);
 
+		constexpr int MAX_SEGMENTS = 50;
 		int minSegU = (m_previewShape == 1) ? 3 : 1;
-		if (m_previewSegU < minSegU)
-		{
-			m_previewSegU = minSegU;
-			changed = true;
-		}
+
+		int oldU = m_previewSegU;
+		int oldV = m_previewSegV;
 
 		changed |= ImGui::SliderInt("Segments U", &m_previewSegU, minSegU, 10);
 		changed |= ImGui::SliderInt("Segments V", &m_previewSegV, 1, 10);
+
+		m_previewSegU = std::clamp(m_previewSegU, minSegU, MAX_SEGMENTS);
+		m_previewSegV = std::clamp(m_previewSegV, 1, MAX_SEGMENTS);
+		changed |= (m_previewSegU != oldU || m_previewSegV != oldV);
 
 		if (m_previewShape == 0)
 		{
@@ -1417,16 +1420,18 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 		{
 			// 1. Rename and Add Surface
 			m_previewSurface->Commit();
-			m_sceneObjects.push_back(std::move(m_previewSurface));
+			std::shared_ptr<Surface> sharedSurface = std::move(m_previewSurface);
 
 			// 2. Add all its points to the scene so they render and can be edited
 			for (auto& pt : m_previewPoints)
 			{
 				pt->Commit();
+				pt->AddDependent(sharedSurface);
 				m_sceneObjects.push_back(pt);
 			}
 			m_previewPoints.clear();
 
+			m_sceneObjects.push_back(sharedSurface);
 			m_previewSurface = nullptr;
 			m_showSurfacePopup = false;
 		}

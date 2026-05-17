@@ -33,6 +33,23 @@ void Point::Commit()
 	name = "Point" + to_string(s_nextId++);
 }
 
+void Point::AddDependent(std::weak_ptr<SceneObject> obj)
+{
+	m_dependents.push_back(std::move(obj));
+}
+
+void Point::NotifyDependents()
+{
+	std::erase_if(m_dependents, [](const std::weak_ptr<SceneObject>& weakDep) {
+		if (auto dep = weakDep.lock())
+		{
+			dep->MarkDirty();
+			return false;
+		}
+		return true;
+		});
+}
+
 MathLib::Mat4f Point::GetModelMatrix() const
 {
 	return MathLib::Mat4f::Translation(m_position.x, m_position.y, m_position.z);

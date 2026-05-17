@@ -59,7 +59,7 @@ void BezierSurface::UpdateVertices(const DxDevice & device)
 
 	device.UpdateBuffer(m_polylineVertexBuffer, positions.data(), static_cast<UINT>(positions.size()) * sizeof(VertexPosition));
 
-	//m_isDirty = false;
+	m_isDirty = false;
 }
 
 SurfaceGenerationResult BezierSurface::CreateFlat(int segU, int segV, float width, float length, const float3& center, const DxDevice& device)

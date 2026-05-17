@@ -39,6 +39,8 @@ struct SceneObject
 	{
 		return IsA(T::ClassType) ? static_cast<T*>(this) : nullptr;
 	}
+
+	virtual void MarkDirty() {};
 	SceneObject(std::string&& name, ObjectType type) : name(std::move(name)), type(type) {}
 	virtual ~SceneObject() = default;
 protected:
