@@ -10,9 +10,7 @@ struct BezierSurface;
 struct BezierSurface : public Surface
 {
 	DEFINE_TYPE(Surface, ObjectType::BezierSurface);
-	static unsigned int s_nextId;
-
-	
+	static unsigned int s_nextId;	
 
 	BezierSurface(int uSeg, int vSeg, SurfaceShape shape, bool isPreview = false);
 	void Commit() override;
@@ -22,12 +20,7 @@ struct BezierSurface : public Surface
 	static SurfaceGenerationResult CreateFlat(int segU, int segV, float width, float length, const float3& center, const DxDevice& device);
 	static SurfaceGenerationResult CreateCylinder(int segU, int segV, float radius, float height, const float3& center, const DxDevice& device);
 protected:
-	//std::vector<unsigned int> GenerateLineIndices() const;
-	//std::vector<unsigned int> GeneratePatchIndices() const;
-	//unsigned int GetPhysicalPointsU() const;
-	//unsigned int GetPhysicalPointsV() const;
 	unsigned int GetGridPointsU() const override;
 	unsigned int GetGridPointsV() const override;
 	unsigned int GetPatchDataIndex(int u, int v) const override;
-	//unsigned int GetControlPointIndex(int u, int v) const override;
 };

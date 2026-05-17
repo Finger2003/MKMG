@@ -138,56 +138,6 @@ SurfaceGenerationResult BezierSurface::CreateCylinder(int segU, int segV, float 
 	return { std::move(surface), std::move(generatedPoints) };
 }
 
-//std::vector<unsigned int> BezierSurface::GenerateLineIndices() const
-//{
-//	std::vector<unsigned int> indices;
-//
-//	int pointsU = GetPhysicalPointsU();
-//	int pointsV = GetPhysicalPointsV();
-//	int logicalPointsU = (shapeType == SurfaceShape::Cylinder) ? pointsU + 1 : pointsU;
-//
-//	// 1. Horizontal lines (U direction)
-//	for (int v = 0; v < pointsV; v++)
-//	{
-//		for (int u = 0; u < logicalPointsU - 1; u++)
-//		{
-//			indices.push_back(GetControlPointIndex(u, v));
-//			indices.push_back(GetControlPointIndex(u + 1, v));
-//		}
-//	}
-//
-//	// 2. Vertical lines (V direction)
-//	// Loop to 'pointsU' here (physical points) to draw seam only once for cylinders
-//	for (int u = 0; u < pointsU; u++)
-//	{
-//		for (int v = 0; v < pointsV - 1; ++v)
-//		{
-//			indices.push_back(GetControlPointIndex(u, v));
-//			indices.push_back(GetControlPointIndex(u, v + 1));
-//		}
-//	}
-//
-//	return indices;
-//}
-//
-//std::vector<unsigned int> BezierSurface::GeneratePatchIndices() const
-//{
-//	std::vector<unsigned int> indices;
-//	indices.reserve(static_cast<size_t>(segmentsU) * segmentsV * 16);
-//
-//	// Iterate over every patch
-//	for (int patchV = 0; patchV < segmentsV; patchV++)
-//		for (int patchU = 0; patchU < segmentsU; patchU++)
-//		{
-//			// Each patch grabs a 4x4 block of control points
-//			for (int v = 0; v < 4; v++)
-//				for (int u = 0; u < 4; u++)
-//					indices.push_back(GetControlPointIndex(patchU * 3 + u, patchV * 3 + v));
-//		}
-//
-//	return indices;
-//}
-
 unsigned int BezierSurface::GetGridPointsU() const
 {
 	return (shapeType == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
@@ -202,10 +152,3 @@ unsigned int BezierSurface::GetPatchDataIndex(int u, int v) const
 {
 	return GetControlPointIndex(u, v);
 }
-
-//unsigned int BezierSurface::GetControlPointIndex(int u, int v) const
-//{
-//	unsigned int pointsU = GetGridPointsU();
-//	int wrappedU = (shapeType == SurfaceShape::Cylinder) ? (u % pointsU) : u;
-//	return static_cast<unsigned int>(v * pointsU + wrappedU);
-//}
