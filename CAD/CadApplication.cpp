@@ -399,12 +399,31 @@ void CadApplication::DrawCursor(float3 position, float scale)
 
 void CadApplication::DeleteSelectedObjects()
 {
+	for (auto& obj : m_sceneObjects)
+	{
+		if (!obj->selected)
+			continue;
+
+		if (auto surface = obj->As<Surface>())
+		{
+			for (const auto& cpWeak : surface->m_controlPoints)
+			{
+				if (auto cp = cpWeak.lock())
+					cp->isLockedToSurface = false;
+			}
+		}		
+	}
+
 	erase_if(m_sceneObjects, [](const auto& obj) {
 		if (!obj->selected)
 			return false;
+
 		if (auto pt = obj->As<Point>())
+		{
 			if (pt->isLockedToSurface)
 				return false;
+		}
+
 		return true;
 		});
 	m_lastClickedIndex = std::nullopt;
@@ -425,7 +444,6 @@ std::optional<float3> CadApplication::GetSelectionCenter() const
 
 		if (const auto transObj = obj->As<TransformableObject>())
 			sum += transObj->m_position.ToVec4f(1.0f);
-		//Vec4f(obj->m_position.x, obj->m_position.y, obj->m_position.z, 1.0f);
 	}
 
 	m_selectionCenterCache = sum.w < 1.0f ? std::nullopt : std::optional<float3>(float3::FromVec4f(sum / sum.w));
