@@ -9,6 +9,7 @@
 #include "BSplineCurve.h"
 #include "InterpolatingCurve.h"
 #include "BezierSurface.h"
+#include "BSplineSurface.h"
 #include "Cursor3D.h"
 #include "Camera.h"
 
@@ -174,8 +175,8 @@ private:
 	void DrawMenu();
 	void DrawListMenu(int selectedCount, int selectedPoints, Curve* activeCurve);
 	void DrawCurveList(Curve* curve, int selectedCount);
-	void DrawSurfaceList(BezierSurface* surface, int selectedCount);
-	void HandleSurfaceListSelection(BezierSurface* surface, size_t index, bool ctrlHeld, bool shiftHeld);
+	void DrawSurfaceList(Surface* surface, int selectedCount);
+	void HandleSurfaceListSelection(Surface* surface, size_t index, bool ctrlHeld, bool shiftHeld);
 	void DrawEditMenu();
 	void DrawTorusMenu(Torus& torus);
 	void DrawPointMenu(Point& selectedObj);
@@ -213,7 +214,7 @@ private:
 	void DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawSurfaces(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context, BezierSurface* surface, MathLib::Vec4f color);
+	void DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context, Surface* surface, MathLib::Vec4f color);
 	void DrawSurfacesPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 #pragma endregion
 
@@ -239,7 +240,7 @@ private:
 	float m_previewRadius = m_previewWidth / (2.0f * std::numbers::pi_v<float>);
 	int m_previewType = 0; // 0 = C0, 1 = C2
 	int m_previewShape = 0;     // 0 = Flat, 1 = Cylinder
-	std::unique_ptr<SceneObject> m_previewSurface = nullptr;
+	std::unique_ptr<Surface> m_previewSurface = nullptr;
 	std::vector<std::shared_ptr<Point>> m_previewPoints; 
 
 	SurfaceGenerationResult GenerateSurface() const;

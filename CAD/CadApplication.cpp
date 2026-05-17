@@ -239,7 +239,7 @@ void CadApplication::HandleObjectSelection(size_t index, bool ctrlHeld, bool shi
 					cp->selected = state;
 			}
 		}
-		else if (auto surface = m_sceneObjects[i]->As<BezierSurface>())
+		else if (auto surface = m_sceneObjects[i]->As<Surface>())
 		{
 			for (const auto& cpWeak : surface->m_controlPoints)
 			{
@@ -247,14 +247,22 @@ void CadApplication::HandleObjectSelection(size_t index, bool ctrlHeld, bool shi
 					cp->selected = state;
 			}
 		}
-		else if (auto surface = m_sceneObjects[i]->As<BSplineSurface>())
-		{
-			for (const auto& cpWeak : surface->m_controlPoints)
-			{
-				if (auto cp = cpWeak.lock())
-					cp->selected = state;
-			}
-		}
+		//else if (auto surface = m_sceneObjects[i]->As<BezierSurface>())
+		//{
+		//	for (const auto& cpWeak : surface->m_controlPoints)
+		//	{
+		//		if (auto cp = cpWeak.lock())
+		//			cp->selected = state;
+		//	}
+		//}
+		//else if (auto surface = m_sceneObjects[i]->As<BSplineSurface>())
+		//{
+		//	for (const auto& cpWeak : surface->m_controlPoints)
+		//	{
+		//		if (auto cp = cpWeak.lock())
+		//			cp->selected = state;
+		//	}
+		//}
 		};
 
 	if (ctrlHeld && shiftHeld)
@@ -1002,92 +1010,97 @@ void CadApplication::DrawSurfaces(const Microsoft::WRL::ComPtr<ID3D11DeviceConte
 
 	if (m_showSurfacePopup && m_previewSurface)
 	{
-		if (auto bez = m_previewSurface->As<BezierSurface>())
-		DrawSurface(context, bez, Vec4f(0.0f, 0.5f, 1.0f, 1.0f));
-		//m_previewSurface->UpdatePatches(m_device);
-		//if (m_previewSurface->m_patchVertexCount > 0)
+		if (auto surface = m_previewSurface->As<Surface>())
+			DrawSurface(context, surface, Vec4f(0.0f, 0.5f, 1.0f, 1.0f));
+		//if (auto bez = m_previewSurface->As<BezierSurface>())
+		//DrawSurface(context, bez, Vec4f(0.0f, 0.5f, 1.0f, 1.0f));
+		////m_previewSurface->UpdatePatches(m_device);
+		////if (m_previewSurface->m_patchVertexCount > 0)
+		////{
+		////	UINT stride = sizeof(VertexPosition);
+		////	UINT offset = 0;
+		////	context->IASetVertexBuffers(0, 1, m_previewSurface->m_patchBuffer.GetAddressOf(), &stride, &offset);
+
+		////	PerObjectBuffer objData;
+		////	objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
+		////	objData.surfaceParams.x = 0.0f;
+		////	m_device.UpdateBuffer(m_cbPerObject, objData);
+		////	context->Draw(m_previewSurface->m_patchVertexCount, 0);
+
+		////	objData.surfaceParams.x = 1.0f;
+		////	m_device.UpdateBuffer(m_cbPerObject, objData);
+		////	context->Draw(m_previewSurface->m_patchVertexCount, 0);
+		////}
+		//else if (auto bspline = m_previewSurface->As<BSplineSurface>())
 		//{
-		//	UINT stride = sizeof(VertexPosition);
-		//	UINT offset = 0;
-		//	context->IASetVertexBuffers(0, 1, m_previewSurface->m_patchBuffer.GetAddressOf(), &stride, &offset);
-
-		//	PerObjectBuffer objData;
-		//	objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
-		//	objData.surfaceParams.x = 0.0f;
-		//	m_device.UpdateBuffer(m_cbPerObject, objData);
-		//	context->Draw(m_previewSurface->m_patchVertexCount, 0);
-
-		//	objData.surfaceParams.x = 1.0f;
-		//	m_device.UpdateBuffer(m_cbPerObject, objData);
-		//	context->Draw(m_previewSurface->m_patchVertexCount, 0);
+		//	bspline->UpdateVertices(m_device);
+		//	if (bspline->m_patchIndexCount > 0)
+		//	{
+		//		UINT stride = sizeof(VertexPosition);
+		//		UINT offset = 0;
+		//		context->IASetVertexBuffers(0, 1, bspline->m_bernsteinVertexBuffer.GetAddressOf(), &stride, &offset);
+		//		context->IASetIndexBuffer(bspline->m_patchIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+		//		PerObjectBuffer objData;
+		//		objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
+		//		auto updateAndDraw = [&](BSplineSurface* surf, float xParam) {
+		//			objData.surfaceParams.x = xParam;
+		//			m_device.UpdateBuffer(m_cbPerObject, objData);
+		//			context->DrawIndexed(surf->m_patchIndexCount, 0, 0);
+		//			};
+		//		updateAndDraw(bspline, 0.0f);
+		//		updateAndDraw(bspline, 1.0f);
+		//	}
 		//}
-		else if (auto bspline = m_previewSurface->As<BSplineSurface>())
-		{
-			bspline->UpdateVertices(m_device);
-			if (bspline->m_patchIndexCount > 0)
-			{
-				UINT stride = sizeof(VertexPosition);
-				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, bspline->m_bernsteinVertexBuffer.GetAddressOf(), &stride, &offset);
-				context->IASetIndexBuffer(bspline->m_patchIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-				PerObjectBuffer objData;
-				objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
-				auto updateAndDraw = [&](BSplineSurface* surf, float xParam) {
-					objData.surfaceParams.x = xParam;
-					m_device.UpdateBuffer(m_cbPerObject, objData);
-					context->DrawIndexed(surf->m_patchIndexCount, 0, 0);
-					};
-				updateAndDraw(bspline, 0.0f);
-				updateAndDraw(bspline, 1.0f);
-			}
-		}
 	}
 
 	for (auto& obj : m_sceneObjects)
 	{
-		if (auto surface = obj->As<BezierSurface>())
-		{
+		if (auto surface = obj->As<Surface>())
 			DrawSurface(context, surface, surface->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f));
-			//surface->UpdatePatches(m_device);
-			//if (surface->m_patchVertexCount > 0)
-			//{
-			//	UINT stride = sizeof(VertexPosition);
-			//	UINT offset = 0;
-			//	context->IASetVertexBuffers(0, 1, surface->m_patchBuffer.GetAddressOf(), &stride, &offset);
-			//	PerObjectBuffer objData;
-			//	objData.color = surface->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-			//	objData.surfaceParams.x = 0.0f;
-			//	m_device.UpdateBuffer(m_cbPerObject, objData);
-			//	context->Draw(surface->m_patchVertexCount, 0);
-			//	objData.surfaceParams.x = 1.0f;
-			//	m_device.UpdateBuffer(m_cbPerObject, objData);
-			//	context->Draw(surface->m_patchVertexCount, 0);
-			//}
-		}
-		else if (auto surface = obj->As<BSplineSurface>())
-		{
-			surface->UpdateVertices(m_device);
-			if (surface->m_patchIndexCount > 0)
-			{
-				UINT stride = sizeof(VertexPosition);
-				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, surface->m_bernsteinVertexBuffer.GetAddressOf(), &stride, &offset);
-				context->IASetIndexBuffer(surface->m_patchIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-				PerObjectBuffer objData;
-				objData.color = surface->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-				auto updateAndDraw = [&](BSplineSurface* surf, float xParam) {
-				objData.surfaceParams.x = xParam;
-				m_device.UpdateBuffer(m_cbPerObject, objData);
-				context->DrawIndexed(surf->m_patchIndexCount, 0, 0);
-			};
-				updateAndDraw(surface, 0.0f);
-				updateAndDraw(surface, 1.0f);
-			}
-		}
+
+		//if (auto surface = obj->As<BezierSurface>())
+		//{
+		//	DrawSurface(context, surface, surface->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f));
+		//	//surface->UpdatePatches(m_device);
+		//	//if (surface->m_patchVertexCount > 0)
+		//	//{
+		//	//	UINT stride = sizeof(VertexPosition);
+		//	//	UINT offset = 0;
+		//	//	context->IASetVertexBuffers(0, 1, surface->m_patchBuffer.GetAddressOf(), &stride, &offset);
+		//	//	PerObjectBuffer objData;
+		//	//	objData.color = surface->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+		//	//	objData.surfaceParams.x = 0.0f;
+		//	//	m_device.UpdateBuffer(m_cbPerObject, objData);
+		//	//	context->Draw(surface->m_patchVertexCount, 0);
+		//	//	objData.surfaceParams.x = 1.0f;
+		//	//	m_device.UpdateBuffer(m_cbPerObject, objData);
+		//	//	context->Draw(surface->m_patchVertexCount, 0);
+		//	//}
+		//}
+		//else if (auto surface = obj->As<BSplineSurface>())
+		//{
+		//	surface->UpdateVertices(m_device);
+		//	if (surface->m_patchIndexCount > 0)
+		//	{
+		//		UINT stride = sizeof(VertexPosition);
+		//		UINT offset = 0;
+		//		context->IASetVertexBuffers(0, 1, surface->m_bernsteinVertexBuffer.GetAddressOf(), &stride, &offset);
+		//		context->IASetIndexBuffer(surface->m_patchIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+		//		PerObjectBuffer objData;
+		//		objData.color = surface->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+		//		auto updateAndDraw = [&](BSplineSurface* surf, float xParam) {
+		//		objData.surfaceParams.x = xParam;
+		//		m_device.UpdateBuffer(m_cbPerObject, objData);
+		//		context->DrawIndexed(surf->m_patchIndexCount, 0, 0);
+		//	};
+		//		updateAndDraw(surface, 0.0f);
+		//		updateAndDraw(surface, 1.0f);
+		//	}
+		//}
 	}
 }
 
-void CadApplication::DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context, BezierSurface* surface, MathLib::Vec4f color)
+void CadApplication::DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context, Surface* surface, MathLib::Vec4f color)
 {
 	//surface->UpdatePatches(m_device);
 	surface->UpdateVertices(m_device);
@@ -1095,12 +1108,12 @@ void CadApplication::DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContex
 	{
 		UINT stride = sizeof(VertexPosition);
 		UINT offset = 0;
-		context->IASetVertexBuffers(0, 1, surface->m_vertexBuffer.GetAddressOf(), &stride, &offset);
+		context->IASetVertexBuffers(0, 1, surface->m_patchVertexBuffer.GetAddressOf(), &stride, &offset);
 		context->IASetIndexBuffer(surface->m_patchIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 		PerObjectBuffer objData;
 		objData.color = color;
 
-		auto updateAndDraw = [&](BezierSurface* surf, float xParam) {
+		auto updateAndDraw = [&](Surface* surf, float xParam) {
 			objData.surfaceParams.x = xParam;
 			m_device.UpdateBuffer(m_cbPerObject, objData);
 			context->DrawIndexed(surf->m_patchIndexCount, 0, 0);
@@ -1128,30 +1141,44 @@ void CadApplication::DrawSurfacesPolylines(const Microsoft::WRL::ComPtr<ID3D11De
 
 	for (auto& obj : m_sceneObjects)
 	{
-		if (auto surface = obj->As<BezierSurface>())
+		if (auto surface = obj->As<Surface>())
 		{
 			surface->UpdateVertices(m_device);
 			if (surface->selected && surface->m_polylineIndexCount > 0)
 			{
+
 				UINT stride = sizeof(VertexPosition);
 				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, surface->m_vertexBuffer.GetAddressOf(), &stride, &offset);
+				context->IASetVertexBuffers(0, 1, surface->m_polylineIndexBuffer.GetAddressOf(), &stride, &offset);
 				context->IASetIndexBuffer(surface->m_polylineIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 				context->DrawIndexed(surface->m_polylineIndexCount, 0, 0);
+
 			}
 		}
-		else if (auto surface = obj->As<BSplineSurface>())
-		{
-			surface->UpdateVertices(m_device);
-			if (surface->selected && surface->m_polylineIndexCount > 0)
-			{
-				UINT stride = sizeof(VertexPosition);
-				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, surface->m_deBoorVertexBuffer.GetAddressOf(), &stride, &offset);
-				context->IASetIndexBuffer(surface->m_polylineIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-				context->DrawIndexed(surface->m_polylineIndexCount, 0, 0);
-			}
-		}
+		//if (auto surface = obj->As<BezierSurface>())
+		//{
+		//	surface->UpdateVertices(m_device);
+		//	if (surface->selected && surface->m_polylineIndexCount > 0)
+		//	{
+		//		UINT stride = sizeof(VertexPosition);
+		//		UINT offset = 0;
+		//		context->IASetVertexBuffers(0, 1, surface->m_vertexBuffer.GetAddressOf(), &stride, &offset);
+		//		context->IASetIndexBuffer(surface->m_polylineIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+		//		context->DrawIndexed(surface->m_polylineIndexCount, 0, 0);
+		//	}
+		//}
+		//else if (auto surface = obj->As<BSplineSurface>())
+		//{
+		//	surface->UpdateVertices(m_device);
+		//	if (surface->selected && surface->m_polylineIndexCount > 0)
+		//	{
+		//		UINT stride = sizeof(VertexPosition);
+		//		UINT offset = 0;
+		//		context->IASetVertexBuffers(0, 1, surface->m_deBoorVertexBuffer.GetAddressOf(), &stride, &offset);
+		//		context->IASetIndexBuffer(surface->m_polylineIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+		//		context->DrawIndexed(surface->m_polylineIndexCount, 0, 0);
+		//	}
+		//}
 	}
 }
 
@@ -1320,7 +1347,7 @@ void CadApplication::DrawMenu()
 	int selectedCurves = 0;
 	int selectedSurfaces = 0;
 	std::weak_ptr<Curve> selectedCurve;
-	std::weak_ptr<BezierSurface> selectedSurface;
+	std::weak_ptr<Surface> selectedSurface;
 
 	for (const auto& obj : m_sceneObjects)
 	{
@@ -1336,10 +1363,10 @@ void CadApplication::DrawMenu()
 				selectedCurve = sharedCurve;
 				sharedCurve->CleanExpiredPoints();
 			}
-			else if (obj->IsA(ObjectType::BezierSurface))
+			else if (obj->IsA(ObjectType::Surface))
 			{
 				selectedSurfaces++;
-				selectedSurface = std::static_pointer_cast<BezierSurface>(obj);
+				selectedSurface = std::static_pointer_cast<Surface>(obj);
 			}
 		}
 	}
@@ -1520,11 +1547,11 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 		if (ImGui::Button("Add to Scene"))
 		{
 			// 1. Rename and Add Surface
-			if (auto bez = m_previewSurface->As<BezierSurface>())
-				bez->Commit();
-			else if (auto bspline = m_previewSurface->As<BSplineSurface>())
-				bspline->Commit();
-			//m_previewSurface->Commit();
+			//if (auto bez = m_previewSurface->As<BezierSurface>())
+			//	bez->Commit();
+			//else if (auto bspline = m_previewSurface->As<BSplineSurface>())
+			//	bspline->Commit();
+			m_previewSurface->Commit();
 			m_sceneObjects.push_back(std::move(m_previewSurface));
 
 			// 2. Add all its points to the scene so they render and can be edited
@@ -1743,7 +1770,7 @@ void CadApplication::DrawCurveList(Curve* curve, int selectedCount)
 	ImGui::PopStyleColor(2);
 }
 
-void CadApplication::DrawSurfaceList(BezierSurface* surface, int selectedCount)
+void CadApplication::DrawSurfaceList(Surface* surface, int selectedCount)
 {
 	ImGui::TextDisabled("Selected Surface Control Points:");
 	ImGui::Text("%s", surface->name.c_str());
@@ -1837,7 +1864,7 @@ void CadApplication::DrawSurfaceList(BezierSurface* surface, int selectedCount)
 	ImGui::PopStyleColor(2);
 }
 
-void CadApplication::HandleSurfaceListSelection(BezierSurface* surface, size_t index, bool ctrlHeld, bool shiftHeld)
+void CadApplication::HandleSurfaceListSelection(Surface* surface, size_t index, bool ctrlHeld, bool shiftHeld)
 {
 	auto setSelection = [&](size_t i, bool state) {
 		if (auto cp = surface->m_controlPoints[i].lock())

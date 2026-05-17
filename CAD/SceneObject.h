@@ -9,6 +9,7 @@
     X(BezierCurve)           \
     X(BSplineCurve)          \
     X(InterpolatingCurve)	 \
+	X(Surface)				 \
 	X(BezierSurface)		 \
 	X(BSplineSurface)
 

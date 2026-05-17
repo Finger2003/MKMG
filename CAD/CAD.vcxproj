@@ -154,6 +154,7 @@
     <ClCompile Include="BezierCurve.cpp" />
     <ClCompile Include="BezierSurface.cpp" />
     <ClCompile Include="BSplineCurve.cpp" />
+    <ClCompile Include="BSplineSurface.cpp" />
     <ClCompile Include="CadApplication.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Cursor3D.cpp" />
@@ -172,6 +173,7 @@
     </ClCompile>
     <ClCompile Include="Point.cpp" />
     <ClCompile Include="SceneObject.cpp" />
+    <ClCompile Include="Surface.cpp" />
     <ClCompile Include="Torus.cpp" />
     <ClCompile Include="Window.cpp" />
     <ClCompile Include="WindowApplication.cpp" />
@@ -180,6 +182,7 @@
     <ClInclude Include="BezierCurve.h" />
     <ClInclude Include="BezierSurface.h" />
     <ClInclude Include="BSplineCurve.h" />
+    <ClInclude Include="BSplineSurface.h" />
     <ClInclude Include="CadApplication.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Cursor3D.h" />
@@ -194,6 +197,7 @@
     <ClInclude Include="Point.h" />
     <ClInclude Include="SceneObject.h" />
     <ClInclude Include="structs.h" />
+    <ClInclude Include="Surface.h" />
     <ClInclude Include="Torus.h" />
     <ClInclude Include="Window.h" />
     <ClInclude Include="WindowApplication.h" />

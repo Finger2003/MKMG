@@ -99,6 +99,12 @@
     <ClCompile Include="BezierSurface.cpp">
       <Filter>Pliki źródłowe\geometry</Filter>
     </ClCompile>
+    <ClCompile Include="Surface.cpp">
+      <Filter>Pliki źródłowe\geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="BSplineSurface.cpp">
+      <Filter>Pliki źródłowe\geometry</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -159,6 +165,12 @@
       <Filter>Pliki nagłówkowe\utils</Filter>
     </ClInclude>
     <ClInclude Include="BezierSurface.h">
+      <Filter>Pliki nagłówkowe\geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="Surface.h">
+      <Filter>Pliki nagłówkowe\geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="BSplineSurface.h">
       <Filter>Pliki nagłówkowe\geometry</Filter>
     </ClInclude>
   </ItemGroup>
