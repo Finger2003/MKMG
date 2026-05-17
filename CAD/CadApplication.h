@@ -133,6 +133,7 @@ private:
 	static constexpr int cMinHeight = 500;
 #pragma endregion
 	char m_renameBuffer[128] = {};
+	char m_filterBuffer[128] = {};
 	Camera m_camera;
 
 	MathLib::Vec3f m_startArcballVector{};
@@ -246,5 +247,7 @@ private:
 
 	SurfaceGenerationResult GenerateSurface() const;
 #pragma endregion
+
+	static bool ContainsCaseInsensitive(const std::string& str, const std::string& substr);
 };
 

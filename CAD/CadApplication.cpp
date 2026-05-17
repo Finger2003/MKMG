@@ -1159,6 +1159,17 @@ SurfaceGenerationResult CadApplication::GenerateSurface() const
 	}	
 }
 
+bool CadApplication::ContainsCaseInsensitive(const std::string& str, const std::string& substr)
+{
+	auto it = std::search(
+		str.begin(), str.end(),
+		substr.begin(), substr.end(),
+		[](char ch1, char ch2) { return std::tolower(ch1) == std::tolower(ch2); }
+	);
+	return (it != str.end());
+		
+}
+
 void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
 {
 	for (auto& obj : m_sceneObjects)
@@ -1439,13 +1450,21 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 	}
 
 	ImGui::Separator();
+
+	ImGui::InputText("##Search", m_filterBuffer, IM_ARRAYSIZE(m_filterBuffer));
+	ImGui::SameLine();
+	if (ImGui::Button("Clear"))
+		m_filterBuffer[0] = '\0';
+	std::string filterStr(m_filterBuffer);
+
 	const ImGuiIO& io = ImGui::GetIO();
 	ImGui::BeginChild("##ObjectListRegion", ImVec2(0, 250), true);
 	for (int i = 0; i < m_sceneObjects.size(); i++)
 	{
-		ImGui::PushID(i);
 		auto& obj = m_sceneObjects[i];
-
+		if (!filterStr.empty() && !ContainsCaseInsensitive(obj->name, filterStr))
+			continue;
+		ImGui::PushID(i);
 
 		if (m_nameEditingIndex == i)
 		{
