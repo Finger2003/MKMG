@@ -1043,7 +1043,7 @@ void CadApplication::DrawSurfacesPolylines(const Microsoft::WRL::ComPtr<ID3D11De
 			{
 				UINT stride = sizeof(VertexPosition);
 				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, surface->m_polylineIndexBuffer.GetAddressOf(), &stride, &offset);
+				context->IASetVertexBuffers(0, 1, surface->m_polylineVertexBuffer.GetAddressOf(), &stride, &offset);
 				context->IASetIndexBuffer(surface->m_polylineIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 				context->DrawIndexed(surface->m_polylineIndexCount, 0, 0);
 			}
