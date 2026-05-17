@@ -180,6 +180,7 @@ private:
 	void DrawEditMenu();
 	void DrawTorusMenu(Torus& torus);
 	void DrawPointMenu(Point& selectedObj);
+	void DrawSurfaceMenu(Surface& surface);
 	void DrawActionCombo();
 	void DrawEditGroupMenu(int selectedCount);
 	void DrawCameraSettingsMenu();

@@ -11,7 +11,7 @@ cbuffer perObject : register(b1)
 {
     matrix model;
     float4 objectColor;
-    float4 surfaceParams;
+    float4 surfaceParams; // x: isoline direction (0: u, 1: v), y: line density, z: line smoothness
 }
 
 struct DS_OUTPUT
@@ -27,7 +27,6 @@ struct HS_CONTROL_POINT_OUTPUT
 struct HS_CONSTANT_DATA_OUTPUT
 {
 	float EdgeTessFactor[2]			: SV_TessFactor;
-	//float InsideTessFactor			: SV_InsideTessFactor;
 };
 
 #define NUM_CONTROL_POINTS 16

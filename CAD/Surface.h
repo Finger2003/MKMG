@@ -22,6 +22,10 @@ struct Surface : public SceneObject
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_patchIndexBuffer;
 	UINT m_patchIndexCount = 0;
 
+
+	int m_linesPerSegment = 4;
+	int m_smoothness = 25;
+
 	Surface(int uSeg, int vSeg, SurfaceShape shape, std::string&& name = "Surface")
 		: SceneObject(std::move(name), ObjectType::Surface), segmentsU(uSeg), segmentsV(vSeg), shapeType(shape)
 	{}

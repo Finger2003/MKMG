@@ -11,8 +11,14 @@ struct HS_CONTROL_POINT_OUTPUT
 struct HS_CONSTANT_DATA_OUTPUT
 {
 	float EdgeTessFactor[2]			: SV_TessFactor;
-	//float InsideTessFactor			: SV_InsideTessFactor;
 };
+
+cbuffer perObject : register(b1)
+{
+    matrix model;
+    float4 objectColor;
+    float4 surfaceParams;	 // x: isoline direction (0: u, 1: v), y: line density, z: line smoothness
+}
 
 #define NUM_CONTROL_POINTS 16
 
@@ -22,8 +28,8 @@ HS_CONSTANT_DATA_OUTPUT CalcHSPatchConstants(
 {
 	HS_CONSTANT_DATA_OUTPUT Output;
 
-    Output.EdgeTessFactor[0] = 4.0f;
-    Output.EdgeTessFactor[1] = 25.0f;
+    Output.EdgeTessFactor[0] = surfaceParams.y;
+    Output.EdgeTessFactor[1] = surfaceParams.z;
 
 	return Output;
 }
@@ -41,6 +47,7 @@ HS_CONTROL_POINT_OUTPUT main(
 	HS_CONTROL_POINT_OUTPUT Output;
 
 	Output.PosW = ip[i].PosW;
+
 
 	return Output;
 }

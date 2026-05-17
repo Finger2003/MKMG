@@ -1008,7 +1008,14 @@ void CadApplication::DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContex
 		objData.color = color;
 
 		auto updateAndDraw = [&](Surface* surf, float xParam) {
-			objData.surfaceParams.x = xParam;
+			objData.surfaceParams =
+			{
+				xParam,
+				static_cast<float>(surf->m_linesPerSegment),
+				static_cast<float>(surf->m_smoothness),
+				0.0f
+			};
+
 			m_device.UpdateBuffer(m_cbPerObject, objData);
 			context->DrawIndexed(surf->m_patchIndexCount, 0, 0);
 			};
@@ -1795,6 +1802,8 @@ void CadApplication::DrawEditMenu()
 			DrawPointMenu(*point);
 		else if (auto torus = selectedObj->As<Torus>())
 			DrawTorusMenu(*torus);
+		else if (auto surface = selectedObj->As<Surface>())
+			DrawSurfaceMenu(*surface);
 	}
 
 }
@@ -1853,6 +1862,18 @@ void CadApplication::DrawPointMenu(Point& selectedObj)
 {
 	if (ImGui::DragFloat3("Position", &selectedObj.m_position.x, 0.01f))
 		m_selectionDirty = true;
+}
+
+void CadApplication::DrawSurfaceMenu(Surface& surface)
+{
+	ImGui::Text("Tessellation Parameters");
+	ImGui::Spacing();
+
+	// Sliders to control the shader density
+	ImGui::SliderInt("Lines per Segment", &surface.m_linesPerSegment, 2, 64);
+	ImGui::SliderInt("Smoothness", &surface.m_smoothness, 2, 64);
+
+	ImGui::Separator();
 }
 
 void CadApplication::DrawActionCombo()
