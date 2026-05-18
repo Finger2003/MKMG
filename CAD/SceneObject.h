@@ -30,7 +30,9 @@ struct SceneObject
 {
 	std::string name;
 	ObjectType type;
+	uint32_t m_id = 0;
 	bool selected = false;
+
 
 
 	static constexpr ObjectType ClassType = ObjectType::SceneObject;
@@ -44,6 +46,14 @@ struct SceneObject
 	SceneObject(std::string&& name, ObjectType type) : name(std::move(name)), type(type) {}
 	virtual ~SceneObject() = default;
 protected:
+	void AssignGlobalID()
+	{
+		if (m_id == 0)
+		{
+			static uint32_t s_globalIdCounter = 1;
+			m_id = s_globalIdCounter++;
+		}
+	}
 };
 
 struct TransformableObject : public SceneObject

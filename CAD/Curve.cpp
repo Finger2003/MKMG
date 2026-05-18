@@ -4,7 +4,9 @@
 
 Curve::Curve(std::string name, ObjectType type, std::vector<std::weak_ptr<Point>>&& controlPoints)
     : SceneObject(std::move(name), type), m_controlPoints(std::move(controlPoints))
-{}
+{
+	AssignGlobalID();
+}
 
 void Curve::CleanExpiredPoints()
 {

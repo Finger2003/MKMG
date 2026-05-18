@@ -26,10 +26,14 @@ Point::Point(float3 position, bool isPreview, bool lockToSurface)
 	: TransformableObject(position, 
 		isPreview ? "PreviewPoint" : "Point" + to_string(s_nextId++),
 		ObjectType::Point), isLockedToSurface(lockToSurface)
-{}
+{
+	if (!isPreview)
+		AssignGlobalID();
+}
 
 void Point::Commit()
 {
+	AssignGlobalID();
 	name = "Point" + to_string(s_nextId++);
 }
 

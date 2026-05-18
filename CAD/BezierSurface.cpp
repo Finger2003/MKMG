@@ -8,10 +8,14 @@ unsigned int BezierSurface::s_nextId = 0;
 BezierSurface::BezierSurface(int uSeg, int vSeg, SurfaceShape shape, bool isPreview)
 	: Surface(uSeg, vSeg, shape, isPreview ? "Preview Surface" : "Surface C0 - " + std::to_string(s_nextId++))
 	
-{}
+{
+	if (!isPreview)
+		AssignGlobalID();
+}
 
 void BezierSurface::Commit()
 {
+	AssignGlobalID();
 	name = "Surface C0 - " + std::to_string(s_nextId++);
 }
 

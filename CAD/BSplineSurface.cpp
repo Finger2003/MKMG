@@ -9,10 +9,14 @@ unsigned int BSplineSurface::s_nextId = 0;
 
 BSplineSurface::BSplineSurface(int uSeg, int vSeg, SurfaceShape shape, bool isPreview)
 	: Surface(uSeg, vSeg, shape, isPreview ? "Preview Surface" : "Surface C2 - " + std::to_string(s_nextId++))
-{}
+{
+	if (!isPreview)
+		AssignGlobalID();
+}
 
 void BSplineSurface::Commit()
 {
+	AssignGlobalID();
 	name = "Surface C2 - " + std::to_string(s_nextId++);
 }
 

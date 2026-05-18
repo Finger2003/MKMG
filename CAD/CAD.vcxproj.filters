@@ -40,6 +40,18 @@
     <Filter Include="Pliki nagłówkowe\utils">
       <UniqueIdentifier>{5f209589-7983-49ec-8425-95a08564e128}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Pliki nagłówkowe\geometry\curves">
+      <UniqueIdentifier>{25f5be40-294b-4d5f-ab5f-8747292c84a9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Pliki nagłówkowe\geometry\surfaces">
+      <UniqueIdentifier>{405776ce-fec2-4ce4-b3c9-1dc375ff5dff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Pliki źródłowe\geometry\curves">
+      <UniqueIdentifier>{777f8653-ed1c-44a9-95bc-9a221b19c59f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Pliki źródłowe\geometry\surfaces">
+      <UniqueIdentifier>{4b356c1c-1eb0-4e77-80f6-63437aca2ff2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -54,15 +66,6 @@
     <ClCompile Include="Cursor3D.cpp">
       <Filter>Pliki źródłowe</Filter>
     </ClCompile>
-    <ClCompile Include="BezierCurve.cpp">
-      <Filter>Pliki źródłowe\geometry</Filter>
-    </ClCompile>
-    <ClCompile Include="BSplineCurve.cpp">
-      <Filter>Pliki źródłowe\geometry</Filter>
-    </ClCompile>
-    <ClCompile Include="InterpolatingCurve.cpp">
-      <Filter>Pliki źródłowe\geometry</Filter>
-    </ClCompile>
     <ClCompile Include="SceneObject.cpp">
       <Filter>Pliki źródłowe\geometry</Filter>
     </ClCompile>
@@ -70,9 +73,6 @@
       <Filter>Pliki źródłowe\geometry</Filter>
     </ClCompile>
     <ClCompile Include="Torus.cpp">
-      <Filter>Pliki źródłowe\geometry</Filter>
-    </ClCompile>
-    <ClCompile Include="Curve.cpp">
       <Filter>Pliki źródłowe\geometry</Filter>
     </ClCompile>
     <ClCompile Include="DxApplication.cpp">
@@ -96,14 +96,26 @@
     <ClCompile Include="exceptions.cpp">
       <Filter>Pliki źródłowe\utils</Filter>
     </ClCompile>
-    <ClCompile Include="BezierSurface.cpp">
-      <Filter>Pliki źródłowe\geometry</Filter>
+    <ClCompile Include="BezierCurve.cpp">
+      <Filter>Pliki źródłowe\geometry\curves</Filter>
     </ClCompile>
-    <ClCompile Include="Surface.cpp">
-      <Filter>Pliki źródłowe\geometry</Filter>
+    <ClCompile Include="BSplineCurve.cpp">
+      <Filter>Pliki źródłowe\geometry\curves</Filter>
+    </ClCompile>
+    <ClCompile Include="Curve.cpp">
+      <Filter>Pliki źródłowe\geometry\curves</Filter>
+    </ClCompile>
+    <ClCompile Include="InterpolatingCurve.cpp">
+      <Filter>Pliki źródłowe\geometry\curves</Filter>
+    </ClCompile>
+    <ClCompile Include="BezierSurface.cpp">
+      <Filter>Pliki źródłowe\geometry\surfaces</Filter>
     </ClCompile>
     <ClCompile Include="BSplineSurface.cpp">
-      <Filter>Pliki źródłowe\geometry</Filter>
+      <Filter>Pliki źródłowe\geometry\surfaces</Filter>
+    </ClCompile>
+    <ClCompile Include="Surface.cpp">
+      <Filter>Pliki źródłowe\geometry\surfaces</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -140,18 +152,6 @@
     <ClInclude Include="WindowApplication.h">
       <Filter>Pliki nagłówkowe\win32</Filter>
     </ClInclude>
-    <ClInclude Include="BezierCurve.h">
-      <Filter>Pliki nagłówkowe\geometry</Filter>
-    </ClInclude>
-    <ClInclude Include="BSplineCurve.h">
-      <Filter>Pliki nagłówkowe\geometry</Filter>
-    </ClInclude>
-    <ClInclude Include="Curve.h">
-      <Filter>Pliki nagłówkowe\geometry</Filter>
-    </ClInclude>
-    <ClInclude Include="InterpolatingCurve.h">
-      <Filter>Pliki nagłówkowe\geometry</Filter>
-    </ClInclude>
     <ClInclude Include="SceneObject.h">
       <Filter>Pliki nagłówkowe\geometry</Filter>
     </ClInclude>
@@ -164,14 +164,26 @@
     <ClInclude Include="exceptions.h">
       <Filter>Pliki nagłówkowe\utils</Filter>
     </ClInclude>
-    <ClInclude Include="BezierSurface.h">
-      <Filter>Pliki nagłówkowe\geometry</Filter>
+    <ClInclude Include="BezierCurve.h">
+      <Filter>Pliki nagłówkowe\geometry\curves</Filter>
     </ClInclude>
-    <ClInclude Include="Surface.h">
-      <Filter>Pliki nagłówkowe\geometry</Filter>
+    <ClInclude Include="BSplineCurve.h">
+      <Filter>Pliki nagłówkowe\geometry\curves</Filter>
+    </ClInclude>
+    <ClInclude Include="Curve.h">
+      <Filter>Pliki nagłówkowe\geometry\curves</Filter>
+    </ClInclude>
+    <ClInclude Include="InterpolatingCurve.h">
+      <Filter>Pliki nagłówkowe\geometry\curves</Filter>
+    </ClInclude>
+    <ClInclude Include="BezierSurface.h">
+      <Filter>Pliki nagłówkowe\geometry\surfaces</Filter>
     </ClInclude>
     <ClInclude Include="BSplineSurface.h">
-      <Filter>Pliki nagłówkowe\geometry</Filter>
+      <Filter>Pliki nagłówkowe\geometry\surfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="Surface.h">
+      <Filter>Pliki nagłówkowe\geometry\surfaces</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
