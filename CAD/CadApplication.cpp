@@ -1009,11 +1009,11 @@ void CadApplication::DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContex
 		PerObjectBuffer objData;
 		objData.color = color;
 
-		auto updateAndDraw = [&](Surface* surf, float xParam) {
+		auto updateAndDraw = [&](Surface* surf, float xParam, float yParam) {
 			objData.surfaceParams =
 			{
 				xParam,
-				static_cast<float>(surf->m_linesPerSegment),
+				yParam,
 				static_cast<float>(surf->m_smoothness),
 				0.0f
 			};
@@ -1022,8 +1022,8 @@ void CadApplication::DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContex
 			context->DrawIndexed(surf->m_patchIndexCount, 0, 0);
 			};
 
-		updateAndDraw(surface, 0.0f);
-		updateAndDraw(surface, 1.0f);		
+		updateAndDraw(surface, 0.0f, static_cast<float>(surface->m_linesPerSegmentU));
+		updateAndDraw(surface, 1.0f, static_cast<float>(surface->m_linesPerSegmentV));
 	}
 }
 
@@ -1894,7 +1894,8 @@ void CadApplication::DrawSurfaceMenu(Surface& surface)
 	ImGui::Spacing();
 
 	// Sliders to control the shader density
-	ImGui::SliderInt("Lines per Segment", &surface.m_linesPerSegment, 2, 64);
+	ImGui::SliderInt("Lines per Segment (U)", &surface.m_linesPerSegmentU, 2, 64);
+	ImGui::SliderInt("Lines per Segment (V)", &surface.m_linesPerSegmentV, 2, 64);
 	ImGui::SliderInt("Smoothness", &surface.m_smoothness, 2, 64);
 
 	ImGui::Separator();

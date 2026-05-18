@@ -23,7 +23,8 @@ struct Surface : public SceneObject
 	UINT m_patchIndexCount = 0;
 
 
-	int m_linesPerSegment = 4;
+	int m_linesPerSegmentU = 4;
+	int m_linesPerSegmentV = 4;
 	int m_smoothness = 25;
 
 	Surface(int uSeg, int vSeg, SurfaceShape shape, std::string&& name = "Surface")
