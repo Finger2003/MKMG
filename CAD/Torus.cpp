@@ -78,6 +78,17 @@ void Torus::UpdateModelMatrix()
 	m_modelMatrix = translation * m_rotationMatrix * scaling;
 }
 
+nlohmann::json Torus::Serialize() const
+{
+	nlohmann::json j = Base::Serialize();
+	j["rotation"] = m_rotationMatrix.ToQuaternion();
+	j["scale"] = m_scale;
+	j["samples"] = { majorSegments, minorSegments };
+	j["smallRadius"] = minorRadius;
+	j["largeRadius"] = majorRadius;
+	return j;
+}
+
 void Torus::GenerateMesh()
 {
 	GenerateVertices();

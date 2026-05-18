@@ -22,6 +22,8 @@ struct BSplineCurve : public Curve
 
 	BSplineCurve(std::vector<std::weak_ptr<Point>>&& controlPoints);
 	void UpdatePolyline(const DxDevice& device) override;
+
+	const char* GetSchemaType() const override { return "bezierC2"; }
 };
 
 

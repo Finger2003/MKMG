@@ -62,3 +62,25 @@ unsigned int Surface::GetControlPointIndex(int u, int v) const
 	int wrappedU = (shapeType == SurfaceShape::Cylinder) ? (u % pointsU) : u;
 	return static_cast<unsigned int>(v * pointsU + wrappedU);
 }
+
+nlohmann::json Surface::Serialize() const
+{
+	nlohmann::json j = Base::Serialize();
+	unsigned int exportU = GetExportPointsU();
+	unsigned int exportV = GetExportPointsV();
+
+	j["size"] = { exportU, exportV };
+	j["samples"] = { m_linesPerSegmentU, m_linesPerSegmentV };
+	nlohmann::json cpArray = nlohmann::json::array();
+	for (unsigned int v = 0; v < exportV; ++v)
+	{
+		for (unsigned int u = 0; u < exportU; ++u)
+		{
+			unsigned int idx = GetControlPointIndex(u, v);
+			if (auto cp = m_controlPoints[idx].lock())
+				cpArray.push_back({ {"id", cp->m_id} });
+		}
+	}
+	j["controlPoints"] = cpArray;
+	return j;
+}

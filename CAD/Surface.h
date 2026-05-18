@@ -46,6 +46,10 @@ protected:
 	virtual unsigned int GetGridPointsU() const = 0;
 	virtual unsigned int GetGridPointsV() const = 0;
 	virtual unsigned int GetPatchDataIndex(int u, int v) const = 0;
+	virtual unsigned int GetExportPointsU() const = 0;
+	virtual unsigned int GetExportPointsV() const = 0;
+
+	nlohmann::json Serialize() const override;
 };
 
 struct SurfaceGenerationResult

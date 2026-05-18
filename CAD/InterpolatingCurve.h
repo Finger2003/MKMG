@@ -8,5 +8,7 @@ struct InterpolatingCurve : public Curve
 
 	InterpolatingCurve(std::vector<std::weak_ptr<Point>>&& controlPoints);
 	void UpdatePolyline(const DxDevice& device) override;
+
+	const char* GetSchemaType() const override { return "interpolatedC2"; }
 };
 

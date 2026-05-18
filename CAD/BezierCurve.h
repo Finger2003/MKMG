@@ -9,5 +9,6 @@ struct BezierCurve : public Curve
 
 	BezierCurve(std::vector<std::weak_ptr<Point>>&& controlPoints);
 	void UpdatePolyline(const DxDevice& device) override;
+	const char* GetSchemaType() const override { return "bezierC0"; }
 };
 

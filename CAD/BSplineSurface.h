@@ -8,6 +8,7 @@ struct BSplineSurface : public Surface
 
 	BSplineSurface(int uSeg, int vSeg, SurfaceShape shape, bool isPreview = false);
 	void Commit() override;
+	const char* GetSchemaType() const override { return "bezierSurfaceC2"; }
 
 
 	void InitGeometry(const DxDevice& device) override;
@@ -22,6 +23,9 @@ protected:
 	unsigned int GetBernsteinPointsU() const;
 	unsigned int GetBernsteinPointsV() const;
 	unsigned int GetBernsteinIndex(int u, int v) const;
+
+	unsigned int GetExportPointsU() const override { return segmentsU + 3; }
+	unsigned int GetExportPointsV() const override { return segmentsV + 3; }
 
 	void ConvertPatchToBernstein(int patchU, int patchV, std::vector<VertexPosition>& bernsteinGrid) const;
 	MathLib::Vec3f Evaluate1D(MathLib::Vec3f p0, MathLib::Vec3f p1, MathLib::Vec3f p2, MathLib::Vec3f p3, int index) const;

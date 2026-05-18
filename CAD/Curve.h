@@ -18,7 +18,7 @@ struct Curve : public SceneObject
 
 	void CleanExpiredPoints();
 	virtual void UpdatePolyline(const DxDevice& device) = 0;
-
+	nlohmann::json Serialize() const override;
 protected:
 	Curve(std::string name, ObjectType type, std::vector<std::weak_ptr<Point>>&& controlPoints);
 	virtual ~Curve() = default;

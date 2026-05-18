@@ -4,6 +4,11 @@
 
 namespace MathLib
 {
+	struct Quaternion
+	{
+		float x, y, z, w;
+	};
+
 	struct Mat4f
 	{
 		union
@@ -204,6 +209,51 @@ namespace MathLib
 				Vec4f(0.0f, 0.0f, f / (n - f), (f * n) / (n - f)),
 				Vec4f(0.0f, 0.0f, -1.0f, 0.0f)
 			);
+		}
+
+		Quaternion ToQuaternion() const
+		{
+			float r11 = m[0][0], r12 = m[0][1], r13 = m[0][2];
+			float r21 = m[1][0], r22 = m[1][1], r23 = m[1][2];
+			float r31 = m[2][0], r32 = m[2][1], r33 = m[2][2];
+
+			float trace = r11 + r22 + r33;
+			Quaternion q;
+
+			if (trace > 0.0f)
+			{
+				float s = 0.5f / std::sqrt(trace + 1.0f);
+				q.w = 0.25f / s;
+				q.x = (r32 - r23) * s;
+				q.y = (r13 - r31) * s;
+				q.z = (r21 - r12) * s;
+			}
+			else if (r11 > r22 && r11 > r33)
+			{
+				float s = 2.0f * std::sqrt(1.0f + r11 - r22 - r33);
+				q.w = (r32 - r23) / s;
+				q.x = 0.25f * s;
+				q.y = (r12 + r21) / s;
+				q.z = (r13 + r31) / s;
+			}
+			else if (r22 > r33)
+			{
+				float s = 2.0f * std::sqrt(1.0f + r22 - r11 - r33);
+				q.w = (r13 - r31) / s;
+				q.x = (r12 + r21) / s;
+				q.y = 0.25f * s;
+				q.z = (r23 + r32) / s;
+			}
+			else
+			{
+				float s = 2.0f * std::sqrt(1.0f + r33 - r11 - r22);
+				q.w = (r21 - r12) / s;
+				q.x = (r13 + r31) / s;
+				q.y = (r23 + r32) / s;
+				q.z = 0.25f * s;
+			}
+
+			return q;
 		}
 	};
 }

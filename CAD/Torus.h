@@ -57,6 +57,8 @@ struct Torus : public TransformableObject
 	MathLib::Mat4f m_modelMatrix{};// = MathLib::Mat4f::Translation(m_position.x, m_position.y, m_position.z);
 
 	void UpdateModelMatrix();
+	nlohmann::json Serialize() const override;
+	const char* GetSchemaType() const override { return "torus"; }
 
 	virtual ~Torus() = default;
 
