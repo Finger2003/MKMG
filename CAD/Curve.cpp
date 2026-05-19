@@ -4,9 +4,7 @@
 
 Curve::Curve(std::string name, ObjectType type, std::vector<std::weak_ptr<Point>>&& controlPoints)
     : Base(std::move(name), type), m_controlPoints(std::move(controlPoints))
-{
-	AssignGlobalID();
-}
+{}
 
 void Curve::CleanExpiredPoints()
 {

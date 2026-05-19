@@ -35,7 +35,7 @@ struct SceneObject
 	uint32_t m_id = 0;
 	bool selected = false;
 
-
+	static unsigned int s_globalIdCounter;
 
 	static constexpr ObjectType ClassType = ObjectType::SceneObject;
 	virtual bool IsA(ObjectType t) const { return t == ClassType; }
@@ -47,17 +47,9 @@ struct SceneObject
 	virtual const char* GetSchemaType() const { return nullptr; }
 	virtual void MarkDirty() {};
 	virtual nlohmann::json Serialize() const = 0;
-	SceneObject(std::string&& name, ObjectType type) : name(std::move(name)), type(type) {}
-	virtual ~SceneObject() = default;
 protected:
-	void AssignGlobalID()
-	{
-		if (m_id == 0)
-		{
-			static uint32_t s_globalIdCounter = 1;
-			m_id = s_globalIdCounter++;
-		}
-	}
+	SceneObject(std::string&& name, ObjectType type) : name(std::move(name)), type(type), m_id(s_globalIdCounter++) {}
+	virtual ~SceneObject() = default;
 };
 
 

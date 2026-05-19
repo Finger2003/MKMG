@@ -9,15 +9,7 @@ unsigned int BSplineSurface::s_nextId = 0;
 
 BSplineSurface::BSplineSurface(int uSeg, int vSeg, SurfaceShape shape)
 	: Surface(uSeg, vSeg, shape, "Surface C2 - " + std::to_string(s_nextId++))
-{
-	AssignGlobalID();
-}
-
-void BSplineSurface::Commit()
-{
-	AssignGlobalID();
-	name = "Surface C2 - " + std::to_string(s_nextId++);
-}
+{}
 
 unsigned int BSplineSurface::GetBernsteinPointsU() const
 {
@@ -103,12 +95,6 @@ void BSplineSurface::InitGeometry(const DxDevice& device)
 		m_patchIndexCount = static_cast<UINT>(patchIndices.size());
 		m_patchIndexBuffer = device.CreateIndexBuffer(patchIndices);
 	}
-	//UINT bernsteinCount = GetBernsteinPointsU() * GetBernsteinPointsV();
-	//m_patchVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(bernsteinCount);
-
-	//std::vector<unsigned int> patchIndices = GeneratePatchIndices();
-	//m_patchIndexCount = static_cast<UINT>(patchIndices.size());
-	//m_patchIndexBuffer = device.CreateIndexBuffer(patchIndices);
 }
 
 void BSplineSurface::UpdateVertices(const DxDevice& device)
@@ -146,68 +132,6 @@ void BSplineSurface::UpdateVertices(const DxDevice& device)
 
 	m_isDirty = false;
 }
-
-//SurfaceGenerationResult BSplineSurface::CreateFlat(int segU, int segV, float width, float length, const float3& center, const DxDevice& device)
-//{
-//	auto surface = std::make_unique<BSplineSurface>(segU, segV, SurfaceShape::Flat, true);
-//	std::vector<std::shared_ptr<Point>> generatedPoints;
-//
-//	int pointsU = segU + 3;
-//	int pointsV = segV + 3;
-//
-//	for (int v = 0; v < pointsV; v++)
-//	{
-//		float vParam = static_cast<float>(v - 1) / segV;
-//		for (int u = 0; u < pointsU; u++)
-//		{
-//			float uParam = static_cast<float>(u - 1) / segU;
-//			float3 pos{ uParam * width + center.x, center.y, vParam * length + center.z };
-//
-//			auto pt = std::make_shared<Point>(pos, true, true);
-//			pt->isLockedToSurface = true;
-//			generatedPoints.push_back(pt);
-//			surface->m_controlPoints.push_back(pt);
-//		}
-//	}
-//
-//	surface->InitGeometry(device);
-//	return { std::move(surface), std::move(generatedPoints) };
-//}
-//
-//SurfaceGenerationResult BSplineSurface::CreateCylinder(int segU, int segV, float radius, float height, const float3& center, const DxDevice& device)
-//{
-//	auto surface = std::make_unique<BSplineSurface>(segU, segV, SurfaceShape::Cylinder, true);
-//	std::vector<std::shared_ptr<Point>> generatedPoints;
-//
-//	int pointsU = segU;
-//	int pointsV = segV + 3;
-//
-//	// Scale De Boor points out so the resulting C2 surface passes exactly through 'radius'
-//	float dTheta = 2.0f * std::numbers::pi_v<float> / segU;
-//	float R_deBoor = radius * (3.0f / (2.0f + std::cos(dTheta)));
-//
-//	for (int v = 0; v < pointsV; v++)
-//	{
-//		float vParam = static_cast<float>(v - 1) / segV;
-//		for (int u = 0; u < pointsU; u++)
-//		{
-//			float angle = u * dTheta;
-//			float3 pos = {
-//				R_deBoor * std::cos(angle) + center.x,
-//				R_deBoor * std::sin(angle) + center.y + radius,
-//				vParam * height + center.z
-//			};
-//
-//			auto pt = std::make_shared<Point>(pos, true, true);
-//			pt->isLockedToSurface = true;
-//			generatedPoints.push_back(pt);
-//			surface->m_controlPoints.push_back(pt);
-//		}
-//	}
-//
-//	surface->InitGeometry(device);
-//	return { std::move(surface), std::move(generatedPoints) };
-//}
 
 unsigned int BSplineSurface::GetGridPointsU() const
 {

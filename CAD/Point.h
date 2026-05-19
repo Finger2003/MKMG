@@ -17,7 +17,6 @@ struct Point : public TransformableObject
 	std::vector<std::weak_ptr<SceneObject>> m_dependents;
 	bool isLockedToSurface = false;
 
-	void Commit();
 	void AddDependent(std::weak_ptr<SceneObject> obj);
 	void NotifyDependents();
 	MathLib::Mat4f GetModelMatrix() const;

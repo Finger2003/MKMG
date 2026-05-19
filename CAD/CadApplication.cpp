@@ -874,7 +874,6 @@ void CadApplication::DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext
 			objData.model = point->GetModelMatrix();
 			objData.color = point->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
 			m_device.UpdateBuffer(m_cbPerObject, objData);
-
 			context->Draw(1, 0);
 		}
 	}
@@ -887,10 +886,6 @@ void CadApplication::DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext
 			objData.model = Mat4f::Translation(point.x, point.y, point.z);
 			objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
 			m_device.UpdateBuffer(m_cbPerObject, objData);
-
-			//UINT stride = sizeof(VertexPosition);
-			//UINT offset = 0;
-			//context->IASetVertexBuffers(0, 1, point->GetVertexBuffer().GetAddressOf(), &stride, &offset);
 			context->Draw(1, 0);
 		}
 	}
@@ -1163,25 +1158,6 @@ void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>
 	context->DSSetShader(nullptr, nullptr, 0);
 }
 
-//SurfaceGenerationResult CadApplication::GenerateSurface() const
-//{
-//	const auto shape = static_cast<SurfaceShape>(m_previewShape);
-//	if (m_previewType == 0)
-//	{
-//		if (shape == SurfaceShape::Flat)
-//			return BezierSurface::CreateFlat(m_previewSegU, m_previewSegV, m_previewWidth, m_previewDim2, m_cursorPosition, m_device);
-//		else
-//			return BezierSurface::CreateCylinder(m_previewSegU, m_previewSegV, m_previewRadius, m_previewDim2, m_cursorPosition, m_device);
-//	}
-//	else if (m_previewType == 1)
-//	{
-//		if (shape == SurfaceShape::Flat)
-//			return BSplineSurface::CreateFlat(m_previewSegU, m_previewSegV, m_previewWidth, m_previewDim2, m_cursorPosition, m_device);
-//		else
-//			return BSplineSurface::CreateCylinder(m_previewSegU, m_previewSegV, m_previewRadius, m_previewDim2, m_cursorPosition, m_device);
-//	}	
-//}
-
 bool CadApplication::ContainsCaseInsensitive(const std::string& str, const std::string& substr)
 {
 	auto it = std::search(
@@ -1400,7 +1376,6 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 	if (ImGui::Button("Create C0 Surface"))
 	{
 		m_previewType = 0;
-		//m_previewSurface = nullptr;
 		changed = true;
 		m_showSurfacePopup = true;
 	}
@@ -1408,7 +1383,6 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 	{
 		m_previewType = 1;
 		changed = true;
-		//m_previewSurface = nullptr;
 		m_showSurfacePopup = true;
 	}
 
@@ -1470,21 +1444,7 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 				m_sceneObjects.push_back(pt);
 			}
 
-			// 1. Rename and Add Surface
-			//m_previewSurface->Commit();
-			//std::shared_ptr<Surface> sharedSurface = std::move(m_previewSurface);
-
-			// 2. Add all its points to the scene so they render and can be edited
-			//for (auto& pt : m_previewPoints)
-			//{
-			//	pt->Commit();
-			//	pt->AddDependent(sharedSurface);
-			//	m_sceneObjects.push_back(pt);
-			//}
-			//m_previewPoints.clear();
-
 			m_sceneObjects.push_back(sharedSurface);
-			//m_previewSurface = nullptr;
 			m_showSurfacePopup = false;
 		}
 		ImGui::End();

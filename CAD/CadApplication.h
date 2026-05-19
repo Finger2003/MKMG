@@ -245,10 +245,6 @@ private:
 	int m_previewShape = 0;     // 0 = Flat, 1 = Cylinder
 
 	SurfaceBuilder m_surfaceBuilder;
-	//std::unique_ptr<Surface> m_previewSurface = nullptr;
-	//std::vector<std::shared_ptr<Point>> m_previewPoints; 
-
-	//SurfaceGenerationResult GenerateSurface() const;
 #pragma endregion
 
 	static bool ContainsCaseInsensitive(const std::string& str, const std::string& substr);

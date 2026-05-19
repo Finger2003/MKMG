@@ -21,7 +21,6 @@ void SurfaceBuilder::UpdateGeometry(const DxDevice& device, SurfaceType type, Su
 
 	rawPoints.clear();
 	const std::vector<VertexPosition>* dataToUpload = nullptr;
-	//std::vector<VertexPosition> convertedC2Points;
 	if (surfaceType == SurfaceType::C0)
 	{
 		if (surfaceShape == SurfaceShape::Flat)
@@ -38,7 +37,6 @@ void SurfaceBuilder::UpdateGeometry(const DxDevice& device, SurfaceType type, Su
 			GenerateC2Cylinder();
 
 		bernsteinPoints = GenerateC2BernsteinPoints();
-		//convertedC2Points = GenerateC2BernsteinPoints();
 		dataToUpload = &bernsteinPoints;
 	}
 
@@ -92,23 +90,6 @@ SurfaceGenerationResult SurfaceBuilder::Build(const DxDevice& device) const
 	std::vector<unsigned int> lineIndices = surface->GenerateLineIndices();
 	surface->m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
 	surface->m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
-
-	//surface->m_patchVertexBuffer = m_patchVertexBuffer;
-	//surface->m_patchIndexBuffer = m_patchIndexBuffer;
-	//surface->m_patchIndexCount = m_patchIndexCount;
-
-	//if (surfaceType == SurfaceType::C0)
-	//	surface->m_polylineVertexBuffer = m_patchVertexBuffer;
-	//else
-	//{
-	//	UINT polylineCount = static_cast<UINT>(rawPoints.size());
-	//	surface->m_polylineVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(polylineCount);
-	//	device.UpdateBuffer(surface->m_polylineVertexBuffer, rawPoints.data(), polylineCount * sizeof(VertexPosition));
-	//}
-
-	//std::vector<unsigned int> lineIndices = surface->GenerateLineIndices();
-	//surface->m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
-	//surface->m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
 
 	return { std::move(surface), std::move(generatedPoints) };
 }

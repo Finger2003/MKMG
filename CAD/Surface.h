@@ -29,19 +29,20 @@ struct Surface : public SceneObject
 	int m_linesPerSegmentV = 4;
 	int m_smoothness = 25;
 
-	Surface(int uSeg, int vSeg, SurfaceShape shape, std::string&& name = "Surface")
-		: SceneObject(std::move(name), ObjectType::Surface), segmentsU(uSeg), segmentsV(vSeg), shapeType(shape)
-	{}
-	virtual ~Surface() = default;
 
 	std::shared_ptr<Point> GetPoint(int u, int v) const;
-	virtual void Commit() = 0;
 
 	virtual void InitGeometry(const DxDevice& device) = 0;
 	virtual void UpdateVertices(const DxDevice& device) = 0;
 	void MarkDirty() override { m_isDirty = true; }
 	friend SurfaceBuilder;
+	Surface(int uSeg, int vSeg, SurfaceShape shape, std::string&& name = "Surface")
+		: SceneObject(std::move(name), ObjectType::Surface), segmentsU(uSeg), segmentsV(vSeg), shapeType(shape)
+	{}
+	virtual ~Surface() = default;
 protected:
+
+
 	std::vector<unsigned int> GenerateLineIndices() const;
 	std::vector<unsigned int> GeneratePatchIndices() const;
 	unsigned int GetControlPointIndex(int u, int v) const;

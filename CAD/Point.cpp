@@ -23,18 +23,10 @@ void Point::ReleaseSharedGeometry()
 }
 
 Point::Point(float3 position, bool lockToSurface)
-	: TransformableObject(position, 
+	: TransformableObject(position,
 		"Point" + to_string(s_nextId++),
 		ObjectType::Point), isLockedToSurface(lockToSurface)
-{
-		AssignGlobalID();
-}
-
-void Point::Commit()
-{
-	AssignGlobalID();
-	name = "Point" + to_string(s_nextId++);
-}
+{}
 
 void Point::AddDependent(std::weak_ptr<SceneObject> obj)
 {
