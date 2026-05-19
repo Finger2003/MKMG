@@ -55,6 +55,16 @@ public:
 	}
 
 	template<typename T>
+	Microsoft::WRL::ComPtr<ID3D11Buffer> CreateDynamicVertexBuffer(const std::vector<T>& vertices) const
+	{
+		auto desc = BufferDescription::VertexBufferDescription(sizeof(T) * vertices.size());
+		desc.Usage = D3D11_USAGE_DYNAMIC;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		return CreateBuffer(desc, vertices.data());
+	}
+
+
+	template<typename T>
 	Microsoft::WRL::ComPtr<ID3D11Buffer> CreateIndexBuffer(const std::vector<T>& indices) const
 	{
 		D3D11_BUFFER_DESC desc = BufferDescription::IndexBufferDescription(sizeof(T) * indices.size());

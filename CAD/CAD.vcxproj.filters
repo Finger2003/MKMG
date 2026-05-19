@@ -117,6 +117,9 @@
     <ClCompile Include="Surface.cpp">
       <Filter>Pliki źródłowe\geometry\surfaces</Filter>
     </ClCompile>
+    <ClCompile Include="SurfaceBuilder.cpp">
+      <Filter>Pliki źródłowe\geometry\surfaces</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -183,6 +186,12 @@
       <Filter>Pliki nagłówkowe\geometry\surfaces</Filter>
     </ClInclude>
     <ClInclude Include="Surface.h">
+      <Filter>Pliki nagłówkowe\geometry\surfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="SplineMath.h">
+      <Filter>Pliki nagłówkowe\geometry\surfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="SurfaceBuilder.h">
       <Filter>Pliki nagłówkowe\geometry\surfaces</Filter>
     </ClInclude>
   </ItemGroup>

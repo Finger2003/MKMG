@@ -2,11 +2,21 @@
 #include "../MathLib/Vec3f.h"
 #include "../MathLib/Vec4f.h"
 #include "../MathLib/Mat4f.h"
-#include <nlohmann/json.hpp>
+//#include <nlohmann/json.hpp>
 struct VertexPosition
 {
 	float x, y, z;
 };
+
+inline MathLib::Vec3f ToVec3f(const VertexPosition& vp)
+{
+	return MathLib::Vec3f(vp.x, vp.y, vp.z);
+}
+
+inline VertexPosition ToVertexPosition(const MathLib::Vec3f& v)
+{
+	return { v.x, v.y, v.z };
+}
 
 struct float3
 {

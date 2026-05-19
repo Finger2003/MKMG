@@ -1,6 +1,6 @@
 #pragma once
 #include "structs.h"
-#include <nlohmann/json.hpp>
+//#include <nlohmann/json.hpp>
 
 #define SCENE_OBJECT_LIST(X) \
     X(TransformableObject)   \

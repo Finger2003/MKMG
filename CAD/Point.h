@@ -9,9 +9,10 @@ struct Point : public TransformableObject
 	DEFINE_TYPE(TransformableObject, ObjectType::Point);
 	static void InitSharedGeometry(const DxDevice& device);
 	static void ReleaseSharedGeometry();
-	Point(float3 position, bool isPreview = false, bool lockToSurface = false);
+	Point(float3 position, bool lockToSurface = false);
 	static unsigned int s_nextId;
 
+	static const Microsoft::WRL::ComPtr<ID3D11Buffer>& GetSharedVertexBuffer() { return s_vertexBuffer; }
 	const Microsoft::WRL::ComPtr<ID3D11Buffer>& GetVertexBuffer() const { return s_vertexBuffer; }
 	std::vector<std::weak_ptr<SceneObject>> m_dependents;
 	bool isLockedToSurface = false;

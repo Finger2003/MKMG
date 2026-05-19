@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Surface.h"
+#include "DxDevice.h"
 
 std::shared_ptr<Point> Surface::GetPoint(int u, int v) const
 {

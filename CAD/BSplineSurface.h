@@ -6,7 +6,7 @@ struct BSplineSurface : public Surface
 	DEFINE_TYPE(Surface, ObjectType::BSplineSurface);
 	static unsigned int s_nextId;
 
-	BSplineSurface(int uSeg, int vSeg, SurfaceShape shape, bool isPreview = false);
+	BSplineSurface(int uSeg, int vSeg, SurfaceShape shape);
 	void Commit() override;
 	const char* GetSchemaType() const override { return "bezierSurfaceC2"; }
 
@@ -14,8 +14,8 @@ struct BSplineSurface : public Surface
 	void InitGeometry(const DxDevice& device) override;
 	void UpdateVertices(const DxDevice& device) override;
 
-	static SurfaceGenerationResult CreateFlat(int segU, int segV, float width, float length, const float3& center, const DxDevice& device);
-	static SurfaceGenerationResult CreateCylinder(int segU, int segV, float radius, float height, const float3& center, const DxDevice& device);
+	//static SurfaceGenerationResult CreateFlat(int segU, int segV, float width, float length, const float3& center, const DxDevice& device);
+	//static SurfaceGenerationResult CreateCylinder(int segU, int segV, float radius, float height, const float3& center, const DxDevice& device);
 protected:
 	unsigned int GetGridPointsU() const override;
 	unsigned int GetGridPointsV() const override;

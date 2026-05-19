@@ -12,6 +12,7 @@
 #include "BSplineSurface.h"
 #include "Cursor3D.h"
 #include "Camera.h"
+#include "SurfaceBuilder.h"
 
 struct PerPointBuffer
 {
@@ -242,10 +243,12 @@ private:
 	float m_previewRadius = m_previewWidth / (2.0f * std::numbers::pi_v<float>);
 	int m_previewType = 0; // 0 = C0, 1 = C2
 	int m_previewShape = 0;     // 0 = Flat, 1 = Cylinder
-	std::unique_ptr<Surface> m_previewSurface = nullptr;
-	std::vector<std::shared_ptr<Point>> m_previewPoints; 
 
-	SurfaceGenerationResult GenerateSurface() const;
+	SurfaceBuilder m_surfaceBuilder;
+	//std::unique_ptr<Surface> m_previewSurface = nullptr;
+	//std::vector<std::shared_ptr<Point>> m_previewPoints; 
+
+	//SurfaceGenerationResult GenerateSurface() const;
 #pragma endregion
 
 	static bool ContainsCaseInsensitive(const std::string& str, const std::string& substr);

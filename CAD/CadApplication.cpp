@@ -863,6 +863,9 @@ void CadApplication::Render()
 
 void CadApplication::DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
 {
+	UINT stride = sizeof(VertexPosition);
+	UINT offset = 0;
+	context->IASetVertexBuffers(0, 1, Point::GetSharedVertexBuffer().GetAddressOf(), &stride, &offset);
 	for (auto& obj : m_sceneObjects)
 	{
 		if (auto point = obj->As<Point>())
@@ -872,25 +875,22 @@ void CadApplication::DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext
 			objData.color = point->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
 			m_device.UpdateBuffer(m_cbPerObject, objData);
 
-			UINT stride = sizeof(VertexPosition);
-			UINT offset = 0;
-			context->IASetVertexBuffers(0, 1, point->GetVertexBuffer().GetAddressOf(), &stride, &offset);
 			context->Draw(1, 0);
 		}
 	}
 
 	if (m_showSurfacePopup)
 	{
-		for (auto& point : m_previewPoints)
+		for (auto& point : m_surfaceBuilder.rawPoints)
 		{
 			PerObjectBuffer objData;
-			objData.model = point->GetModelMatrix();
+			objData.model = Mat4f::Translation(point.x, point.y, point.z);
 			objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
 			m_device.UpdateBuffer(m_cbPerObject, objData);
 
-			UINT stride = sizeof(VertexPosition);
-			UINT offset = 0;
-			context->IASetVertexBuffers(0, 1, point->GetVertexBuffer().GetAddressOf(), &stride, &offset);
+			//UINT stride = sizeof(VertexPosition);
+			//UINT offset = 0;
+			//context->IASetVertexBuffers(0, 1, point->GetVertexBuffer().GetAddressOf(), &stride, &offset);
 			context->Draw(1, 0);
 		}
 	}
@@ -987,8 +987,31 @@ void CadApplication::DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3
 void CadApplication::DrawSurfaces(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
 {
 
-	if (m_showSurfacePopup && m_previewSurface)
-		DrawSurface(context, m_previewSurface.get(), Vec4f(0.0f, 0.5f, 1.0f, 1.0f));	
+	if (m_showSurfacePopup && m_surfaceBuilder.m_patchIndexCount > 0)// && m_previewSurface)
+	{
+		UINT stride = sizeof(VertexPosition);
+		UINT offset = 0;
+		context->IASetVertexBuffers(0, 1, m_surfaceBuilder.m_patchVertexBuffer.GetAddressOf(), &stride, &offset);
+		context->IASetIndexBuffer(m_surfaceBuilder.m_patchIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+		PerObjectBuffer objData;
+		objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
+		auto updateAndDraw = [&](float xParam, float yParam) {
+			objData.surfaceParams =
+			{
+				xParam,
+				yParam,
+				25.0f,
+				0.0f
+			};
+			m_device.UpdateBuffer(m_cbPerObject, objData);
+			context->DrawIndexed(m_surfaceBuilder.m_patchIndexCount, 0, 0);
+			};
+
+		updateAndDraw(0.0f, m_surfaceBuilder.linesPerSegmentU);
+		updateAndDraw(1.0f, m_surfaceBuilder.linesPerSegmentV);
+
+		//DrawSurface(context, m_previewSurface.get(), Vec4f(0.0f, 0.5f, 1.0f, 1.0f));	
+	}
 
 	for (auto& obj : m_sceneObjects)
 	{
@@ -1140,24 +1163,24 @@ void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>
 	context->DSSetShader(nullptr, nullptr, 0);
 }
 
-SurfaceGenerationResult CadApplication::GenerateSurface() const
-{
-	const auto shape = static_cast<SurfaceShape>(m_previewShape);
-	if (m_previewType == 0)
-	{
-		if (shape == SurfaceShape::Flat)
-			return BezierSurface::CreateFlat(m_previewSegU, m_previewSegV, m_previewWidth, m_previewDim2, m_cursorPosition, m_device);
-		else
-			return BezierSurface::CreateCylinder(m_previewSegU, m_previewSegV, m_previewRadius, m_previewDim2, m_cursorPosition, m_device);
-	}
-	else if (m_previewType == 1)
-	{
-		if (shape == SurfaceShape::Flat)
-			return BSplineSurface::CreateFlat(m_previewSegU, m_previewSegV, m_previewWidth, m_previewDim2, m_cursorPosition, m_device);
-		else
-			return BSplineSurface::CreateCylinder(m_previewSegU, m_previewSegV, m_previewRadius, m_previewDim2, m_cursorPosition, m_device);
-	}	
-}
+//SurfaceGenerationResult CadApplication::GenerateSurface() const
+//{
+//	const auto shape = static_cast<SurfaceShape>(m_previewShape);
+//	if (m_previewType == 0)
+//	{
+//		if (shape == SurfaceShape::Flat)
+//			return BezierSurface::CreateFlat(m_previewSegU, m_previewSegV, m_previewWidth, m_previewDim2, m_cursorPosition, m_device);
+//		else
+//			return BezierSurface::CreateCylinder(m_previewSegU, m_previewSegV, m_previewRadius, m_previewDim2, m_cursorPosition, m_device);
+//	}
+//	else if (m_previewType == 1)
+//	{
+//		if (shape == SurfaceShape::Flat)
+//			return BSplineSurface::CreateFlat(m_previewSegU, m_previewSegV, m_previewWidth, m_previewDim2, m_cursorPosition, m_device);
+//		else
+//			return BSplineSurface::CreateCylinder(m_previewSegU, m_previewSegV, m_previewRadius, m_previewDim2, m_cursorPosition, m_device);
+//	}	
+//}
 
 bool CadApplication::ContainsCaseInsensitive(const std::string& str, const std::string& substr)
 {
@@ -1373,16 +1396,19 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 	}
 	ImGui::EndDisabled();
 
+	bool changed = false;
 	if (ImGui::Button("Create C0 Surface"))
 	{
 		m_previewType = 0;
-		m_previewSurface = nullptr;
+		//m_previewSurface = nullptr;
+		changed = true;
 		m_showSurfacePopup = true;
 	}
 	if (ImGui::Button("Create C2 Surface"))
 	{
 		m_previewType = 1;
-		m_previewSurface = nullptr;
+		changed = true;
+		//m_previewSurface = nullptr;
 		m_showSurfacePopup = true;
 	}
 
@@ -1391,7 +1417,7 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 		const char* popupTitle = (m_previewType == 0) ? "C0 Surface Parameters" : "C2 Surface Parameters";
 		ImGui::Begin(popupTitle, &m_showSurfacePopup);
 
-		bool changed = (m_previewSurface == nullptr);
+		
 		changed |= ImGui::RadioButton("Flat", &m_previewShape, 0);
 		ImGui::SameLine();
 		changed |= ImGui::RadioButton("Cylinder", &m_previewShape, 1);
@@ -1422,28 +1448,43 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 
 		if (changed)
 		{
-			auto [surface, points] = GenerateSurface();
-			m_previewSurface = std::move(surface);
-			m_previewPoints = std::move(points);
+			m_surfaceBuilder.UpdateGeometry(
+				m_device, 
+				(m_previewType == 0) ? SurfaceType::C0 : SurfaceType::C2, 
+				static_cast<SurfaceShape>(m_previewShape), 
+				m_previewSegU, 
+				m_previewSegV,
+				(m_previewShape == 0) ? m_previewWidth : m_previewRadius,
+				m_previewDim2,
+				m_cursorPosition
+			);
 		}
 
 		if (ImGui::Button("Add to Scene"))
 		{
-			// 1. Rename and Add Surface
-			m_previewSurface->Commit();
-			std::shared_ptr<Surface> sharedSurface = std::move(m_previewSurface);
-
-			// 2. Add all its points to the scene so they render and can be edited
-			for (auto& pt : m_previewPoints)
+			auto result = m_surfaceBuilder.Build(m_device);
+			std::shared_ptr<Surface> sharedSurface = std::move(result.surface);
+			for (auto& pt : result.points)
 			{
-				pt->Commit();
 				pt->AddDependent(sharedSurface);
 				m_sceneObjects.push_back(pt);
 			}
-			m_previewPoints.clear();
+
+			// 1. Rename and Add Surface
+			//m_previewSurface->Commit();
+			//std::shared_ptr<Surface> sharedSurface = std::move(m_previewSurface);
+
+			// 2. Add all its points to the scene so they render and can be edited
+			//for (auto& pt : m_previewPoints)
+			//{
+			//	pt->Commit();
+			//	pt->AddDependent(sharedSurface);
+			//	m_sceneObjects.push_back(pt);
+			//}
+			//m_previewPoints.clear();
 
 			m_sceneObjects.push_back(sharedSurface);
-			m_previewSurface = nullptr;
+			//m_previewSurface = nullptr;
 			m_showSurfacePopup = false;
 		}
 		ImGui::End();

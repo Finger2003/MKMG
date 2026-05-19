@@ -3,7 +3,9 @@
 #include "Point.h"
 
 enum class SurfaceShape { Flat, Cylinder };
+//enum class SurfaceType { C0, C2 };
 
+struct SurfaceBuilder;
 struct Surface : public SceneObject
 {
 	DEFINE_TYPE(SceneObject, ObjectType::Surface);
@@ -38,6 +40,7 @@ struct Surface : public SceneObject
 	virtual void InitGeometry(const DxDevice& device) = 0;
 	virtual void UpdateVertices(const DxDevice& device) = 0;
 	void MarkDirty() override { m_isDirty = true; }
+	friend SurfaceBuilder;
 protected:
 	std::vector<unsigned int> GenerateLineIndices() const;
 	std::vector<unsigned int> GeneratePatchIndices() const;
@@ -57,3 +60,4 @@ struct SurfaceGenerationResult
 	std::unique_ptr<Surface> surface;
 	std::vector<std::shared_ptr<Point>> points;
 };
+
