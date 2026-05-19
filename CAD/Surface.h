@@ -43,8 +43,8 @@ struct Surface : public SceneObject
 protected:
 
 
-	std::vector<unsigned int> GenerateLineIndices() const;
-	std::vector<unsigned int> GeneratePatchIndices() const;
+	//std::vector<unsigned int> GenerateLineIndices() const;
+	//std::vector<unsigned int> GeneratePatchIndices() const;
 	unsigned int GetControlPointIndex(int u, int v) const;
 
 	virtual unsigned int GetGridPointsU() const = 0;

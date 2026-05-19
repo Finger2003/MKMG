@@ -87,7 +87,7 @@ SurfaceGenerationResult SurfaceBuilder::Build(const DxDevice& device) const
 	surface->m_patchIndexCount = static_cast<UINT>(patchIndices.size());
 	surface->m_patchIndexBuffer = device.CreateIndexBuffer(patchIndices);
 
-	std::vector<unsigned int> lineIndices = surface->GenerateLineIndices();
+	std::vector<unsigned int> lineIndices = GenerateLineIndices();
 	surface->m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
 	surface->m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
 
@@ -265,9 +265,9 @@ std::vector<unsigned int> SurfaceBuilder::GeneratePatchIndices() const
 	indices.reserve(static_cast<size_t>(segmentsU) * segmentsV * 16);
 	int bernU = (surfaceShape == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
 
-	auto getIndex = [&](int u, int v) {
+	auto getIndex = [&](int u, int v) -> unsigned int {
 		int wrappedU = (surfaceShape == SurfaceShape::Cylinder) ? (u % bernU) : u;
-		return v * bernU + wrappedU;
+		return static_cast<unsigned int>(v * bernU + wrappedU);
 		};
 
 	for (int patchV = 0; patchV < segmentsV; patchV++)
@@ -283,5 +283,47 @@ std::vector<unsigned int> SurfaceBuilder::GeneratePatchIndices() const
 			}
 		}
 	}
+	return indices;
+}
+
+std::vector<unsigned int> SurfaceBuilder::GenerateLineIndices() const
+{
+	std::vector<unsigned int> indices;
+	int pointsU, pointsV;
+	if (surfaceType == SurfaceType::C0)
+	{
+		pointsU = (surfaceShape == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
+		pointsV = 3 * segmentsV + 1;
+	}
+	else // C2
+	{
+		pointsU = (surfaceShape == SurfaceShape::Cylinder) ? segmentsU : (segmentsU + 3);
+		pointsV = segmentsV + 3;
+	}
+
+	int logicalPointsU = (surfaceShape == SurfaceShape::Cylinder) ? (pointsU + 1) : pointsU;
+	auto getIndex = [&](int u, int v) {
+		int wrappedU = (surfaceShape == SurfaceShape::Cylinder) ? (u % pointsU) : u;
+		return static_cast<unsigned int>(v * pointsU + wrappedU);
+		};
+
+	for (int v = 0; v < pointsV; v++)
+	{
+		for (int u = 0; u < logicalPointsU - 1; u++)
+		{
+			indices.push_back(getIndex(u, v));
+			indices.push_back(getIndex(u + 1, v));
+		}
+	}
+
+	for (int u = 0; u < pointsU; u++)
+	{
+		for (int v = 0; v < pointsV - 1; ++v)
+		{
+			indices.push_back(getIndex(u, v));
+			indices.push_back(getIndex(u, v + 1));
+		}
+	}
+
 	return indices;
 }

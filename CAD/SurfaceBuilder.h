@@ -36,4 +36,5 @@ private:
 	void GenerateC2Cylinder();
 	std::vector<VertexPosition> GenerateC2BernsteinPoints() const;
 	std::vector<unsigned int> GeneratePatchIndices() const;
+	std::vector<unsigned int> GenerateLineIndices() const;
 };

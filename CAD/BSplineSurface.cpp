@@ -70,31 +70,31 @@ MathLib::Vec3f BSplineSurface::Evaluate1D(MathLib::Vec3f p0, MathLib::Vec3f p1, 
 
 void BSplineSurface::InitGeometry(const DxDevice& device)
 {
-	// 1. De Boor Buffer (for wireframe)
-	if (!m_polylineVertexBuffer)
-	{
-		UINT deBoorCount = GetGridPointsU() * GetGridPointsV();
-		m_polylineVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(deBoorCount);
-	}
-	if (!m_polylineIndexBuffer)
-	{
-		std::vector<unsigned int> lineIndices = GenerateLineIndices();
-		m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
-		m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
-	}
-	// 2. Bernstein Buffer (for patches)
-	if (!m_patchVertexBuffer)
-	{
-		UINT bernsteinCount = GetBernsteinPointsU() * GetBernsteinPointsV();
-		m_patchVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(bernsteinCount);
-	}
+	//// 1. De Boor Buffer (for wireframe)
+	//if (!m_polylineVertexBuffer)
+	//{
+	//	UINT deBoorCount = GetGridPointsU() * GetGridPointsV();
+	//	m_polylineVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(deBoorCount);
+	//}
+	//if (!m_polylineIndexBuffer)
+	//{
+	//	std::vector<unsigned int> lineIndices = GenerateLineIndices();
+	//	m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
+	//	m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
+	//}
+	//// 2. Bernstein Buffer (for patches)
+	//if (!m_patchVertexBuffer)
+	//{
+	//	UINT bernsteinCount = GetBernsteinPointsU() * GetBernsteinPointsV();
+	//	m_patchVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(bernsteinCount);
+	//}
 
-	if (!m_patchIndexBuffer)
-	{
-		std::vector<unsigned int> patchIndices = GeneratePatchIndices();
-		m_patchIndexCount = static_cast<UINT>(patchIndices.size());
-		m_patchIndexBuffer = device.CreateIndexBuffer(patchIndices);
-	}
+	//if (!m_patchIndexBuffer)
+	//{
+	//	std::vector<unsigned int> patchIndices = GeneratePatchIndices();
+	//	m_patchIndexCount = static_cast<UINT>(patchIndices.size());
+	//	m_patchIndexBuffer = device.CreateIndexBuffer(patchIndices);
+	//}
 }
 
 void BSplineSurface::UpdateVertices(const DxDevice& device)

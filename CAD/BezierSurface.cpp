@@ -11,28 +11,27 @@ BezierSurface::BezierSurface(int uSeg, int vSeg, SurfaceShape shape)
 
 void BezierSurface::InitGeometry(const DxDevice& device)
 {
+	//if (!m_patchVertexBuffer)
+	//{
+	//	UINT vertexCount = GetGridPointsU() * GetGridPointsV();
+	//	m_patchVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(vertexCount);
+	//}
 
-	if (!m_patchVertexBuffer)
-	{
-		UINT vertexCount = GetGridPointsU() * GetGridPointsV();
-		m_patchVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(vertexCount);
-	}
+	//m_polylineVertexBuffer = m_patchVertexBuffer;
 
-	m_polylineVertexBuffer = m_patchVertexBuffer;
+	//if (!m_patchIndexBuffer)
+	//{
+	//	std::vector<unsigned int> patchIndices = GeneratePatchIndices();
+	//	m_patchIndexCount = static_cast<UINT>(patchIndices.size());
+	//	m_patchIndexBuffer = device.CreateIndexBuffer(patchIndices);
+	//}
 
-	if (!m_patchIndexBuffer)
-	{
-		std::vector<unsigned int> patchIndices = GeneratePatchIndices();
-		m_patchIndexCount = static_cast<UINT>(patchIndices.size());
-		m_patchIndexBuffer = device.CreateIndexBuffer(patchIndices);
-	}
-
-	if (!m_polylineIndexBuffer)
-	{
-		std::vector<unsigned int> lineIndices = GenerateLineIndices();
-		m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
-		m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
-	}
+	//if (!m_polylineIndexBuffer)
+	//{
+	//	std::vector<unsigned int> lineIndices = GenerateLineIndices();
+	//	m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
+	//	m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
+	//}
 }
 
 void BezierSurface::UpdateVertices(const DxDevice & device)
