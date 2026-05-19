@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <memory>
 #include <optional>
+#include <fstream>
 
 #include <d3d11.h>
 

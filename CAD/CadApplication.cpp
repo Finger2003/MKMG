@@ -478,6 +478,24 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		msg.result = 0;
 		return true;
 	}
+	case WM_KEYDOWN:
+	{
+		if (msg.wParam == 'S')
+		{
+			bool ctrlHeld = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+			bool shiftHeld = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+
+			if (ctrlHeld)
+			{
+				if (shiftHeld)
+					ActionSaveAs();
+				else
+					ActionSave();
+				return true;
+			}
+		}
+		break;
+	}
 	case WM_LBUTTONDOWN:
 	{
 		WORD fwKeys = LOWORD(msg.wParam);
@@ -754,7 +772,7 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 					obj->m_position = newPos;
 
 					if (auto torus = obj->As<Torus>())
-						torus->SetScale(torus->m_baseScale * scaleFactor);
+						torus->SetScale(torus->m_baseScale.ToVec3f() * scaleFactor);
 				}
 				else if (isRotating)
 				{
@@ -1167,6 +1185,62 @@ bool CadApplication::ContainsCaseInsensitive(const std::string& str, const std::
 	);
 	return (it != str.end());
 		
+}
+
+void CadApplication::ActionSave()
+{
+	if (m_currentFilePath.empty())
+		ActionSaveAs();
+	else
+		SaveScene(m_currentFilePath);
+}
+
+void CadApplication::ActionSaveAs()
+{
+	OPENFILENAMEW ofn;
+	wchar_t szFile[260] = L"scene.json";
+
+	ZeroMemory(&ofn, sizeof(ofn));
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = m_window.getHandle();
+	ofn.lpstrFile = szFile;
+	ofn.nMaxFile = sizeof(szFile);
+	ofn.lpstrFilter = L"JSON Scene Files\0*.json\0All Files\0*.*\0";
+	ofn.nFilterIndex = 1;
+	ofn.lpstrDefExt = L"json";
+	ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
+
+	if (GetSaveFileNameW(&ofn) == TRUE)
+	{
+		m_currentFilePath = ofn.lpstrFile;
+		SaveScene(m_currentFilePath);
+	}
+}
+
+void CadApplication::SaveScene(const std::wstring& filePath)
+{
+	using namespace nlohmann;
+	json rootObject = json::object();
+	json pointsArray = json::array();
+	json geometryArray = json::array();
+
+	for (const auto& obj : m_sceneObjects)
+	{
+		if (obj->type == ObjectType::Point)
+			pointsArray.push_back(obj->Serialize());
+		else
+			geometryArray.push_back(obj->Serialize());
+	}
+
+	rootObject["points"] = std::move(pointsArray);
+	rootObject["geometry"] = std::move(geometryArray);
+
+	std::ofstream file(filePath);
+	if (file.is_open())
+	{
+		file << rootObject.dump(4);
+		file.close();
+	}
 }
 
 void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
@@ -1876,8 +1950,21 @@ void CadApplication::DrawTorusMenu(Torus& torus)
 		torus.m_baseRotationMatrix = MathLib::Mat4f::Identity();
 		transformChanged = true;
 	}
-	if (ImGui::DragFloat("Scale", &torus.m_scale, 0.01f, Torus::cMinScale, Torus::cMaxScale))
+	ImGui::Separator();
+	ImGui::Text("Scale");
+
+	if (ImGui::DragFloat3("Scale XYZ", &torus.m_scale.x, 0.01f, Torus::cMinScale, Torus::cMaxScale))
 		transformChanged = true;
+
+	float uniformScale = torus.m_scale.x;
+	if (ImGui::DragFloat("Uniform Scale", &uniformScale, 0.01f, Torus::cMinScale, Torus::cMaxScale))
+	{
+		torus.m_scale = { uniformScale, uniformScale, uniformScale };
+		transformChanged = true;
+	}
+
+	//if (ImGui::DragFloat("Scale", &torus.m_scale, 0.01f, Torus::cMinScale, Torus::cMaxScale))
+	//	transformChanged = true;
 
 	if (transformChanged)
 		torus.UpdateModelMatrix();

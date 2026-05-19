@@ -248,5 +248,13 @@ private:
 #pragma endregion
 
 	static bool ContainsCaseInsensitive(const std::string& str, const std::string& substr);
+
+#pragma region Serialization
+	std::wstring m_currentFilePath;
+
+	void ActionSave();
+	void ActionSaveAs();
+	void SaveScene(const std::wstring& filePath);
+#pragma endregion
 };
 

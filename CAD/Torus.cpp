@@ -44,12 +44,21 @@ void Torus::SetSegments(int major, int minor)
 	}
 }
 
-void Torus::SetScale(float scale)
+//void Torus::SetScale(float scale)
+//{
+//	float s = scale;// clamp(scale, cMinScale, cMaxScale);
+//	if (s != m_scale)
+//	{
+//		m_scale = s;
+//		UpdateModelMatrix();
+//	}
+//}
+
+void Torus::SetScale(const float3& scale)
 {
-	float s = scale;// clamp(scale, cMinScale, cMaxScale);
-	if (s != m_scale)
+	if (scale.x != m_scale.x || scale.y != m_scale.y || scale.z != m_scale.z)
 	{
-		m_scale = s;
+		m_scale = scale;
 		UpdateModelMatrix();
 	}
 }
@@ -73,7 +82,8 @@ void Torus::UpdateBuffers(const DxDevice& device)
 void Torus::UpdateModelMatrix()
 {
 	Mat4f translation = Mat4f::Translation(m_position.x, m_position.y, m_position.z);
-	Mat4f scaling = Mat4f::Scaling(m_scale);
+	//Mat4f scaling = Mat4f::Scaling(m_scale);
+	Mat4f scaling = Mat4f::Scaling(m_scale.x, m_scale.y, m_scale.z);
 	m_modelMatrix = translation * m_rotationMatrix * scaling;
 }
 
@@ -82,7 +92,7 @@ nlohmann::json Torus::Serialize() const
 	nlohmann::json j = Base::Serialize();
 	j["rotation"] = m_rotationMatrix.ToQuaternion();
 	j["scale"] = m_scale;
-	j["samples"] = { majorSegments, minorSegments };
+	j["samples"] = uint2{ static_cast<uint32_t>(majorSegments), static_cast<uint32_t>(minorSegments) };
 	j["smallRadius"] = minorRadius;
 	j["largeRadius"] = majorRadius;
 	return j;
