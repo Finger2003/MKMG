@@ -1197,24 +1197,35 @@ void CadApplication::ActionSave()
 
 void CadApplication::ActionSaveAs()
 {
-	OPENFILENAMEW ofn;
-	wchar_t szFile[260] = L"scene.json";
+	IFileSaveDialog* pFileSave;
+	HRESULT hr = CoCreateInstance(CLSID_FileSaveDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pFileSave));
+	if (FAILED(hr)) 
+		return;
 
-	ZeroMemory(&ofn, sizeof(ofn));
-	ofn.lStructSize = sizeof(ofn);
-	ofn.hwndOwner = m_window.getHandle();
-	ofn.lpstrFile = szFile;
-	ofn.nMaxFile = sizeof(szFile);
-	ofn.lpstrFilter = L"JSON Scene Files\0*.json\0All Files\0*.*\0";
-	ofn.nFilterIndex = 1;
-	ofn.lpstrDefExt = L"json";
-	ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
+	COMDLG_FILTERSPEC rgSpec[] = { { L"JSON Scene Files", L"*.json" }, { L"All Files", L"*.*" } };
+	pFileSave->SetFileTypes(ARRAYSIZE(rgSpec), rgSpec);
+	pFileSave->SetDefaultExtension(L"json");
+	pFileSave->SetFileName(L"scene.json");
 
-	if (GetSaveFileNameW(&ofn) == TRUE)
+	hr = pFileSave->Show(m_window.getHandle());
+	if (SUCCEEDED(hr))
 	{
-		m_currentFilePath = ofn.lpstrFile;
-		SaveScene(m_currentFilePath);
+		IShellItem* pItem;
+		hr = pFileSave->GetResult(&pItem);
+		if (SUCCEEDED(hr))
+		{
+			PWSTR pszFilePath;
+			hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
+			if (SUCCEEDED(hr))
+			{
+				m_currentFilePath = std::wstring(pszFilePath);
+				SaveScene(m_currentFilePath);
+				CoTaskMemFree(pszFilePath);
+			}
+			pItem->Release();
+		}
 	}
+	pFileSave->Release();
 }
 
 void CadApplication::SaveScene(const std::wstring& filePath)

@@ -14,6 +14,6 @@
 
 #include <Windows.h>
 #include <wrl.h>
-
+#include <shobjidl.h>
 
 #include <nlohmann/json.hpp>

@@ -6,6 +6,9 @@ using namespace std;
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
+	if(FAILED(CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE)))
+		return EXIT_FAILURE;
+
 	auto exitCode = EXIT_FAILURE;
 	try
 	{
@@ -35,6 +38,6 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	{
 		MessageBoxW(nullptr, L"An unknown error has occurred.", L"Error", MB_OK);
 	}
-
+	CoUninitialize();
 	return exitCode;
 }
