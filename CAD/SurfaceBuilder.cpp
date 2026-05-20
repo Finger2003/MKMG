@@ -209,6 +209,7 @@ void SurfaceBuilder::GenerateC2Cylinder()
 	int pointsV = segmentsV + 3;
 	rawPoints.reserve(static_cast<size_t>(pointsU) * pointsV);
 
+	constexpr float startAngle = -std::numbers::pi_v<float> / 2.0f;
 	float dTheta = 2.0f * std::numbers::pi_v<float> / segmentsU;
 	float R_deBoor = radius * (3.0f / (2.0f + std::cos(dTheta)));
 	for (int v = 0; v < pointsV; v++)
@@ -216,7 +217,7 @@ void SurfaceBuilder::GenerateC2Cylinder()
 		float vParam = static_cast<float>(v - 1) / segmentsV;
 		for (int u = 0; u < pointsU; u++)
 		{
-			float angle = u * dTheta;
+			float angle = u * dTheta + startAngle;
 			rawPoints.push_back({
 				R_deBoor * std::cos(angle) + center.x,
 				R_deBoor * std::sin(angle) + center.y + radius,
