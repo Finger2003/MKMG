@@ -5,8 +5,8 @@
 using namespace std;
 using namespace Microsoft::WRL;
 
-ComPtr<ID3D11Buffer> Point::s_vertexBuffer = nullptr;
-unsigned int Point::s_nextId = 0;
+//ComPtr<ID3D11Buffer> Point::s_vertexBuffer = nullptr;
+//unsigned int Point::s_nextId = 0;
 
 void Point::InitSharedGeometry(const DxDevice& device)
 {
@@ -27,6 +27,12 @@ Point::Point(float3 position, bool lockToSurface)
 		"Point" + to_string(s_nextId++),
 		ObjectType::Point), isLockedToSurface(lockToSurface)
 {}
+
+Point::Point(unsigned int id, unsigned int pointIndex, std::string&& name, float3 position)
+	: TransformableObject(id, position, std::move(name), ObjectType::Point)
+{
+	AdvanceCounter(pointIndex);
+}
 
 void Point::AddDependent(std::weak_ptr<SceneObject> obj)
 {

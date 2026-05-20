@@ -5,12 +5,25 @@
 using namespace std;
 using namespace MathLib;
 
-unsigned int Torus::s_nextId = 0;
+//unsigned int Torus::s_nextId = 0;
 
 Torus::Torus(float3 position) : TransformableObject(position, "Torus" + to_string(s_nextId++), ObjectType::Torus)//, m_position(position)
 {
 	UpdateModelMatrix();
 }
+
+Torus::Torus(unsigned int id, unsigned int torusIndex, std::string&& name, 
+	float3 position, float3 scale, const MathLib::Mat4f& rotationMatrix,
+	float majorRadius, float minorRadius, uint2 samples)
+	: TransformableObject(id, position, std::move(name), ObjectType::Torus),
+	m_scale(scale), m_baseScale(scale), m_rotationMatrix(rotationMatrix), m_baseRotationMatrix(rotationMatrix),
+	majorRadius(majorRadius), minorRadius(minorRadius), majorSegments(samples.u), minorSegments(samples.v)
+{
+	AdvanceCounter(id);
+	m_eulerAngles = Mat4f::ExtractEulerAngles(m_rotationMatrix);
+	UpdateModelMatrix();
+}
+
 
 void Torus::SetMajorRadius(float radius)
 {

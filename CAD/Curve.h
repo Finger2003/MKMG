@@ -20,7 +20,8 @@ struct Curve : public SceneObject
 	virtual void UpdatePolyline(const DxDevice& device) = 0;
 	nlohmann::json Serialize() const override;
 protected:
-	Curve(std::string name, ObjectType type, std::vector<std::weak_ptr<Point>>&& controlPoints);
+	Curve(std::string&& name, ObjectType type, std::vector<std::weak_ptr<Point>>&& controlPoints);
+	Curve(unsigned int id, std::string&& name, ObjectType type, std::vector<std::weak_ptr<Point>>&& controlPoints);
 	virtual ~Curve() = default;
 	void UpdateBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data, UINT& vertexCount, UINT minCount);
 };

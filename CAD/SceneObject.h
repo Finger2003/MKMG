@@ -35,7 +35,7 @@ struct SceneObject
 	uint32_t m_id = 0;
 	bool selected = false;
 
-	static unsigned int s_globalIdCounter;
+	inline static unsigned int s_globalIdCounter = 0;
 
 	static constexpr ObjectType ClassType = ObjectType::SceneObject;
 	virtual bool IsA(ObjectType t) const { return t == ClassType; }
@@ -48,7 +48,17 @@ struct SceneObject
 	virtual void MarkDirty() {};
 	virtual nlohmann::json Serialize() const = 0;
 protected:
+	static void AdvanceGlobalId(unsigned int loadedId)
+	{
+		s_globalIdCounter = std::max(s_globalIdCounter, loadedId + 1);
+	}
 	SceneObject(std::string&& name, ObjectType type) : name(std::move(name)), type(type), m_id(s_globalIdCounter++) {}
+	// Deserialization constructor
+	SceneObject(unsigned int id, std::string&& name, ObjectType type)
+		: name(std::move(name)), type(type), m_id(id)
+	{
+		AdvanceGlobalId(id);
+	}
 	virtual ~SceneObject() = default;
 };
 
@@ -78,6 +88,11 @@ protected:
 	TransformableObject(float3 position, std::string&& name, ObjectType type)
 		: SceneObject(std::move(name), type), m_position(position), m_basePosition(position)
 	{}
+
+	// Deserialization constructor
+	TransformableObject(unsigned int id, float3 position, std::string&& name, ObjectType type)
+		: SceneObject(id, std::move(name), type), m_position(position), m_basePosition(position)
+	{}
 	virtual ~TransformableObject() = default;
 };
 
@@ -87,3 +102,15 @@ inline nlohmann::json TransformableObject::Serialize() const
 	j["position"] = m_position;
 	return j;
 }
+
+
+template <typename Derived>
+struct NamedObjectCounter
+{
+	inline static unsigned int s_nextId = 0;
+
+	static void AdvanceCounter(unsigned int loadedId)
+	{
+		s_nextId = std::max(s_nextId, loadedId + 1);
+	}
+};

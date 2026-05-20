@@ -2,8 +2,12 @@
 #include "Curve.h"
 #include "DxDevice.h"
 
-Curve::Curve(std::string name, ObjectType type, std::vector<std::weak_ptr<Point>>&& controlPoints)
+Curve::Curve(std::string&& name, ObjectType type, std::vector<std::weak_ptr<Point>>&& controlPoints)
     : Base(std::move(name), type), m_controlPoints(std::move(controlPoints))
+{}
+
+Curve::Curve(unsigned int id, std::string && name, ObjectType type, std::vector<std::weak_ptr<Point>> && controlPoints)
+    : Base(id, std::move(name), type), m_controlPoints(std::move(controlPoints))
 {}
 
 void Curve::CleanExpiredPoints()

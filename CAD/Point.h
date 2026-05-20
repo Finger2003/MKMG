@@ -4,13 +4,14 @@
 #include "../MathLib/Mat4f.h"
 
 class DxDevice;
-struct Point : public TransformableObject
+struct Point : public TransformableObject, public NamedObjectCounter<Point>
 {
 	DEFINE_TYPE(TransformableObject, ObjectType::Point);
 	static void InitSharedGeometry(const DxDevice& device);
 	static void ReleaseSharedGeometry();
 	Point(float3 position, bool lockToSurface = false);
-	static unsigned int s_nextId;
+	Point(unsigned int id, unsigned int pointIndex, std::string&& name, float3 position);
+	
 
 	static const Microsoft::WRL::ComPtr<ID3D11Buffer>& GetSharedVertexBuffer() { return s_vertexBuffer; }
 	const Microsoft::WRL::ComPtr<ID3D11Buffer>& GetVertexBuffer() const { return s_vertexBuffer; }
@@ -21,5 +22,5 @@ struct Point : public TransformableObject
 	void NotifyDependents();
 	MathLib::Mat4f GetModelMatrix() const;
 private:
-	static Microsoft::WRL::ComPtr<ID3D11Buffer> s_vertexBuffer;
+	inline static Microsoft::WRL::ComPtr<ID3D11Buffer> s_vertexBuffer = nullptr;
 };

@@ -10,34 +10,57 @@ using namespace MathLib;
 using namespace std;
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-static MathLib::Vec3f ScreenToObjectArcballVector(int mouseX, int mouseY, float objScreenX, float objScreenY, float radius)
+namespace
 {
-	float dx = (mouseX - objScreenX) / radius;
-	float dy = (objScreenY - mouseY) / radius; // Invert Y because screen Y goes down
-
-	MathLib::Vec3f p(dx, dy, 0.0f);
-	float length_sqr = p.length_sqr();
-
-	if (length_sqr <= 0.5f)
+	MathLib::Vec3f ScreenToObjectArcballVector(int mouseX, int mouseY, float objScreenX, float objScreenY, float radius)
 	{
-		p.z = std::sqrt(1.0f - length_sqr);
+		float dx = (mouseX - objScreenX) / radius;
+		float dy = (objScreenY - mouseY) / radius; // Invert Y because screen Y goes down
+
+		MathLib::Vec3f p(dx, dy, 0.0f);
+		float length_sqr = p.length_sqr();
+
+		if (length_sqr <= 0.5f)
+		{
+			p.z = std::sqrt(1.0f - length_sqr);
+		}
+		else
+		{
+			p.z = 0.5f / std::sqrt(length_sqr);
+			p = p.normalize();
+		}
+
+		return p;
 	}
-	else
+
+	pair<float, float> CalculateCoordsFromPixel(float x, float y, float width, float height)
 	{
-		p.z = 0.5f / std::sqrt(length_sqr);
-		p = p.normalize();
+		float normX = (x / width) * 2.0f - 1.0f;
+		float normY = 1.0f - (y / height) * 2.0f; // Invert Y coordinate
+		return { normX, normY };
 	}
 
-	return p;
-}
+	unsigned int ExtractIndexFromName(const std::string& name)
+	{
+		size_t lastDigitIdx = name.find_last_of("0123456789");
+		if (lastDigitIdx == std::string::npos) 
+			return 0;
 
-static pair<float, float> CalculateCoordsFromPixel(float x, float y, float width, float height)
-{
-	float normX = (x / width) * 2.0f - 1.0f;
-	float normY = 1.0f - (y / height) * 2.0f; // Invert Y coordinate
-	return { normX, normY };
-}
+		size_t firstDigitIdx = lastDigitIdx;
+		while (firstDigitIdx > 0 && std::isdigit(static_cast<unsigned char>(name[firstDigitIdx - 1])))
+			firstDigitIdx--;
 
+		std::string numStr = name.substr(firstDigitIdx, (lastDigitIdx - firstDigitIdx) + 1);
+		try
+		{
+			return static_cast<unsigned int>(std::stoi(numStr));
+		}
+		catch (...)
+		{
+			return 0;
+		}
+	}
+}
 CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight, std::wstring wndTitle)
 	:DxApplication(hInstance, wndWidth, wndHeight, wndTitle)
 {
@@ -241,7 +264,7 @@ void CadApplication::HandleObjectSelection(size_t index, bool ctrlHeld, bool shi
 				if (auto cp = cpWeak.lock())
 					cp->selected = state;
 			}
-		}		
+		}
 		};
 
 	if (ctrlHeld && shiftHeld)
@@ -344,7 +367,7 @@ std::optional<size_t> CadApplication::PickClosestPoint(int mouseX, int mouseY, f
 	float minZ = std::numeric_limits<float>::max();
 
 	for (size_t i = 0; i < m_sceneObjects.size(); i++)
-	{		
+	{
 		if (const auto point = m_sceneObjects[i]->As<Point>())
 		{
 			Vec4f worldPos = point->m_position.ToVec4f(1.0f);
@@ -411,7 +434,7 @@ void CadApplication::DeleteSelectedObjects()
 				if (auto cp = cpWeak.lock())
 					cp->isLockedToSurface = false;
 			}
-		}		
+		}
 	}
 
 	erase_if(m_sceneObjects, [](const auto& obj) {
@@ -480,11 +503,10 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 	}
 	case WM_KEYDOWN:
 	{
+		bool ctrlHeld = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+		bool shiftHeld = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
 		if (msg.wParam == 'S')
 		{
-			bool ctrlHeld = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
-			bool shiftHeld = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
-
 			if (ctrlHeld)
 			{
 				if (shiftHeld)
@@ -493,6 +515,11 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 					ActionSave();
 				return true;
 			}
+		}
+		else if (msg.wParam == 'O' && ctrlHeld)
+		{
+			ActionLoad();
+			return true;
 		}
 		break;
 	}
@@ -1083,7 +1110,7 @@ void CadApplication::DrawSurfacesPolylines(const Microsoft::WRL::ComPtr<ID3D11De
 				context->IASetIndexBuffer(surface->m_polylineIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 				context->DrawIndexed(surface->m_polylineIndexCount, 0, 0);
 			}
-		}		
+		}
 	}
 }
 
@@ -1184,7 +1211,7 @@ bool CadApplication::ContainsCaseInsensitive(const std::string& str, const std::
 		[](char ch1, char ch2) { return std::tolower(ch1) == std::tolower(ch2); }
 	);
 	return (it != str.end());
-		
+
 }
 
 void CadApplication::ActionSave()
@@ -1197,35 +1224,12 @@ void CadApplication::ActionSave()
 
 void CadApplication::ActionSaveAs()
 {
-	IFileSaveDialog* pFileSave;
-	HRESULT hr = CoCreateInstance(CLSID_FileSaveDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pFileSave));
-	if (FAILED(hr)) 
-		return;
-
-	COMDLG_FILTERSPEC rgSpec[] = { { L"JSON Scene Files", L"*.json" }, { L"All Files", L"*.*" } };
-	pFileSave->SetFileTypes(ARRAYSIZE(rgSpec), rgSpec);
-	pFileSave->SetDefaultExtension(L"json");
-	pFileSave->SetFileName(L"scene.json");
-
-	hr = pFileSave->Show(m_window.getHandle());
-	if (SUCCEEDED(hr))
+	std::wstring path = ShowFileDialog<IFileSaveDialog>();
+	if (!path.empty())
 	{
-		IShellItem* pItem;
-		hr = pFileSave->GetResult(&pItem);
-		if (SUCCEEDED(hr))
-		{
-			PWSTR pszFilePath;
-			hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
-			if (SUCCEEDED(hr))
-			{
-				m_currentFilePath = std::wstring(pszFilePath);
-				SaveScene(m_currentFilePath);
-				CoTaskMemFree(pszFilePath);
-			}
-			pItem->Release();
-		}
+		m_currentFilePath = path;
+		SaveScene(m_currentFilePath);
 	}
-	pFileSave->Release();
 }
 
 void CadApplication::SaveScene(const std::wstring& filePath)
@@ -1251,6 +1255,97 @@ void CadApplication::SaveScene(const std::wstring& filePath)
 	{
 		file << rootObject.dump(4);
 		file.close();
+	}
+}
+
+void CadApplication::ActionLoad()
+{
+	std::wstring path = ShowFileDialog<IFileOpenDialog>();
+	if (!path.empty())
+		LoadScene(path);
+}
+
+void CadApplication::LoadScene(const std::wstring& filePath)
+{
+	std::ifstream file(filePath);
+	if (!file.is_open())
+		return;
+
+	nlohmann::json rootObject;
+	try
+	{
+		file >> rootObject;
+	}
+	catch (const std::exception& e)
+	{
+		MessageBoxA(nullptr, e.what(), "JSON Parse Error", MB_OK | MB_ICONERROR);
+		return;
+	}
+
+	ClearSelection();
+	m_sceneObjects.clear();
+	m_currentFilePath = filePath;
+
+	std::unordered_map<unsigned int, std::shared_ptr<Point>> pointMap;
+
+	if (rootObject.contains("points"))
+	{
+		for (const auto& ptJson : rootObject["points"])
+		{
+			unsigned int id = ptJson["id"];
+			std::string name = ptJson["name"];
+			float3 pos = ptJson["position"].get<float3>();
+			unsigned int nameIdx = ExtractIndexFromName(name);
+
+			auto pt = std::make_shared<Point>(id, nameIdx, std::move(name), pos);
+			pointMap[id] = pt;
+			m_sceneObjects.push_back(pt);
+		}
+	}
+
+	if (rootObject.contains("geometry"))
+	{
+		for (const auto& geomJson : rootObject["geometry"])
+		{
+			unsigned int id = geomJson["id"];
+			std::string name = geomJson["name"];
+			unsigned int nameIdx = ExtractIndexFromName(name);
+
+			std::string type = geomJson["objectType"];
+			std::vector<std::weak_ptr<Point>> curvePoints;
+			if (geomJson.contains("controlPoints"))
+			{
+				for (const auto& cpRef : geomJson["controlPoints"])
+				{
+					unsigned int cpId = cpRef["id"];
+					if (pointMap.count(cpId))
+						curvePoints.push_back(pointMap[cpId]);
+				}
+			}
+
+			std::shared_ptr<SceneObject> newObject = nullptr;
+
+			if (type == "torus")
+			{
+				float3 pos = geomJson["position"].get<float3>();
+				float3 scale = geomJson["scale"].get<float3>();
+				uint2 samples = geomJson["samples"].get<uint2>();
+				float largeRadius = geomJson["largeRadius"];
+				float smallRadius = geomJson["smallRadius"];
+				Quaternion rotation = geomJson["rotation"].get<Quaternion>();
+				Mat4f rotMatrix = Mat4f::FromQuaternion(rotation);
+				newObject = std::make_shared<Torus>(id, nameIdx, std::move(name), pos, scale, rotMatrix, largeRadius, smallRadius, samples);
+			}
+			else if (type == "bezierC0")
+				newObject = std::make_shared<BezierCurve>(id, nameIdx, std::move(name), std::move(curvePoints));
+			else if (type == "bezierC2")
+				newObject = std::make_shared<BSplineCurve>(id, nameIdx, std::move(name), std::move(curvePoints));
+			else if (type == "interpolatedC2")
+				newObject = std::make_shared<InterpolatingCurve>(id, nameIdx, std::move(name), std::move(curvePoints));
+
+			if (newObject)
+				m_sceneObjects.push_back(newObject);
+		}
 	}
 }
 
@@ -1476,7 +1571,7 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 		const char* popupTitle = (m_previewType == 0) ? "C0 Surface Parameters" : "C2 Surface Parameters";
 		ImGui::Begin(popupTitle, &m_showSurfacePopup);
 
-		
+
 		changed |= ImGui::RadioButton("Flat", &m_previewShape, 0);
 		ImGui::SameLine();
 		changed |= ImGui::RadioButton("Cylinder", &m_previewShape, 1);
@@ -1508,10 +1603,10 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 		if (changed)
 		{
 			m_surfaceBuilder.UpdateGeometry(
-				m_device, 
-				(m_previewType == 0) ? SurfaceType::C0 : SurfaceType::C2, 
-				static_cast<SurfaceShape>(m_previewShape), 
-				m_previewSegU, 
+				m_device,
+				(m_previewType == 0) ? SurfaceType::C0 : SurfaceType::C2,
+				static_cast<SurfaceShape>(m_previewShape),
+				m_previewSegU,
 				m_previewSegV,
 				(m_previewShape == 0) ? m_previewWidth : m_previewRadius,
 				m_previewDim2,

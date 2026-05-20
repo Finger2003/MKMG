@@ -6,11 +6,17 @@
 using namespace std;
 using namespace MathLib;
 
-unsigned int BezierCurve::s_nextId = 0;
+//unsigned int BezierCurve::s_nextId = 0;
 
 BezierCurve::BezierCurve(std::vector<std::weak_ptr<Point>>&& controlPoints)
-	: Curve("BezierCurve" + to_string(s_nextId++), ObjectType::BezierCurve, std::move(controlPoints))
+	: Base("BezierCurve" + to_string(s_nextId++), ObjectType::BezierCurve, std::move(controlPoints))
 {}
+
+BezierCurve::BezierCurve(unsigned int id, unsigned int bezierCurveIndex, std::string&& name, std::vector<std::weak_ptr<Point>> && controlPoints)
+	: Base(id, std::move(name), ObjectType::BezierCurve, std::move(controlPoints))
+{
+	AdvanceCounter(bezierCurveIndex);
+}
 
 //void BezierCurve::CleanExpiredPoints()
 //{

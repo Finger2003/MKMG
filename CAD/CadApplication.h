@@ -60,6 +60,23 @@ enum class EditAction
 	Scale
 };
 
+
+template<typename T>
+concept IsFileDialog = std::derived_from<T, IFileDialog>;
+
+template<IsFileDialog T>
+struct DialogTraits;
+template<>
+struct DialogTraits<IFileOpenDialog>
+{
+	static constexpr const CLSID& Clsid = CLSID_FileOpenDialog;
+};
+template<>
+struct DialogTraits<IFileSaveDialog>
+{
+	static constexpr const CLSID& Clsid = CLSID_FileSaveDialog;
+};
+
 class CadApplication : public DxApplication
 {
 	/**
@@ -255,6 +272,48 @@ private:
 	void ActionSave();
 	void ActionSaveAs();
 	void SaveScene(const std::wstring& filePath);
+	void ActionLoad();
+	void LoadScene(const std::wstring& filePath);
+
+
+	template <IsFileDialog DialogType>
+	std::wstring ShowFileDialog();
 #pragma endregion
 };
 
+
+
+template<IsFileDialog DialogType>
+inline std::wstring CadApplication::ShowFileDialog()
+{
+	std::wstring resultPath = L"";
+	DialogType* pDialog = nullptr;
+
+	if (FAILED(CoCreateInstance(DialogTraits<DialogType>::Clsid, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pDialog))))
+		return L"";
+
+	COMDLG_FILTERSPEC rgSpec[] = { { L"JSON Scene Files", L"*.json" }, { L"All Files", L"*.*" } };
+	pDialog->SetFileTypes(ARRAYSIZE(rgSpec), rgSpec);
+	pDialog->SetDefaultExtension(L"json");
+
+	if constexpr (std::is_same_v<DialogType, IFileSaveDialog>)
+		pDialog->SetFileName(L"scene.json");
+
+	if (SUCCEEDED(pDialog->Show(m_window.getHandle())))
+	{
+		IShellItem* pItem;
+		if (SUCCEEDED(pDialog->GetResult(&pItem)))
+		{
+			PWSTR pszFilePath;
+			if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath)))
+			{
+				resultPath = pszFilePath;
+				CoTaskMemFree(pszFilePath);
+			}
+			pItem->Release();
+		}
+		pDialog->Release();
+	}	
+
+	return resultPath;
+}

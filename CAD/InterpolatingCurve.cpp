@@ -5,11 +5,17 @@
 using namespace std;
 using namespace MathLib;
 
-unsigned int InterpolatingCurve::s_nextId = 0;
+//unsigned int InterpolatingCurve::s_nextId = 0;
 
 InterpolatingCurve::InterpolatingCurve(std::vector<std::weak_ptr<Point>>&& controlPoints)
 	: Curve("InterpolatingCurve" + std::to_string(s_nextId++), ObjectType::InterpolatingCurve, std::move(controlPoints))
 {}
+
+InterpolatingCurve::InterpolatingCurve(unsigned int id, unsigned int interpolatingCurveIndex, std::string && name, std::vector<std::weak_ptr<Point>> && controlPoints)
+	: Base(id, std::move(name), ObjectType::InterpolatingCurve, std::move(controlPoints))
+{
+	AdvanceCounter(interpolatingCurveIndex);
+}
 
 void InterpolatingCurve::UpdatePolyline(const DxDevice & device)
 {
