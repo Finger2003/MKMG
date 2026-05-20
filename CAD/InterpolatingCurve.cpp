@@ -11,11 +11,18 @@ InterpolatingCurve::InterpolatingCurve(std::vector<std::weak_ptr<Point>>&& contr
 	: Curve("InterpolatingCurve" + std::to_string(s_nextId++), ObjectType::InterpolatingCurve, std::move(controlPoints))
 {}
 
-InterpolatingCurve::InterpolatingCurve(unsigned int id, unsigned int interpolatingCurveIndex, std::string && name, std::vector<std::weak_ptr<Point>> && controlPoints)
-	: Base(id, std::move(name), ObjectType::InterpolatingCurve, std::move(controlPoints))
+InterpolatingCurve::InterpolatingCurve(unsigned int id, std::vector<std::weak_ptr<Point>> && controlPoints, std::optional<ParsedNameData> && nameData)
+	: Base(id, nameData ? std::move(nameData->name) : "InterpolatingCurve" + std::to_string(s_nextId++), ObjectType::InterpolatingCurve, std::move(controlPoints))
 {
-	AdvanceCounter(interpolatingCurveIndex);
+	if (nameData)
+		AdvanceCounter(nameData->index);
 }
+
+//InterpolatingCurve::InterpolatingCurve(unsigned int id, unsigned int interpolatingCurveIndex, std::string && name, std::vector<std::weak_ptr<Point>> && controlPoints)
+//	: Base(id, std::move(name), ObjectType::InterpolatingCurve, std::move(controlPoints))
+//{
+//	AdvanceCounter(interpolatingCurveIndex);
+//}
 
 void InterpolatingCurve::UpdatePolyline(const DxDevice & device)
 {

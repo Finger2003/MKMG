@@ -114,3 +114,10 @@ struct NamedObjectCounter
 		s_nextId = std::max(s_nextId, loadedId + 1);
 	}
 };
+
+
+struct ParsedNameData
+{
+	std::string name;
+	unsigned int index;
+};

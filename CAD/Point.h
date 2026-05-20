@@ -10,7 +10,7 @@ struct Point : public TransformableObject, public NamedObjectCounter<Point>
 	static void InitSharedGeometry(const DxDevice& device);
 	static void ReleaseSharedGeometry();
 	Point(float3 position, bool lockToSurface = false);
-	Point(unsigned int id, unsigned int pointIndex, std::string&& name, float3 position);
+	Point(unsigned int id, float3 position, std::optional<ParsedNameData>&& nameData);
 	
 
 	static const Microsoft::WRL::ComPtr<ID3D11Buffer>& GetSharedVertexBuffer() { return s_vertexBuffer; }

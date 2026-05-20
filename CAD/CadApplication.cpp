@@ -43,7 +43,7 @@ namespace
 	unsigned int ExtractIndexFromName(const std::string& name)
 	{
 		size_t lastDigitIdx = name.find_last_of("0123456789");
-		if (lastDigitIdx == std::string::npos) 
+		if (lastDigitIdx == std::string::npos)
 			return 0;
 
 		size_t firstDigitIdx = lastDigitIdx;
@@ -1288,16 +1288,28 @@ void CadApplication::LoadScene(const std::wstring& filePath)
 
 	std::unordered_map<unsigned int, std::shared_ptr<Point>> pointMap;
 
+	auto parseNameData = [](const nlohmann::json& jsonNode) -> std::optional<ParsedNameData> {
+		if (jsonNode.contains("name"))
+		{
+			std::string n = jsonNode["name"];
+			if (!n.empty())
+			{
+				unsigned int idx = ExtractIndexFromName(n);
+				return ParsedNameData{ std::move(n), idx };
+			}
+		}
+		return std::nullopt;
+		};
+
 	if (rootObject.contains("points"))
 	{
 		for (const auto& ptJson : rootObject["points"])
 		{
 			unsigned int id = ptJson["id"];
-			std::string name = ptJson["name"];
-			float3 pos = ptJson["position"].get<float3>();
-			unsigned int nameIdx = ExtractIndexFromName(name);
+			float3 pos = ptJson["position"];
+			std::optional<ParsedNameData> nameData = parseNameData(ptJson);
 
-			auto pt = std::make_shared<Point>(id, nameIdx, std::move(name), pos);
+			auto pt = std::make_shared<Point>(id, pos, std::move(nameData));
 			pointMap[id] = pt;
 			m_sceneObjects.push_back(pt);
 		}
@@ -1308,10 +1320,9 @@ void CadApplication::LoadScene(const std::wstring& filePath)
 		for (const auto& geomJson : rootObject["geometry"])
 		{
 			unsigned int id = geomJson["id"];
-			std::string name = geomJson["name"];
-			unsigned int nameIdx = ExtractIndexFromName(name);
-
 			std::string type = geomJson["objectType"];
+			std::optional<ParsedNameData> nameData = parseNameData(geomJson);
+
 			std::vector<std::weak_ptr<Point>> controlPoints;
 			if (geomJson.contains("controlPoints"))
 			{
@@ -1324,11 +1335,15 @@ void CadApplication::LoadScene(const std::wstring& filePath)
 			}
 
 			std::shared_ptr<SceneObject> newObject = nullptr;
-
-			if (type == "bezierSurfaceC0" || type == "bezierSurfaceC2")
+			auto assignCurve = [&]<typename CurveType>()
 			{
-				uint2 size = geomJson["size"].get<uint2>();
-				uint2 samples = geomJson["samples"].get<uint2>();
+				newObject = std::make_shared<CurveType>(id, std::move(controlPoints), std::move(nameData));
+			};
+
+			if (type == BezierSurface::SchemaName || type == BSplineSurface::SchemaName)
+			{
+				uint2 size = geomJson["size"];
+				uint2 samples = geomJson["samples"];
 				bool isCylinder = false;
 
 				if (size.u > 1)
@@ -1357,36 +1372,47 @@ void CadApplication::LoadScene(const std::wstring& filePath)
 				for (unsigned int v = 0; v < internalV; v++)
 				{
 					for (unsigned int u = 0; u < internalU; u++)
-						finalControlPoints.push_back(controlPoints[static_cast<size_t>(v) * size.u + u]);					
-				}				
+						finalControlPoints.push_back(controlPoints[static_cast<size_t>(v) * size.u + u]);
+				}
 				uint2 internalGrid = { internalU, internalV };
 
-				std::unique_ptr<Surface> newSurface;
-				if (type == "bezierSurfaceC0")
-					newSurface = std::make_unique<BezierSurface>(id, nameIdx, std::move(name), internalGrid, shape, std::move(finalControlPoints), samples);
+				std::shared_ptr<Surface> newSurface;
+				auto assignSurface = [&]<typename SurfaceType>()
+				{
+					newSurface = std::make_shared<SurfaceType>(id, internalGrid, samples, shape, std::move(finalControlPoints), std::move(nameData));
+				};
+				if (type == BezierSurface::SchemaName)
+					assignSurface.operator() < BezierSurface > ();
 				else
-					newSurface = std::make_unique<BSplineSurface>(id, nameIdx, std::move(name), internalGrid, shape, std::move(finalControlPoints), samples);
-				
+					assignSurface.operator() < BSplineSurface > ();
+
+
+				for (const auto& cpWeak : newSurface->m_controlPoints)
+				{
+					if (auto cpShared = cpWeak.lock())
+						cpShared->AddDependent(newSurface);
+				}
+
 				newSurface->InitGeometry(m_device);
 				newObject = std::move(newSurface);
 			}
-			else if (type == "torus")
+			else if (type == Torus::SchemaName)
 			{
-				float3 pos = geomJson["position"].get<float3>();
-				float3 scale = geomJson["scale"].get<float3>();
-				uint2 samples = geomJson["samples"].get<uint2>();
+				float3 pos = geomJson["position"];
+				float3 scale = geomJson["scale"];
+				uint2 samples = geomJson["samples"];
 				float largeRadius = geomJson["largeRadius"];
 				float smallRadius = geomJson["smallRadius"];
-				Quaternion rotation = geomJson["rotation"].get<Quaternion>();
+				Quaternion rotation = geomJson["rotation"];
 				Mat4f rotMatrix = Mat4f::FromQuaternion(rotation);
-				newObject = std::make_shared<Torus>(id, nameIdx, std::move(name), pos, scale, rotMatrix, largeRadius, smallRadius, samples);
+				newObject = std::make_shared<Torus>(id, pos, scale, rotMatrix, largeRadius, smallRadius, samples, std::move(nameData));
 			}
-			else if (type == "bezierC0")
-				newObject = std::make_shared<BezierCurve>(id, nameIdx, std::move(name), std::move(controlPoints));
-			else if (type == "bezierC2")
-				newObject = std::make_shared<BSplineCurve>(id, nameIdx, std::move(name), std::move(controlPoints));
-			else if (type == "interpolatedC2")
-				newObject = std::make_shared<InterpolatingCurve>(id, nameIdx, std::move(name), std::move(controlPoints));
+			else if (type == BezierCurve::SchemaName)
+				assignCurve.operator() < BezierCurve > ();
+			else if (type == BSplineCurve::SchemaName)
+				assignCurve.operator() < BSplineCurve > ();
+			else if (type == InterpolatingCurve::SchemaName)
+				assignCurve.operator() < InterpolatingCurve > ();
 
 			if (newObject)
 				m_sceneObjects.push_back(newObject);

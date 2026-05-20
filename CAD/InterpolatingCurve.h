@@ -4,12 +4,12 @@
 struct InterpolatingCurve : public Curve, public NamedObjectCounter<InterpolatingCurve>
 {
 	DEFINE_TYPE(Curve, ObjectType::InterpolatingCurve);
-	//static unsigned int s_nextId;
 
 	InterpolatingCurve(std::vector<std::weak_ptr<Point>>&& controlPoints);
-	InterpolatingCurve(unsigned int id, unsigned int interpolatingCurveIndex, std::string&& name, std::vector<std::weak_ptr<Point>>&& controlPoints);
+	InterpolatingCurve(unsigned int id, std::vector<std::weak_ptr<Point>>&& controlPoints, std::optional<ParsedNameData>&& nameData);
 	void UpdatePolyline(const DxDevice& device) override;
 
-	const char* GetSchemaType() const override { return "interpolatedC2"; }
+	static constexpr const char* SchemaName = "interpolatedC2";
+	const char* GetSchemaType() const override { return SchemaName; }
 };
 

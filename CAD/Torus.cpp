@@ -5,21 +5,18 @@
 using namespace std;
 using namespace MathLib;
 
-//unsigned int Torus::s_nextId = 0;
-
 Torus::Torus(float3 position) : TransformableObject(position, "Torus" + to_string(s_nextId++), ObjectType::Torus)//, m_position(position)
 {
 	UpdateModelMatrix();
 }
 
-Torus::Torus(unsigned int id, unsigned int torusIndex, std::string&& name, 
-	float3 position, float3 scale, const MathLib::Mat4f& rotationMatrix,
-	float majorRadius, float minorRadius, uint2 samples)
-	: TransformableObject(id, position, std::move(name), ObjectType::Torus),
+Torus::Torus(unsigned int id, float3 position, float3 scale, const MathLib::Mat4f& rotationMatrix, float majorRadius, float minorRadius, uint2 samples, std::optional<ParsedNameData>&& nameData)
+	: Base(id, position, nameData ? std::move(nameData->name) : "Torus" + to_string(s_nextId++), ObjectType::Torus),
 	m_scale(scale), m_baseScale(scale), m_rotationMatrix(rotationMatrix), m_baseRotationMatrix(rotationMatrix),
 	majorRadius(majorRadius), minorRadius(minorRadius), majorSegments(samples.u), minorSegments(samples.v)
 {
-	AdvanceCounter(id);
+	if (nameData)
+		AdvanceCounter(nameData->index);
 	m_eulerAngles = Mat4f::ExtractEulerAngles(m_rotationMatrix);
 	UpdateModelMatrix();
 }
@@ -56,16 +53,6 @@ void Torus::SetSegments(int major, int minor)
 		dirty = true;
 	}
 }
-
-//void Torus::SetScale(float scale)
-//{
-//	float s = scale;// clamp(scale, cMinScale, cMaxScale);
-//	if (s != m_scale)
-//	{
-//		m_scale = s;
-//		UpdateModelMatrix();
-//	}
-//}
 
 void Torus::SetScale(const float3& scale)
 {

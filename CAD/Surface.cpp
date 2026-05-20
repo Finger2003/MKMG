@@ -32,32 +32,9 @@ std::vector<unsigned int> Surface::GenerateLineIndices() const
 
 	return indices;
 }
-//
-//std::vector<unsigned int> Surface::GeneratePatchIndices() const
-//{
-//	std::vector<unsigned int> indices;
-//	indices.reserve(static_cast<size_t>(segmentsU) * segmentsV * 16);
-//
-//	for (int patchV = 0; patchV < segmentsV; patchV++)
-//	{
-//		for (int patchU = 0; patchU < segmentsU; patchU++)
-//		{
-//			for (int v = 0; v < 4; v++)
-//			{
-//				for (int u = 0; u < 4; u++)
-//				{
-//					indices.push_back(GetPatchDataIndex(patchU * 3 + u, patchV * 3 + v));
-//				}
-//			}
-//		}
-//	}
-//	return indices;
-//}
 
 unsigned int Surface::GetControlPointIndex(int u, int v) const
 {
-	//unsigned int pointsU = GetGridPointsU();
-	//int wrappedU = (shapeType == SurfaceShape::Cylinder) ? (u % pointsU) : u;
 	int wrappedU = (shapeType == SurfaceShape::Cylinder) ? (u % m_gridPointsU) : u;
 	return static_cast<unsigned int>(v * m_gridPointsU + wrappedU);
 }
@@ -65,8 +42,6 @@ unsigned int Surface::GetControlPointIndex(int u, int v) const
 nlohmann::json Surface::Serialize() const
 {
 	nlohmann::json j = Base::Serialize();
-	//unsigned int exportU = GetExportPointsU();
-	//unsigned int exportV = GetExportPointsV();
 
 	unsigned int exportU = static_cast<unsigned int>((shapeType == SurfaceShape::Cylinder) ? (m_gridPointsU + 1) : m_gridPointsU);
 

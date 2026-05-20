@@ -12,11 +12,18 @@ BezierCurve::BezierCurve(std::vector<std::weak_ptr<Point>>&& controlPoints)
 	: Base("BezierCurve" + to_string(s_nextId++), ObjectType::BezierCurve, std::move(controlPoints))
 {}
 
-BezierCurve::BezierCurve(unsigned int id, unsigned int bezierCurveIndex, std::string&& name, std::vector<std::weak_ptr<Point>> && controlPoints)
-	: Base(id, std::move(name), ObjectType::BezierCurve, std::move(controlPoints))
+BezierCurve::BezierCurve(unsigned int id, std::vector<std::weak_ptr<Point>>&& controlPoints, std::optional<ParsedNameData>&& nameData)
+	: Base(id, nameData ? std::move(nameData->name) : "BezierCurve" + to_string(s_nextId++), ObjectType::BezierCurve, std::move(controlPoints))
 {
-	AdvanceCounter(bezierCurveIndex);
+	if (nameData)
+		AdvanceCounter(nameData->index);
 }
+
+//BezierCurve::BezierCurve(unsigned int id, unsigned int bezierCurveIndex, std::string&& name, std::vector<std::weak_ptr<Point>>&& controlPoints)
+//	: Base(id, std::move(name), ObjectType::BezierCurve, std::move(controlPoints))
+//{
+//	AdvanceCounter(bezierCurveIndex);
+//}
 
 //void BezierCurve::CleanExpiredPoints()
 //{
@@ -60,7 +67,7 @@ void BezierCurve::UpdatePolyline(const DxDevice& device)
 		{
 			if (auto sp = wp.lock())
 			{
-				m_lastPositions.push_back(sp->m_position);				
+				m_lastPositions.push_back(sp->m_position);
 			}
 		}
 

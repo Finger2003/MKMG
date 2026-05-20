@@ -13,7 +13,6 @@ struct VirtualPointMapping
 struct BSplineCurve : public Curve, public NamedObjectCounter<BSplineCurve>
 {
 	DEFINE_TYPE(Curve, ObjectType::BSplineCurve);
-	//static unsigned int s_nextId;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_bernsteinVertexBuffer;
 	UINT m_bernsteinVertexCount = 0;
 	UINT m_bernsteinBufferCapacity = 0;
@@ -21,10 +20,11 @@ struct BSplineCurve : public Curve, public NamedObjectCounter<BSplineCurve>
 	std::vector<VirtualPointMapping> m_virtualPoints;
 
 	BSplineCurve(std::vector<std::weak_ptr<Point>>&& controlPoints);
-	BSplineCurve(unsigned int id, unsigned int bsplineCurveIndex, std::string&& name, std::vector<std::weak_ptr<Point>>&& controlPoints);
+	BSplineCurve(unsigned int id, std::vector<std::weak_ptr<Point>>&& controlPoints, std::optional<ParsedNameData>&& nameData);
 	void UpdatePolyline(const DxDevice& device) override;
 
-	const char* GetSchemaType() const override { return "bezierC2"; }
+	static constexpr const char* SchemaName = "bezierC2";
+	const char* GetSchemaType() const override { return SchemaName; }
 };
 
 

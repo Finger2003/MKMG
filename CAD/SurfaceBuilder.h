@@ -2,7 +2,6 @@
 #include "SceneObject.h"
 #include "Surface.h"
 
-//enum class SurfaceShape { Flat, Cylinder };
 enum class SurfaceType { C0, C2 };
 struct SurfaceBuilder
 {

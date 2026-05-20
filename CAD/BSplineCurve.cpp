@@ -12,11 +12,18 @@ BSplineCurve::BSplineCurve(std::vector<std::weak_ptr<Point>>&& controlPoints)
 	: Base("BSplineCurve" + to_string(s_nextId++), ObjectType::BSplineCurve, std::move(controlPoints))
 {}
 
-BSplineCurve::BSplineCurve(unsigned int id, unsigned int bsplineCurveIndex, std::string&& name, std::vector<std::weak_ptr<Point>>&& controlPoints)
-	: Base(id, std::move(name), ObjectType::BSplineCurve, std::move(controlPoints))
+BSplineCurve::BSplineCurve(unsigned int id, std::vector<std::weak_ptr<Point>> && controlPoints, std::optional<ParsedNameData> && nameData)
+	: Base(id, nameData ? std::move(nameData->name) : "BSplineCurve" + to_string(s_nextId++), ObjectType::BSplineCurve, std::move(controlPoints))
 {
-	AdvanceCounter(bsplineCurveIndex);
+	if (nameData)
+		AdvanceCounter(nameData->index);
 }
+
+//BSplineCurve::BSplineCurve(unsigned int id, unsigned int bsplineCurveIndex, std::string&& name, std::vector<std::weak_ptr<Point>>&& controlPoints)
+//	: Base(id, std::move(name), ObjectType::BSplineCurve, std::move(controlPoints))
+//{
+//	AdvanceCounter(bsplineCurveIndex);
+//}
 
 void BSplineCurve::UpdatePolyline(const DxDevice& device)
 {
