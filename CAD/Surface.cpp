@@ -7,34 +7,31 @@ std::shared_ptr<Point> Surface::GetPoint(int u, int v) const
     return m_controlPoints[GetControlPointIndex(u, v)].lock();
 }
 //
-//std::vector<unsigned int> Surface::GenerateLineIndices() const
-//{
-//	std::vector<unsigned int> indices;
-//
-//	int pointsU = GetGridPointsU();
-//	int pointsV = GetGridPointsV();
-//	int logicalPointsU = (shapeType == SurfaceShape::Cylinder) ? pointsU + 1 : pointsU;
-//
-//	for (int v = 0; v < pointsV; v++)
-//	{
-//		for (int u = 0; u < logicalPointsU - 1; u++)
-//		{
-//			indices.push_back(GetControlPointIndex(u, v));
-//			indices.push_back(GetControlPointIndex(u + 1, v));
-//		}
-//	}
-//
-//	for (int u = 0; u < pointsU; u++)
-//	{
-//		for (int v = 0; v < pointsV - 1; ++v)
-//		{
-//			indices.push_back(GetControlPointIndex(u, v));
-//			indices.push_back(GetControlPointIndex(u, v + 1));
-//		}
-//	}
-//
-//	return indices;
-//}
+std::vector<unsigned int> Surface::GenerateLineIndices() const
+{
+	std::vector<unsigned int> indices;
+	int logicalPointsU = (shapeType == SurfaceShape::Cylinder) ? m_gridPointsU + 1 : m_gridPointsU;
+
+	for (int v = 0; v < m_gridPointsV; v++)
+	{
+		for (int u = 0; u < logicalPointsU - 1; u++)
+		{
+			indices.push_back(GetControlPointIndex(u, v));
+			indices.push_back(GetControlPointIndex(u + 1, v));
+		}
+	}
+
+	for (int u = 0; u < m_gridPointsU; u++)
+	{
+		for (int v = 0; v < m_gridPointsV - 1; ++v)
+		{
+			indices.push_back(GetControlPointIndex(u, v));
+			indices.push_back(GetControlPointIndex(u, v + 1));
+		}
+	}
+
+	return indices;
+}
 //
 //std::vector<unsigned int> Surface::GeneratePatchIndices() const
 //{
@@ -59,21 +56,24 @@ std::shared_ptr<Point> Surface::GetPoint(int u, int v) const
 
 unsigned int Surface::GetControlPointIndex(int u, int v) const
 {
-	unsigned int pointsU = GetGridPointsU();
-	int wrappedU = (shapeType == SurfaceShape::Cylinder) ? (u % pointsU) : u;
-	return static_cast<unsigned int>(v * pointsU + wrappedU);
+	//unsigned int pointsU = GetGridPointsU();
+	//int wrappedU = (shapeType == SurfaceShape::Cylinder) ? (u % pointsU) : u;
+	int wrappedU = (shapeType == SurfaceShape::Cylinder) ? (u % m_gridPointsU) : u;
+	return static_cast<unsigned int>(v * m_gridPointsU + wrappedU);
 }
 
 nlohmann::json Surface::Serialize() const
 {
 	nlohmann::json j = Base::Serialize();
-	unsigned int exportU = GetExportPointsU();
-	unsigned int exportV = GetExportPointsV();
+	//unsigned int exportU = GetExportPointsU();
+	//unsigned int exportV = GetExportPointsV();
 
-	j["size"] = { exportU, exportV };
-	j["samples"] = { m_linesPerSegmentU, m_linesPerSegmentV };
+	unsigned int exportU = static_cast<unsigned int>((shapeType == SurfaceShape::Cylinder) ? (m_gridPointsU + 1) : m_gridPointsU);
+
+	j["size"] = uint2{ exportU, static_cast<unsigned int>(m_gridPointsV) };
+	j["samples"] = uint2{ static_cast<unsigned int>(m_linesPerSegmentU), static_cast<unsigned int>(m_linesPerSegmentV) };
 	nlohmann::json cpArray = nlohmann::json::array();
-	for (unsigned int v = 0; v < exportV; ++v)
+	for (unsigned int v = 0; v < m_gridPointsV; ++v)
 	{
 		for (unsigned int u = 0; u < exportU; ++u)
 		{

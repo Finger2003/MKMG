@@ -5,19 +5,33 @@
 using namespace MathLib;
 
 
-unsigned int BSplineSurface::s_nextId = 0;
+//unsigned int BSplineSurface::s_nextId = 0;
 
-BSplineSurface::BSplineSurface(int uSeg, int vSeg, SurfaceShape shape)
-	: Surface(uSeg, vSeg, shape, "Surface C2 - " + std::to_string(s_nextId++))
+//BSplineSurface::BSplineSurface(int uSeg, int vSeg, SurfaceShape shape)
+//	: Surface(uSeg, vSeg, shape, "Surface C2 - " + std::to_string(s_nextId++))
+//{}
+
+BSplineSurface::BSplineSurface(int uGrid, int vGrid, SurfaceShape shape)
+	: Surface(uGrid, vGrid, shape, "Surface C2 - " + std::to_string(s_nextId++))
 {}
+
+BSplineSurface::BSplineSurface(unsigned int id, unsigned int nameIndex, std::string&& name, uint2 grid, SurfaceShape shape, std::vector<std::weak_ptr<Point>>&& controlPoints, uint2 samples)
+	: Surface(id, std::move(name), grid.u, grid.v, samples.u, samples.v, shape, std::move(controlPoints))
+{
+	AdvanceCounter(nameIndex);
+}
 
 unsigned int BSplineSurface::GetBernsteinPointsU() const
 {
-	return (shapeType == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
+	//return (shapeType == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
+	return (shapeType == SurfaceShape::Cylinder)
+		? (3 * m_gridPointsU)
+		: (3 * (m_gridPointsU - 3) + 1);
 }
 unsigned int BSplineSurface::GetBernsteinPointsV() const
 {
-	return 3 * segmentsV + 1;
+	//return 3 * segmentsV + 1;
+	return 3 * (m_gridPointsV - 3) + 1;
 }
 
 unsigned int BSplineSurface::GetBernsteinIndex(int u, int v) const
@@ -25,6 +39,16 @@ unsigned int BSplineSurface::GetBernsteinIndex(int u, int v) const
 	unsigned int pointsU = GetBernsteinPointsU();
 	int wrappedU = (shapeType == SurfaceShape::Cylinder) ? (u % pointsU) : u;
 	return static_cast<unsigned int>(v * pointsU + wrappedU);
+}
+
+unsigned int BSplineSurface::GetSegmentsU() const
+{
+	return (shapeType == SurfaceShape::Cylinder) ? m_gridPointsU : (m_gridPointsU - 3);
+}
+
+unsigned int BSplineSurface::GetSegmentsV() const
+{
+	return m_gridPointsV - 3;
 }
 
 void BSplineSurface::ConvertPatchToBernstein(int patchU, int patchV, std::vector<VertexPosition>& bernsteinGrid) const
@@ -68,33 +92,35 @@ MathLib::Vec3f BSplineSurface::Evaluate1D(MathLib::Vec3f p0, MathLib::Vec3f p1, 
 	}
 }
 
+
+
 void BSplineSurface::InitGeometry(const DxDevice& device)
 {
-	//// 1. De Boor Buffer (for wireframe)
-	//if (!m_polylineVertexBuffer)
-	//{
-	//	UINT deBoorCount = GetGridPointsU() * GetGridPointsV();
-	//	m_polylineVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(deBoorCount);
-	//}
-	//if (!m_polylineIndexBuffer)
-	//{
-	//	std::vector<unsigned int> lineIndices = GenerateLineIndices();
-	//	m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
-	//	m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
-	//}
-	//// 2. Bernstein Buffer (for patches)
-	//if (!m_patchVertexBuffer)
-	//{
-	//	UINT bernsteinCount = GetBernsteinPointsU() * GetBernsteinPointsV();
-	//	m_patchVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(bernsteinCount);
-	//}
+	// 1. De Boor Buffer (for wireframe)
+	if (!m_polylineVertexBuffer)
+	{
+		UINT deBoorCount = m_gridPointsU * m_gridPointsV;
+		m_polylineVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(deBoorCount);
+	}
+	if (!m_polylineIndexBuffer)
+	{
+		std::vector<unsigned int> lineIndices = GenerateLineIndices();
+		m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
+		m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
+	}
+	// 2. Bernstein Buffer (for patches)
+	if (!m_patchVertexBuffer)
+	{
+		UINT bernsteinCount = GetBernsteinPointsU() * GetBernsteinPointsV();
+		m_patchVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(bernsteinCount);
+	}
 
-	//if (!m_patchIndexBuffer)
-	//{
-	//	std::vector<unsigned int> patchIndices = GeneratePatchIndices();
-	//	m_patchIndexCount = static_cast<UINT>(patchIndices.size());
-	//	m_patchIndexBuffer = device.CreateIndexBuffer(patchIndices);
-	//}
+	if (!m_patchIndexBuffer)
+	{
+		std::vector<unsigned int> patchIndices = GeneratePatchIndices();
+		m_patchIndexCount = static_cast<UINT>(patchIndices.size());
+		m_patchIndexBuffer = device.CreateIndexBuffer(patchIndices);
+	}
 }
 
 void BSplineSurface::UpdateVertices(const DxDevice& device)
@@ -103,12 +129,12 @@ void BSplineSurface::UpdateVertices(const DxDevice& device)
 		return;
 
 	// 1. Upload De Boor Points (Wireframe)
-	UINT deBoorCount = GetGridPointsU() * GetGridPointsV();
+	UINT deBoorCount = m_gridPointsU * m_gridPointsV;
 	std::vector<VertexPosition> deBoorPositions(deBoorCount);
 
-	for (unsigned int v = 0; v < GetGridPointsV(); v++)
+	for (unsigned int v = 0; v < m_gridPointsV; v++)
 	{
-		for (unsigned int u = 0; u < GetGridPointsU(); ++u)
+		for (unsigned int u = 0; u < m_gridPointsU; ++u)
 		{
 			unsigned int idx = GetControlPointIndex(u, v);
 			if (auto pt = m_controlPoints[idx].lock())
@@ -121,9 +147,9 @@ void BSplineSurface::UpdateVertices(const DxDevice& device)
 	// 2. Convert and Upload Bernstein Points (Surface Patches)
 	UINT bernsteinCount = GetBernsteinPointsU() * GetBernsteinPointsV();
 	std::vector<VertexPosition> bernsteinPositions(bernsteinCount);
-	for (int patchV = 0; patchV < segmentsV; patchV++)
+	for (int patchV = 0; patchV < GetSegmentsV(); patchV++)
 	{
-		for (int patchU = 0; patchU < segmentsU; patchU++)
+		for (int patchU = 0; patchU < GetSegmentsU(); patchU++)
 		{
 			ConvertPatchToBernstein(patchU, patchV, bernsteinPositions);
 		}
@@ -133,15 +159,38 @@ void BSplineSurface::UpdateVertices(const DxDevice& device)
 	m_isDirty = false;
 }
 
-unsigned int BSplineSurface::GetGridPointsU() const
+std::vector<unsigned int> BSplineSurface::GeneratePatchIndices() const
 {
-	return (shapeType == SurfaceShape::Cylinder) ? segmentsU : (segmentsU + 3);
+	std::vector<unsigned int> indices;
+	unsigned int segU = GetSegmentsU();
+	unsigned int segV = GetSegmentsV();
+	indices.reserve(static_cast<size_t>(segU) * segV * 16);
+
+	for (unsigned int patchV = 0; patchV < segV; patchV++)
+	{
+		for (unsigned int patchU = 0; patchU < segU; patchU++)
+		{
+			for (int v = 0; v < 4; v++)
+			{
+				for (int u = 0; u < 4; u++)
+				{
+					indices.push_back(GetBernsteinIndex(patchU * 3 + u, patchV * 3 + v));
+				}
+			}
+		}
+	}
+	return indices;
 }
 
-unsigned int BSplineSurface::GetGridPointsV() const
-{
-	return segmentsV + 3;
-}
+//unsigned int BSplineSurface::GetGridPointsU() const
+//{
+//	return (shapeType == SurfaceShape::Cylinder) ? segmentsU : (segmentsU + 3);
+//}
+//
+//unsigned int BSplineSurface::GetGridPointsV() const
+//{
+//	return segmentsV + 3;
+//}
 
 unsigned int BSplineSurface::GetPatchDataIndex(int u, int v) const
 {

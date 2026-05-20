@@ -10,8 +10,11 @@ struct Surface : public SceneObject
 {
 	DEFINE_TYPE(SceneObject, ObjectType::Surface);
 	SurfaceShape shapeType;
-	int segmentsU;
-	int segmentsV;
+	//int segmentsU;
+	//int segmentsV;
+
+	int m_gridPointsU = 0;
+	int m_gridPointsV = 0;
 	bool m_isDirty = true;
 
 	std::vector<std::weak_ptr<Point>> m_controlPoints;
@@ -36,8 +39,23 @@ struct Surface : public SceneObject
 	virtual void UpdateVertices(const DxDevice& device) = 0;
 	void MarkDirty() override { m_isDirty = true; }
 	friend SurfaceBuilder;
-	Surface(int uSeg, int vSeg, SurfaceShape shape, std::string&& name = "Surface")
-		: SceneObject(std::move(name), ObjectType::Surface), segmentsU(uSeg), segmentsV(vSeg), shapeType(shape)
+	//Surface(int uSeg, int vSeg, SurfaceShape shape, std::string&& name = "Surface")
+	//	: SceneObject(std::move(name), ObjectType::Surface), segmentsU(uSeg), segmentsV(vSeg), shapeType(shape)
+	//{}
+
+	std::vector<unsigned int> GenerateLineIndices() const;
+
+
+	Surface(int uGrid, int vGrid, SurfaceShape shape, std::string&& name)
+		: SceneObject(std::move(name), ObjectType::Surface), m_gridPointsU(uGrid), m_gridPointsV(vGrid), shapeType(shape)
+	{}
+
+	Surface(unsigned int id, std::string&& name, 
+		int gridPointsU, int gridPointsV, int linesPerSegmentU, int linesPerSegmentV, 
+		SurfaceShape shape, std::vector<std::weak_ptr<Point>>&& controlPoints)
+		: SceneObject(id, std::move(name), ObjectType::Surface),
+		m_gridPointsU(gridPointsU), m_gridPointsV(gridPointsV), m_linesPerSegmentU(linesPerSegmentU), m_linesPerSegmentV(linesPerSegmentV), 
+		shapeType(shape), m_controlPoints(std::move(controlPoints))
 	{}
 	virtual ~Surface() = default;
 protected:
@@ -47,11 +65,11 @@ protected:
 	//std::vector<unsigned int> GeneratePatchIndices() const;
 	unsigned int GetControlPointIndex(int u, int v) const;
 
-	virtual unsigned int GetGridPointsU() const = 0;
-	virtual unsigned int GetGridPointsV() const = 0;
+	//virtual unsigned int GetGridPointsU() const = 0;
+	//virtual unsigned int GetGridPointsV() const = 0;
 	virtual unsigned int GetPatchDataIndex(int u, int v) const = 0;
-	virtual unsigned int GetExportPointsU() const = 0;
-	virtual unsigned int GetExportPointsV() const = 0;
+	//virtual unsigned int GetExportPointsU() const = 0;
+	//virtual unsigned int GetExportPointsV() const = 0;
 
 	nlohmann::json Serialize() const override;
 };

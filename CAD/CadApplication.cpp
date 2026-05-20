@@ -1312,20 +1312,65 @@ void CadApplication::LoadScene(const std::wstring& filePath)
 			unsigned int nameIdx = ExtractIndexFromName(name);
 
 			std::string type = geomJson["objectType"];
-			std::vector<std::weak_ptr<Point>> curvePoints;
+			std::vector<std::weak_ptr<Point>> controlPoints;
 			if (geomJson.contains("controlPoints"))
 			{
 				for (const auto& cpRef : geomJson["controlPoints"])
 				{
 					unsigned int cpId = cpRef["id"];
 					if (pointMap.count(cpId))
-						curvePoints.push_back(pointMap[cpId]);
+						controlPoints.push_back(pointMap[cpId]);
 				}
 			}
 
 			std::shared_ptr<SceneObject> newObject = nullptr;
 
-			if (type == "torus")
+			if (type == "bezierSurfaceC0" || type == "bezierSurfaceC2")
+			{
+				uint2 size = geomJson["size"].get<uint2>();
+				uint2 samples = geomJson["samples"].get<uint2>();
+				bool isCylinder = false;
+
+				if (size.u > 1)
+				{
+					isCylinder = true;
+					for (unsigned int v = 0; v < size.v; v++)
+					{
+						auto firstInRow = controlPoints[static_cast<size_t>(v) * size.u].lock();
+						auto lastInRow = controlPoints[static_cast<size_t>(v) * size.u + (static_cast<size_t>(size.u) - 1)].lock();
+
+						if (!firstInRow || !lastInRow || firstInRow->m_id != lastInRow->m_id)
+						{
+							isCylinder = false;
+							break;
+						}
+					}
+				}
+
+				SurfaceShape shape = isCylinder ? SurfaceShape::Cylinder : SurfaceShape::Flat;
+				unsigned int internalU = isCylinder ? (size.u - 1) : size.u;
+				unsigned int internalV = size.v;
+
+				std::vector<std::weak_ptr<Point>> finalControlPoints;
+				finalControlPoints.reserve(static_cast<size_t>(internalU) * internalV);
+
+				for (unsigned int v = 0; v < internalV; v++)
+				{
+					for (unsigned int u = 0; u < internalU; u++)
+						finalControlPoints.push_back(controlPoints[static_cast<size_t>(v) * size.u + u]);					
+				}				
+				uint2 internalGrid = { internalU, internalV };
+
+				std::unique_ptr<Surface> newSurface;
+				if (type == "bezierSurfaceC0")
+					newSurface = std::make_unique<BezierSurface>(id, nameIdx, std::move(name), internalGrid, shape, std::move(finalControlPoints), samples);
+				else
+					newSurface = std::make_unique<BSplineSurface>(id, nameIdx, std::move(name), internalGrid, shape, std::move(finalControlPoints), samples);
+				
+				newSurface->InitGeometry(m_device);
+				newObject = std::move(newSurface);
+			}
+			else if (type == "torus")
 			{
 				float3 pos = geomJson["position"].get<float3>();
 				float3 scale = geomJson["scale"].get<float3>();
@@ -1337,11 +1382,11 @@ void CadApplication::LoadScene(const std::wstring& filePath)
 				newObject = std::make_shared<Torus>(id, nameIdx, std::move(name), pos, scale, rotMatrix, largeRadius, smallRadius, samples);
 			}
 			else if (type == "bezierC0")
-				newObject = std::make_shared<BezierCurve>(id, nameIdx, std::move(name), std::move(curvePoints));
+				newObject = std::make_shared<BezierCurve>(id, nameIdx, std::move(name), std::move(controlPoints));
 			else if (type == "bezierC2")
-				newObject = std::make_shared<BSplineCurve>(id, nameIdx, std::move(name), std::move(curvePoints));
+				newObject = std::make_shared<BSplineCurve>(id, nameIdx, std::move(name), std::move(controlPoints));
 			else if (type == "interpolatedC2")
-				newObject = std::make_shared<InterpolatingCurve>(id, nameIdx, std::move(name), std::move(curvePoints));
+				newObject = std::make_shared<InterpolatingCurve>(id, nameIdx, std::move(name), std::move(controlPoints));
 
 			if (newObject)
 				m_sceneObjects.push_back(newObject);
@@ -1868,8 +1913,8 @@ void CadApplication::DrawSurfaceList(Surface* surface, int selectedCount)
 	const ImGuiIO& io = ImGui::GetIO();
 	if (ImGui::BeginListBox(("##SurfacePointsList_" + surface->name).c_str(), ImVec2(-1.0f, 0.0f)))
 	{
-		int pointsU = (surface->shapeType == SurfaceShape::Cylinder) ? (3 * surface->segmentsU) : (3 * surface->segmentsU + 1);
-
+		//int pointsU = (surface->shapeType == SurfaceShape::Cylinder) ? (3 * surface->segmentsU) : (3 * surface->segmentsU + 1);
+		unsigned int pointsU = surface->m_gridPointsU;
 		for (size_t i = 0; i < surface->m_controlPoints.size(); i++)
 		{
 			if (auto cp = surface->m_controlPoints[i].lock())

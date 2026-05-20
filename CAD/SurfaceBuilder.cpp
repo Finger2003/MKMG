@@ -52,11 +52,22 @@ void SurfaceBuilder::UpdateGeometry(const DxDevice& device, SurfaceType type, Su
 
 SurfaceGenerationResult SurfaceBuilder::Build(const DxDevice& device) const
 {
+	unsigned int gridU, gridV;
+	if (surfaceType == SurfaceType::C0)
+	{
+		gridU = (surfaceShape == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
+		gridV = 3 * segmentsV + 1;
+	}
+	else
+	{
+		gridU = (surfaceShape == SurfaceShape::Cylinder) ? segmentsU : (segmentsU + 3);
+		gridV = segmentsV + 3;
+	}
 	std::unique_ptr<Surface> surface;
 	if (surfaceType == SurfaceType::C0)
-		surface = std::make_unique<BezierSurface>(segmentsU, segmentsV, surfaceShape);
+		surface = std::make_unique<BezierSurface>(gridU, gridV, surfaceShape);
 	else
-		surface = std::make_unique<BSplineSurface>(segmentsU, segmentsV, surfaceShape);
+		surface = std::make_unique<BSplineSurface>(gridU, gridV, surfaceShape);
 	
 
 	surface->m_linesPerSegmentU = linesPerSegmentU;
