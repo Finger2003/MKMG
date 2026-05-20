@@ -28,6 +28,10 @@ enum class ObjectType
     static constexpr ObjectType ClassType = EnumVal; \
     bool IsA(ObjectType t) const override { return t == ClassType || BaseType::IsA(t); }
 
+#define DEFINE_SCHEMA(SchemaString) \
+    static constexpr const char* SchemaName = SchemaString; \
+    const char* GetSchemaType() const override { return SchemaName; }
+
 struct SceneObject
 {
 	std::string name;

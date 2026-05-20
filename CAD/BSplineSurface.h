@@ -4,10 +4,10 @@
 struct BSplineSurface : public Surface, public NamedObjectCounter<BSplineSurface>
 {
 	DEFINE_TYPE(Surface, ObjectType::BSplineSurface);
+	DEFINE_SCHEMA("bezierSurfaceC2");
+
 	BSplineSurface(int uGrid, int vGrid, SurfaceShape shape);
 	BSplineSurface(unsigned int id, uint2 grid, uint2 samples, SurfaceShape shape, std::vector<std::weak_ptr<Point>>&& controlPoints, std::optional<ParsedNameData>&& nameData);
-	static constexpr const char* SchemaName = "bezierSurfaceC2";
-	const char* GetSchemaType() const override { return SchemaName; }
 
 	void InitGeometry(const DxDevice& device) override;
 	void UpdateVertices(const DxDevice& device) override;

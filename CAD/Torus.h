@@ -9,6 +9,8 @@ class DxDevice;
 struct Torus : public TransformableObject, public NamedObjectCounter<Torus>
 {
 	DEFINE_TYPE(TransformableObject, ObjectType::Torus);
+	DEFINE_SCHEMA("torus");
+
 	Torus(float3 position);
 	Torus(unsigned int id, float3 position, float3 scale, const MathLib::Mat4f& rotationMatrix,
 		float majorRadius, float minorRadius, uint2 samples, std::optional<ParsedNameData>&& nameData);
@@ -60,9 +62,6 @@ struct Torus : public TransformableObject, public NamedObjectCounter<Torus>
 
 	void UpdateModelMatrix();
 	nlohmann::json Serialize() const override;
-
-	static constexpr const char* SchemaName = "torus";
-	const char* GetSchemaType() const override { return SchemaName; }
 
 	virtual ~Torus() = default;
 
