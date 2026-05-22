@@ -3,12 +3,13 @@
 #include "DxDevice.h"
 using namespace MathLib;
 
-BezierSurface::BezierSurface(int uGrid, int vGrid, SurfaceShape shape)
-	: Base(uGrid, vGrid, shape, "Surface C0 - " + std::to_string(s_nextId++))
+
+BezierSurface::BezierSurface(int uGrid, int vGrid, int linesPerSegmentU, int linesPerSegmentV, std::vector<std::weak_ptr<Point>> controlPoints)
+	: Base(uGrid, vGrid, linesPerSegmentU, linesPerSegmentV, std::move(controlPoints), "Surface C0 - " + std::to_string(s_nextId++))
 {}
 
-BezierSurface::BezierSurface(unsigned int id, uint2 grid, uint2 samples, SurfaceShape shape, std::vector<std::weak_ptr<Point>>&& controlPoints, std::optional<ParsedNameData>&& nameData)
-	: Base(id, nameData ? std::move(nameData->name) : "Surface C0 - " + std::to_string(s_nextId++), grid.u, grid.v, samples.u, samples.v, shape, std::move(controlPoints))
+BezierSurface::BezierSurface(unsigned int id, uint2 grid, uint2 samples, std::vector<std::weak_ptr<Point>>&& controlPoints, std::optional<ParsedNameData>&& nameData)
+	: Base(id, nameData ? std::move(nameData->name) : "Surface C0 - " + std::to_string(s_nextId++), grid.u, grid.v, samples.u, samples.v, std::move(controlPoints))
 {
 	if (nameData)
 		AdvanceCounter(nameData->index);
@@ -37,6 +38,19 @@ void BezierSurface::InitGeometry(const DxDevice& device)
 		m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
 		m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
 	}
+}
+
+void BezierSurface::InitGeometry(const DxDevice& device, const PrecalculatedSurfaceData& precalculatedData)
+{
+	m_patchVertexBuffer = device.CreateDynamicVertexBuffer(precalculatedData.controlPoints);
+	m_polylineVertexBuffer = m_patchVertexBuffer;
+
+	m_patchIndexCount = static_cast<UINT>(precalculatedData.patchIndices.size());
+	m_patchIndexBuffer = device.CreateIndexBuffer(precalculatedData.patchIndices);
+
+	std::vector<unsigned int> lineIndices = GenerateLineIndices();
+	m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
+	m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
 }
 
 void BezierSurface::UpdateVertices(const DxDevice& device)
@@ -69,7 +83,8 @@ void BezierSurface::UpdateVertices(const DxDevice& device)
 
 unsigned int BezierSurface::GetSegmentsU() const
 {
-	return (shapeType == SurfaceShape::Cylinder) ? m_gridPointsU / 3 : (m_gridPointsU - 1) / 3;
+	return (m_gridPointsU - 1) / 3;
+	//return (shapeType == SurfaceShape::Cylinder) ? m_gridPointsU / 3 : (m_gridPointsU - 1) / 3;
 }
 
 unsigned int BezierSurface::GetSegmentsV() const

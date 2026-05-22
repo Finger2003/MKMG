@@ -3,12 +3,17 @@
 #include "Point.h"
 
 enum class SurfaceShape { Flat, Cylinder };
+struct PrecalculatedSurfaceData
+{
+	std::vector<VertexPosition> controlPoints;
+	std::optional<std::vector<VertexPosition>> patchVertices;
+	std::vector<unsigned int> patchIndices;
+};
 
 struct SurfaceBuilder;
 struct Surface : public SceneObject
 {
 	DEFINE_TYPE(SceneObject, ObjectType::Surface);
-	SurfaceShape shapeType;
 
 	int m_gridPointsU = 0;
 	int m_gridPointsV = 0;
@@ -32,6 +37,7 @@ struct Surface : public SceneObject
 
 	std::shared_ptr<Point> GetPoint(int u, int v) const;
 
+	virtual void InitGeometry(const DxDevice& device, const PrecalculatedSurfaceData& precalculatedData) = 0;
 	virtual void InitGeometry(const DxDevice& device) = 0;
 	virtual void UpdateVertices(const DxDevice& device) = 0;
 	void MarkDirty() override { m_isDirty = true; }
@@ -39,17 +45,20 @@ struct Surface : public SceneObject
 
 	std::vector<unsigned int> GenerateLineIndices() const;
 
-
-	Surface(int uGrid, int vGrid, SurfaceShape shape, std::string&& name)
-		: SceneObject(std::move(name), ObjectType::Surface), m_gridPointsU(uGrid), m_gridPointsV(vGrid), shapeType(shape)
+	Surface(int uGrid, int vGrid, int linesPerSegmentU, int linesPerSegmentV, std::vector<std::weak_ptr<Point>>&& controlPoints, std::string&& name)
+		: SceneObject(std::move(name), ObjectType::Surface), m_gridPointsU(uGrid), m_gridPointsV(vGrid), m_linesPerSegmentU(linesPerSegmentU), m_linesPerSegmentV(linesPerSegmentV), m_controlPoints(std::move(controlPoints))
 	{}
+
+	//Surface(int uGrid, int vGrid, std::string&& name)
+	//	: SceneObject(std::move(name), ObjectType::Surface), m_gridPointsU(uGrid), m_gridPointsV(vGrid)
+	//{}
 
 	Surface(unsigned int id, std::string&& name, 
 		int gridPointsU, int gridPointsV, int linesPerSegmentU, int linesPerSegmentV, 
-		SurfaceShape shape, std::vector<std::weak_ptr<Point>>&& controlPoints)
+		std::vector<std::weak_ptr<Point>>&& controlPoints)
 		: SceneObject(id, std::move(name), ObjectType::Surface),
 		m_gridPointsU(gridPointsU), m_gridPointsV(gridPointsV), m_linesPerSegmentU(linesPerSegmentU), m_linesPerSegmentV(linesPerSegmentV), 
-		shapeType(shape), m_controlPoints(std::move(controlPoints))
+		m_controlPoints(std::move(controlPoints))
 	{}
 	virtual ~Surface() = default;
 protected:

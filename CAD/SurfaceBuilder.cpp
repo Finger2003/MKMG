@@ -52,57 +52,134 @@ void SurfaceBuilder::UpdateGeometry(const DxDevice& device, SurfaceType type, Su
 
 SurfaceGenerationResult SurfaceBuilder::Build(const DxDevice& device) const
 {
-	unsigned int gridU, gridV;
-	if (surfaceType == SurfaceType::C0)
+	unsigned int gridV = static_cast<unsigned int>(indexGrid.size());
+	unsigned int gridU = indexGrid.empty() ? 0 : static_cast<unsigned int>(indexGrid[0].size());
+
+	std::vector<std::shared_ptr<Point>> generatedPoints(m_uniquePointsCount);
+	//generatedPoints.reserve(m_uniquePointsCount);
+	for (unsigned int v = 0; v < gridV; ++v)
 	{
-		gridU = (surfaceShape == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
-		gridV = 3 * segmentsV + 1;
+		for (unsigned int u = 0; u < gridU; ++u)
+		{
+			int id = indexGrid[v][u];
+			if (!generatedPoints[id])
+			{
+				size_t index = static_cast<size_t>(v * gridU + u);
+				const auto& pos = rawPoints[index];
+				generatedPoints[id] = std::make_shared<Point>(float3{ pos.x, pos.y, pos.z }, true);
+			}
+		}
 	}
-	else
+
+	std::vector<std::weak_ptr<Point>> surfaceControlPoints;
+	surfaceControlPoints.reserve(static_cast<size_t>(gridU) * gridV);
+	for (unsigned int v = 0; v < gridV; ++v)
 	{
-		gridU = (surfaceShape == SurfaceShape::Cylinder) ? segmentsU : (segmentsU + 3);
-		gridV = segmentsV + 3;
+		for (unsigned int u = 0; u < gridU; ++u)
+		{
+			surfaceControlPoints.push_back(generatedPoints[indexGrid[v][u]]);
+		}
 	}
+
 	std::unique_ptr<Surface> surface;
 	if (surfaceType == SurfaceType::C0)
-		surface = std::make_unique<BezierSurface>(gridU, gridV, surfaceShape);
+		surface = std::make_unique<BezierSurface>(gridU, gridV, linesPerSegmentU, linesPerSegmentV, std::move(surfaceControlPoints));
 	else
-		surface = std::make_unique<BSplineSurface>(gridU, gridV, surfaceShape);
-	
+		surface = std::make_unique<BSplineSurface>(gridU, gridV, linesPerSegmentU, linesPerSegmentV, std::move(surfaceControlPoints));
 
-	surface->m_linesPerSegmentU = linesPerSegmentU;
-	surface->m_linesPerSegmentV = linesPerSegmentV;
-
-	std::vector<std::shared_ptr<Point>> generatedPoints;
-	generatedPoints.reserve(rawPoints.size());
-
-	for (const VertexPosition& pos : rawPoints)
+	PrecalculatedSurfaceData precalcData
 	{
-		float3 floatPos{ pos.x, pos.y, pos.z };
-		auto pt = std::make_shared<Point>(floatPos, true);
-		generatedPoints.push_back(pt);
-		surface->m_controlPoints.push_back(pt);
-	}
+		.controlPoints = rawPoints,
+		.patchVertices = (surfaceType == SurfaceType::C2) ? std::make_optional(bernsteinPoints) : std::nullopt,
+		.patchIndices = patchIndices
+	};
 
-	if (surfaceType == SurfaceType::C0)
-	{
-		surface->m_patchVertexBuffer = device.CreateDynamicVertexBuffer(rawPoints);
-		surface->m_polylineVertexBuffer = surface->m_patchVertexBuffer;
-	}
-	else
-	{
-		surface->m_patchVertexBuffer = device.CreateDynamicVertexBuffer(bernsteinPoints);
-		surface->m_polylineVertexBuffer = device.CreateDynamicVertexBuffer(rawPoints);
-	}
-
-	surface->m_patchIndexCount = static_cast<UINT>(patchIndices.size());
-	surface->m_patchIndexBuffer = device.CreateIndexBuffer(patchIndices);
-
-	std::vector<unsigned int> lineIndices = GenerateLineIndices();
-	surface->m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
-	surface->m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
-
+	surface->InitGeometry(device, precalcData);
 	return { std::move(surface), std::move(generatedPoints) };
+
+	//for (const VertexPosition& pos : rawPoints)
+	//{
+	//	float3 floatPos{ pos.x, pos.y, pos.z };
+	//	generatedPoints.push_back(std::make_shared<Point>(floatPos, true));
+	//}
+
+	//int gridU, gridV;
+	//if (surfaceType == SurfaceType::C0)
+	//{
+	//	gridU = (surfaceShape == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
+	//	gridV = 3 * segmentsV + 1;
+	//}
+	//else
+	//{
+	//	gridU = (surfaceShape == SurfaceShape::Cylinder) ? segmentsU : (segmentsU + 3);
+	//	gridV = segmentsV + 3;
+	//}
+
+	//std::unique_ptr<Surface> surface;
+	//if (surfaceType == SurfaceType::C0)
+	//	surface = std::make_unique<BezierSurface>(gridU, gridV, linesPerSegmentU, linesPerSegmentV)
+	//else
+	//	surface = std::make_unique<BSplineSurface>(gridU, gridV, surfaceShape);
+
+
+	//PrecalculatedSurfaceData precalcData 
+	//{
+	//	.controlPoints = rawPoints,
+	//	.patchVertices = (surfaceType == SurfaceType::C2) ? std::make_optional(bernsteinPoints) : std::nullopt,
+	//	.patchIndices = patchIndices,
+	//};
+
+	//unsigned int gridU, gridV;
+	//if (surfaceType == SurfaceType::C0)
+	//{
+	//	gridU = (surfaceShape == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
+	//	gridV = 3 * segmentsV + 1;
+	//}
+	//else
+	//{
+	//	gridU = (surfaceShape == SurfaceShape::Cylinder) ? segmentsU : (segmentsU + 3);
+	//	gridV = segmentsV + 3;
+	//}
+	//std::unique_ptr<Surface> surface;
+	//if (surfaceType == SurfaceType::C0)
+	//	surface = std::make_unique<BezierSurface>(gridU, gridV, surfaceShape);
+	//else
+	//	surface = std::make_unique<BSplineSurface>(gridU, gridV, surfaceShape);
+	//
+
+	//surface->m_linesPerSegmentU = linesPerSegmentU;
+	//surface->m_linesPerSegmentV = linesPerSegmentV;
+
+	//std::vector<std::shared_ptr<Point>> generatedPoints;
+	//generatedPoints.reserve(rawPoints.size());
+
+	//for (const VertexPosition& pos : rawPoints)
+	//{
+	//	float3 floatPos{ pos.x, pos.y, pos.z };
+	//	auto pt = std::make_shared<Point>(floatPos, true);
+	//	generatedPoints.push_back(pt);
+	//	surface->m_controlPoints.push_back(pt);
+	//}
+
+	//if (surfaceType == SurfaceType::C0)
+	//{
+	//	surface->m_patchVertexBuffer = device.CreateDynamicVertexBuffer(rawPoints);
+	//	surface->m_polylineVertexBuffer = surface->m_patchVertexBuffer;
+	//}
+	//else
+	//{
+	//	surface->m_patchVertexBuffer = device.CreateDynamicVertexBuffer(bernsteinPoints);
+	//	surface->m_polylineVertexBuffer = device.CreateDynamicVertexBuffer(rawPoints);
+	//}
+
+	//surface->m_patchIndexCount = static_cast<UINT>(patchIndices.size());
+	//surface->m_patchIndexBuffer = device.CreateIndexBuffer(patchIndices);
+
+	//std::vector<unsigned int> lineIndices = GenerateLineIndices();
+	//surface->m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
+	//surface->m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
+
+	//return { std::move(surface), std::move(generatedPoints) };
 }
 
 void SurfaceBuilder::UpdateVertexBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data)
@@ -119,7 +196,10 @@ void SurfaceBuilder::GenerateC0Flat()
 {
 	int pointsU = 3 * segmentsU + 1;
 	int pointsV = 3 * segmentsV + 1;
+	indexGrid.assign(pointsV, std::vector<int>(pointsU, 0));
 	rawPoints.reserve(static_cast<size_t>(pointsU) * pointsV);
+
+	int uniqueIdCounter = 0;
 	for (int v = 0; v < pointsV; v++)
 	{
 		float vParam = static_cast<float>(v) / (pointsV - 1);
@@ -131,26 +211,36 @@ void SurfaceBuilder::GenerateC0Flat()
 				center.y,
 				vParam * length + center.z
 				});
+			indexGrid[v][u] = uniqueIdCounter++;
 		}
 	}
+	m_uniquePointsCount = uniqueIdCounter;
 }
 
 void SurfaceBuilder::GenerateC0Cylinder()
 {
-	int pointsU = 3 * segmentsU;
+	//int pointsU = 3 * segmentsU;
+	//int pointsV = 3 * segmentsV + 1;
+
+	int pointsU = 3 * segmentsU + 1;
 	int pointsV = 3 * segmentsV + 1;
+	int uniqueU = 3 * segmentsU;
+	indexGrid = std::vector<std::vector<int>>(pointsV, std::vector<int>(pointsU));
 	rawPoints.reserve(static_cast<size_t>(pointsU) * pointsV);
 
 	float dTheta = 2.0f * std::numbers::pi_v<float> / segmentsU;
 	float L = radius * (4.0f / 3.0f) * std::tan(dTheta / 4.0f);
 	constexpr float startAngle = -std::numbers::pi_v<float> / 2.0f;
 
+	int uniqueIdCounter = 0;
 	for (int v = 0; v < pointsV; v++)
 	{
 		float vParam = static_cast<float>(v) / (pointsV - 1);
+		int firstIdInRow = uniqueIdCounter;
 		for (int u = 0; u < pointsU; u++)
 		{
-			float uParam = static_cast<float>(u) / (pointsU);
+			//float uParam = static_cast<float>(u) / (pointsU);
+			int wrappedU = u % uniqueU;
 			int patchIndex = u / 3;
 			int pointType = u % 3;
 			float angle = patchIndex * dTheta + startAngle;
@@ -173,21 +263,34 @@ void SurfaceBuilder::GenerateC0Cylinder()
 				cy = radius * std::sin(nextAngle) - L * std::cos(nextAngle);
 			}
 
-			rawPoints.push_back({
-				cx + center.x,
-				(cy + radius) + center.y,
-				vParam * length + center.z
-				});
+			rawPoints.push_back({ cx + center.x, cy + radius + center.y, vParam * length + center.z });
+
+			if (u < uniqueU) 
+				indexGrid[v][u] = uniqueIdCounter++;
+			else
+				indexGrid[v][u] = indexGrid[v][wrappedU]; //firstIdInRow;
+			//indexGrid[v][u] = static_cast<int>(rawPoints.size() - 1);
+			//rawPoints.push_back({
+			//	cx + center.x,
+			//	(cy + radius) + center.y,
+			//	vParam * length + center.z
+			//	});
 		}
+
+		//indexGrid[v][uniqueU] = indexGrid[v][0];
 	}
+
+	m_uniquePointsCount = uniqueIdCounter;
 }
 
 void SurfaceBuilder::GenerateC2Flat()
 {
 	int pointsU = segmentsU + 3;
 	int pointsV = segmentsV + 3;
+	indexGrid.assign(pointsV, std::vector<int>(pointsU, 0));
 	rawPoints.reserve(static_cast<size_t>(pointsU) * pointsV);
 
+	int uniqueIdCounter = 0;
 	for (int v = 0; v < pointsV; v++)
 	{
 		float vParam = static_cast<float>(v - 1) / segmentsV;
@@ -199,51 +302,108 @@ void SurfaceBuilder::GenerateC2Flat()
 				center.y,
 				vParam * length + center.z,
 				});
+			indexGrid[v][u] = uniqueIdCounter++;
 		}
 	}
+
+	m_uniquePointsCount = uniqueIdCounter;
 }
 
 void SurfaceBuilder::GenerateC2Cylinder()
 {
-	int pointsU = segmentsU;
+	int pointsU = segmentsU + 3;
 	int pointsV = segmentsV + 3;
+	int uniqueU = segmentsU;
+
+	indexGrid.assign(pointsV, std::vector<int>(pointsU, 0));
 	rawPoints.reserve(static_cast<size_t>(pointsU) * pointsV);
 
 	constexpr float startAngle = -std::numbers::pi_v<float> / 2.0f;
 	float dTheta = 2.0f * std::numbers::pi_v<float> / segmentsU;
 	float R_deBoor = radius * (3.0f / (2.0f + std::cos(dTheta)));
+
+	int uniqueIdCounter = 0;
 	for (int v = 0; v < pointsV; v++)
 	{
 		float vParam = static_cast<float>(v - 1) / segmentsV;
+		int firstIdInRow = uniqueIdCounter;
+
 		for (int u = 0; u < pointsU; u++)
 		{
+			int wrappedU = u % uniqueU;
 			float angle = u * dTheta + startAngle;
+			float cx = R_deBoor * std::cos(angle);
+			float cy = R_deBoor * std::sin(angle);
 			rawPoints.push_back({
-				R_deBoor * std::cos(angle) + center.x,
-				R_deBoor * std::sin(angle) + center.y + radius,
+				cx + center.x,
+				cy + center.y + radius,
 				vParam * length + center.z
 				});
+
+			if (u < uniqueU) 
+				indexGrid[v][u] = uniqueIdCounter++;
+			else 
+				indexGrid[v][u] = indexGrid[v][wrappedU]; //firstIdInRow + (u - uniqueU);
 		}
+
+		//for (int i = 0; i < 3; i++)
+		//{
+		//	indexGrid[v][static_cast<size_t>(uniqueU) + i] = indexGrid[v][i];
+		//}
 	}
+	m_uniquePointsCount = uniqueIdCounter;
 }
 
 std::vector<VertexPosition> SurfaceBuilder::GenerateC2BernsteinPoints() const
 {
-	int bernU = (surfaceShape == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
+	int bernU = 3 * segmentsU + 1;
 	int bernV = 3 * segmentsV + 1;
-	int deBoorU = (surfaceShape == SurfaceShape::Cylinder) ? segmentsU : (segmentsU + 3);
+	int deBoorU = segmentsU + 3;
+
+	//int bernU = (surfaceShape == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
+	//int bernV = 3 * segmentsV + 1;
+	//int deBoorU = (surfaceShape == SurfaceShape::Cylinder) ? segmentsU : (segmentsU + 3);
 	std::vector<VertexPosition> bernsteinGrid(bernU * bernV);
 
-	auto getWrappedU = [&](int u, int maxU) -> int {
-			return (surfaceShape == SurfaceShape::Cylinder) ? (u % maxU) : u;
-		};
+	//auto getWrappedU = [&](int u, int maxU) -> int {
+	//		return (surfaceShape == SurfaceShape::Cylinder) ? (u % maxU) : u;
+	//	};
+	//auto getDeBoorPoint = [&](int u, int v) -> VertexPosition {
+	//	int wrappedU = getWrappedU(u, deBoorU);
+	//	return rawPoints[static_cast<size_t>(v) * deBoorU + wrappedU];
+	//	};
+	//auto getBernsteinIndex = [&](int u, int v) -> int {
+	//	int wrappedU = getWrappedU(u, bernU);
+	//	return v * bernU + wrappedU;
+	//	};
+
+	//for (int patchV = 0; patchV < segmentsV; patchV++)
+	//{
+	//	for (int patchU = 0; patchU < segmentsU; patchU++)
+	//	{
+	//		Vec3f P[4][4];
+	//		for (int v = 0; v < 4; v++)
+	//			for (int u = 0; u < 4; u++)
+	//				P[v][u] = ToVec3f(getDeBoorPoint(patchU + u, patchV + v));
+	//		Vec3f Q[4][4];
+	//		for (int v = 0; v < 4; v++)
+	//			for (int u = 0; u < 4; u++)
+	//				Q[v][u] = SplineMath::EvaluateBSpline1D(P[v][0], P[v][1], P[v][2], P[v][3], u);
+	//		for (int v = 0; v < 4; v++)
+	//			for (int u = 0; u < 4; u++)
+	//			{
+	//				Vec3f B = SplineMath::EvaluateBSpline1D(Q[0][u], Q[1][u], Q[2][u], Q[3][u], v);
+	//				int bIdx = getBernsteinIndex(patchU * 3 + u, patchV * 3 + v);
+	//				bernsteinGrid[bIdx] = ToVertexPosition(B);
+	//			}
+	//	}
+	//}
+
 	auto getDeBoorPoint = [&](int u, int v) -> VertexPosition {
-		int wrappedU = getWrappedU(u, deBoorU);
-		return rawPoints[static_cast<size_t>(v) * deBoorU + wrappedU];
+		return rawPoints[static_cast<size_t>(v) * deBoorU + u];
 		};
 	auto getBernsteinIndex = [&](int u, int v) -> int {
-		int wrappedU = getWrappedU(u, bernU);
-		return v * bernU + wrappedU;
+		return v * bernU + u;
 		};
 
 	for (int patchV = 0; patchV < segmentsV; patchV++)
@@ -254,10 +414,12 @@ std::vector<VertexPosition> SurfaceBuilder::GenerateC2BernsteinPoints() const
 			for (int v = 0; v < 4; v++)
 				for (int u = 0; u < 4; u++)
 					P[v][u] = ToVec3f(getDeBoorPoint(patchU + u, patchV + v));
+
 			Vec3f Q[4][4];
 			for (int v = 0; v < 4; v++)
 				for (int u = 0; u < 4; u++)
 					Q[v][u] = SplineMath::EvaluateBSpline1D(P[v][0], P[v][1], P[v][2], P[v][3], u);
+
 			for (int v = 0; v < 4; v++)
 				for (int u = 0; u < 4; u++)
 				{
@@ -275,11 +437,30 @@ std::vector<unsigned int> SurfaceBuilder::GeneratePatchIndices() const
 {
 	std::vector<unsigned int> indices;
 	indices.reserve(static_cast<size_t>(segmentsU) * segmentsV * 16);
-	int bernU = (surfaceShape == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
+	int widthU = 3 * segmentsU + 1;
+	//int bernU = (surfaceShape == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
+
+	//auto getIndex = [&](int u, int v) -> unsigned int {
+	//	int wrappedU = (surfaceShape == SurfaceShape::Cylinder) ? (u % bernU) : u;
+	//	return static_cast<unsigned int>(v * bernU + wrappedU);
+	//	};
+
+	//for (int patchV = 0; patchV < segmentsV; patchV++)
+	//{
+	//	for (int patchU = 0; patchU < segmentsU; patchU++)
+	//	{
+	//		for (int v = 0; v < 4; v++)
+	//		{
+	//			for (int u = 0; u < 4; u++)
+	//			{
+	//				indices.push_back(getIndex(patchU * 3 + u, patchV * 3 + v));
+	//			}
+	//		}
+	//	}
+	//}
 
 	auto getIndex = [&](int u, int v) -> unsigned int {
-		int wrappedU = (surfaceShape == SurfaceShape::Cylinder) ? (u % bernU) : u;
-		return static_cast<unsigned int>(v * bernU + wrappedU);
+		return static_cast<unsigned int>(v * widthU + u);
 		};
 
 	for (int patchV = 0; patchV < segmentsV; patchV++)
@@ -301,27 +482,18 @@ std::vector<unsigned int> SurfaceBuilder::GeneratePatchIndices() const
 std::vector<unsigned int> SurfaceBuilder::GenerateLineIndices() const
 {
 	std::vector<unsigned int> indices;
-	int pointsU, pointsV;
-	if (surfaceType == SurfaceType::C0)
-	{
-		pointsU = (surfaceShape == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
-		pointsV = 3 * segmentsV + 1;
-	}
-	else // C2
-	{
-		pointsU = (surfaceShape == SurfaceShape::Cylinder) ? segmentsU : (segmentsU + 3);
-		pointsV = segmentsV + 3;
-	}
+	if (indexGrid.empty()) 
+		return indices;
+	int pointsV = static_cast<int>(indexGrid.size());
+	int pointsU = static_cast<int>(indexGrid[0].size());
 
-	int logicalPointsU = (surfaceShape == SurfaceShape::Cylinder) ? (pointsU + 1) : pointsU;
-	auto getIndex = [&](int u, int v) {
-		int wrappedU = (surfaceShape == SurfaceShape::Cylinder) ? (u % pointsU) : u;
-		return static_cast<unsigned int>(v * pointsU + wrappedU);
+	auto getIndex = [&](int u, int v) -> unsigned int {
+		return static_cast<unsigned int>(v * pointsU + u);
 		};
 
 	for (int v = 0; v < pointsV; v++)
 	{
-		for (int u = 0; u < logicalPointsU - 1; u++)
+		for (int u = 0; u < pointsU - 1; u++)
 		{
 			indices.push_back(getIndex(u, v));
 			indices.push_back(getIndex(u + 1, v));
@@ -336,6 +508,42 @@ std::vector<unsigned int> SurfaceBuilder::GenerateLineIndices() const
 			indices.push_back(getIndex(u, v + 1));
 		}
 	}
+
+	//int pointsU, pointsV;
+	//if (surfaceType == SurfaceType::C0)
+	//{
+	//	pointsU = (surfaceShape == SurfaceShape::Cylinder) ? (3 * segmentsU) : (3 * segmentsU + 1);
+	//	pointsV = 3 * segmentsV + 1;
+	//}
+	//else // C2
+	//{
+	//	pointsU = (surfaceShape == SurfaceShape::Cylinder) ? segmentsU : (segmentsU + 3);
+	//	pointsV = segmentsV + 3;
+	//}
+
+	//int logicalPointsU = (surfaceShape == SurfaceShape::Cylinder) ? (pointsU + 1) : pointsU;
+	//auto getIndex = [&](int u, int v) {
+	//	int wrappedU = (surfaceShape == SurfaceShape::Cylinder) ? (u % pointsU) : u;
+	//	return static_cast<unsigned int>(v * pointsU + wrappedU);
+	//	};
+
+	//for (int v = 0; v < pointsV; v++)
+	//{
+	//	for (int u = 0; u < logicalPointsU - 1; u++)
+	//	{
+	//		indices.push_back(getIndex(u, v));
+	//		indices.push_back(getIndex(u + 1, v));
+	//	}
+	//}
+
+	//for (int u = 0; u < pointsU; u++)
+	//{
+	//	for (int v = 0; v < pointsV - 1; ++v)
+	//	{
+	//		indices.push_back(getIndex(u, v));
+	//		indices.push_back(getIndex(u, v + 1));
+	//	}
+	//}
 
 	return indices;
 }

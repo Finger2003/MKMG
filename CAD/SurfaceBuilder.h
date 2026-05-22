@@ -8,6 +8,8 @@ struct SurfaceBuilder
 	std::vector<VertexPosition> rawPoints;
 	std::vector<VertexPosition> bernsteinPoints;
 	std::vector<unsigned int> patchIndices;
+	std::vector<std::vector<int>> indexGrid;
+
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_patchVertexBuffer;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_patchIndexBuffer;
 	UINT m_patchIndexCount = 0;
@@ -23,6 +25,7 @@ struct SurfaceBuilder
 
 	float3 center = { 0.0f, 0.0f, 0.0f };
 	int linesPerSegmentU = 4, linesPerSegmentV = 4;
+	int m_uniquePointsCount = 0;
 
 	void UpdateGeometry(const DxDevice& device, SurfaceType newType, SurfaceShape newShape, int segU, int segV, float d1, float d2, const float3& centerPos);
 	SurfaceGenerationResult Build(const DxDevice& device) const;

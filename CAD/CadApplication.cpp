@@ -1379,7 +1379,7 @@ void CadApplication::LoadScene(const std::wstring& filePath)
 				std::shared_ptr<Surface> newSurface;
 				auto assignSurface = [&]<typename SurfaceType>()
 				{
-					newSurface = std::make_shared<SurfaceType>(id, internalGrid, samples, shape, std::move(finalControlPoints), std::move(nameData));
+					newSurface = std::make_shared<SurfaceType>(id, internalGrid, samples, std::move(finalControlPoints), std::move(nameData));
 				};
 				if (type == BezierSurface::SchemaName)
 					assignSurface.operator() < BezierSurface > ();
