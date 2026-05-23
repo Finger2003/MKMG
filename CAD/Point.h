@@ -4,6 +4,7 @@
 #include "../MathLib/Mat4f.h"
 
 class DxDevice;
+struct IPointDependent;
 struct Point : public TransformableObject, public NamedObjectCounter<Point>
 {
 	DEFINE_TYPE(TransformableObject, ObjectType::Point);
@@ -15,13 +16,20 @@ struct Point : public TransformableObject, public NamedObjectCounter<Point>
 
 	static const Microsoft::WRL::ComPtr<ID3D11Buffer>& GetSharedVertexBuffer() { return s_vertexBuffer; }
 	const Microsoft::WRL::ComPtr<ID3D11Buffer>& GetVertexBuffer() const { return s_vertexBuffer; }
-	std::vector<std::weak_ptr<SceneObject>> m_dependents;
+	std::vector<std::weak_ptr<IPointDependent>> m_dependents;
 	bool isLockedToSurface = false;
 
-	void AddDependent(std::weak_ptr<SceneObject> obj);
-	void RemoveDependent(SceneObject* obj);
+	void AddDependent(std::weak_ptr<IPointDependent> obj);
+	void RemoveDependent(IPointDependent* obj);
 	void NotifyDependents();
 	MathLib::Mat4f GetModelMatrix() const;
 private:
 	inline static Microsoft::WRL::ComPtr<ID3D11Buffer> s_vertexBuffer = nullptr;
+};
+
+
+struct IPointDependent
+{
+	virtual ~IPointDependent() = default;
+	virtual void MarkDirty() {}// = 0;
 };

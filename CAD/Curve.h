@@ -2,7 +2,7 @@
 #include "SceneObject.h"
 #include "Point.h"
 
-struct Curve : public SceneObject
+struct Curve : public SceneObject, public IPointDependent
 {
 	DEFINE_TYPE(SceneObject, ObjectType::Curve);
 	std::vector<std::weak_ptr<Point>> m_controlPoints;
@@ -20,7 +20,7 @@ struct Curve : public SceneObject
 	void CleanExpiredPoints();
 	virtual void UpdatePolyline(const DxDevice& device) = 0;
 	nlohmann::json Serialize() const override;
-	void MarkDirty() { m_isDirty = true; }
+	void MarkDirty() override { m_isDirty = true; }
 protected:
 	Curve(std::string&& name, ObjectType type, std::vector<std::weak_ptr<Point>>&& controlPoints);
 	Curve(unsigned int id, std::string&& name, ObjectType type, std::vector<std::weak_ptr<Point>>&& controlPoints);

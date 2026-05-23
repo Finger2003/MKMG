@@ -11,7 +11,7 @@ struct PrecalculatedSurfaceData
 };
 
 struct SurfaceBuilder;
-struct Surface : public SceneObject
+struct Surface : public SceneObject, public IPointDependent
 {
 	DEFINE_TYPE(SceneObject, ObjectType::Surface);
 

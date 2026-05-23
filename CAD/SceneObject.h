@@ -49,7 +49,6 @@ struct SceneObject
 	}
 
 	virtual const char* GetSchemaType() const { return nullptr; }
-	virtual void MarkDirty() {};
 	virtual nlohmann::json Serialize() const = 0;
 protected:
 	static void AdvanceGlobalId(unsigned int loadedId)

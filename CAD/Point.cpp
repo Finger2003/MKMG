@@ -34,14 +34,14 @@ Point::Point(unsigned int id, float3 position, std::optional<ParsedNameData>&& n
 		AdvanceCounter(nameData->index);
 }
 
-void Point::AddDependent(std::weak_ptr<SceneObject> obj)
+void Point::AddDependent(std::weak_ptr<IPointDependent> obj)
 {
 	m_dependents.push_back(std::move(obj));
 }
 
-void Point::RemoveDependent(SceneObject* obj)
+void Point::RemoveDependent(IPointDependent* obj)
 {
-	std::erase_if(m_dependents, [obj](const std::weak_ptr<SceneObject>& weakDep) {
+	std::erase_if(m_dependents, [obj](const std::weak_ptr<IPointDependent>& weakDep) {
 		if (auto dep = weakDep.lock())
 			return dep.get() == obj;
 		return true; // Remove expired dependents
@@ -50,7 +50,7 @@ void Point::RemoveDependent(SceneObject* obj)
 
 void Point::NotifyDependents()
 {
-	std::erase_if(m_dependents, [](const std::weak_ptr<SceneObject>& weakDep) {
+	std::erase_if(m_dependents, [](const std::weak_ptr<IPointDependent>& weakDep) {
 		if (auto dep = weakDep.lock())
 		{
 			dep->MarkDirty();
