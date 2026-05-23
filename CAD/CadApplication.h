@@ -192,7 +192,7 @@ private:
 #pragma region Menu Methods
 	void InitImGui();
 	void DrawMenu();
-	void DrawListMenu(int selectedCount, int selectedPoints, Curve* activeCurve);
+	void DrawListMenu(int selectedCount, int selectedPoints, std::shared_ptr<Curve> activeCurve);
 	void DrawCurveList(Curve* curve, int selectedCount);
 	void DrawSurfaceList(Surface* surface, int selectedCount);
 	void HandleSurfaceListSelection(Surface* surface, size_t index, bool ctrlHeld, bool shiftHeld);

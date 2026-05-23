@@ -6,7 +6,7 @@ struct Curve : public SceneObject
 {
 	DEFINE_TYPE(SceneObject, ObjectType::Curve);
 	std::vector<std::weak_ptr<Point>> m_controlPoints;
-	std::vector<float3> m_lastPositions;
+	//std::vector<float3> m_lastPositions;
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_lineVertexBuffer;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_curveVertexBuffer;
@@ -15,10 +15,12 @@ struct Curve : public SceneObject
 	UINT m_curveVertexCount = 0;
 	UINT m_lineBufferCapacity = 0;
 	UINT m_curveBufferCapacity = 0;
+	bool m_isDirty = true;
 
 	void CleanExpiredPoints();
 	virtual void UpdatePolyline(const DxDevice& device) = 0;
 	nlohmann::json Serialize() const override;
+	void MarkDirty() { m_isDirty = true; }
 protected:
 	Curve(std::string&& name, ObjectType type, std::vector<std::weak_ptr<Point>>&& controlPoints);
 	Curve(unsigned int id, std::string&& name, ObjectType type, std::vector<std::weak_ptr<Point>>&& controlPoints);

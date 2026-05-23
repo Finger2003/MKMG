@@ -27,49 +27,61 @@ InterpolatingCurve::InterpolatingCurve(unsigned int id, std::vector<std::weak_pt
 void InterpolatingCurve::UpdatePolyline(const DxDevice & device)
 {
 	CleanExpiredPoints();
+	if (!m_isDirty)
+		return;
 
 	if (m_controlPoints.size() < 2)
 	{
 		m_lineVertexCount = 0;
 		m_curveVertexCount = 0;
+		m_isDirty = false;
 		return;
 	}
 
-	bool needUpdate = false;
-	if (m_lastPositions.size() != m_controlPoints.size())
-		needUpdate = true;
-	else
+	//bool needUpdate = false;
+	//if (m_lastPositions.size() != m_controlPoints.size())
+	//	needUpdate = true;
+	//else
+	//{
+	//	for (size_t i = 0; i < m_controlPoints.size(); i++)
+	//	{
+	//		auto sp = m_controlPoints[i].lock();
+	//		if (!sp ||
+	//			sp->m_position.x != m_lastPositions[i].x ||
+	//			sp->m_position.y != m_lastPositions[i].y ||
+	//			sp->m_position.z != m_lastPositions[i].z)
+	//		{
+	//			needUpdate = true;
+	//			break;
+	//		}
+	//	}
+	//}
+	std::vector<Vec3f> currentPositions;
+	currentPositions.reserve(m_controlPoints.size());
+	for (const auto& wp : m_controlPoints)
 	{
-		for (size_t i = 0; i < m_controlPoints.size(); i++)
-		{
-			auto sp = m_controlPoints[i].lock();
-			if (!sp ||
-				sp->m_position.x != m_lastPositions[i].x ||
-				sp->m_position.y != m_lastPositions[i].y ||
-				sp->m_position.z != m_lastPositions[i].z)
-			{
-				needUpdate = true;
-				break;
-			}
-		}
+		if (auto sp = wp.lock())
+			currentPositions.push_back(sp->m_position.ToVec3f());
 	}
 
-	if (needUpdate)
-	{
-		m_lastPositions.clear();
-		for (const auto& wp : m_controlPoints)
-		{
-			if (auto sp = wp.lock())
-				m_lastPositions.push_back(sp->m_position);
-		}
+	//if (needUpdate)
+	//{
+		//m_lastPositions.clear();
+		//for (const auto& wp : m_controlPoints)
+		//{
+		//	if (auto sp = wp.lock())
+		//		m_lastPositions.push_back(sp->m_position);
+		//}
 
-		size_t raw_n = m_lastPositions.size();
+		//size_t raw_n = m_lastPositions.size();
+		size_t raw_n = currentPositions.size();
 		std::vector<Vec3f> P;
 		P.reserve(raw_n);
 
 		for (size_t i = 0; i < raw_n; i++)
 		{
-			Vec3f pt = m_lastPositions[i].ToVec3f();
+			//Vec3f pt = m_lastPositions[i].ToVec3f();
+			Vec3f pt = currentPositions[i];
 			if (P.empty() || (pt - P.back()).length_sqr() > 1e-8f)
 				P.push_back(pt);
 		}
@@ -79,14 +91,17 @@ void InterpolatingCurve::UpdatePolyline(const DxDevice & device)
 		{
 			m_lineVertexCount = 0;
 			m_curveVertexCount = 0;
+			m_isDirty = false;
 			return;
 		}
 
 		// Control polygon
 		std::vector<VertexPosition> lineVertices;
 		lineVertices.reserve(n);
+		//for (size_t i = 0; i < n; i++)
+		//	lineVertices.push_back({ m_lastPositions[i].x, m_lastPositions[i].y, m_lastPositions[i].z });
 		for (size_t i = 0; i < n; i++)
-			lineVertices.push_back({ m_lastPositions[i].x, m_lastPositions[i].y, m_lastPositions[i].z });
+			lineVertices.push_back(ToVertexPosition(P[i])); 
 
 		// Calculate chordal lengths
 		std::vector<float> h(n - 1);
@@ -154,5 +169,6 @@ void InterpolatingCurve::UpdatePolyline(const DxDevice & device)
 
 		UpdateBuffer(device, m_lineVertexBuffer, m_lineBufferCapacity, lineVertices, m_lineVertexCount, 2);
 		UpdateBuffer(device, m_curveVertexBuffer, m_curveBufferCapacity, vertices, m_curveVertexCount, 4);
-	}	
+	//}	
+		m_isDirty = false;
 }

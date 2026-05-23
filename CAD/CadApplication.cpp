@@ -559,7 +559,11 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			}
 
 			if (selectedCurves == 1 && activeCurve)
+			{
 				activeCurve->m_controlPoints.push_back(newPoint);
+				newPoint->AddDependent(activeCurve);
+				activeCurve->MarkDirty();
+			}
 
 			return true;
 		}
@@ -1337,7 +1341,14 @@ void CadApplication::LoadScene(const std::wstring& filePath)
 			std::shared_ptr<SceneObject> newObject = nullptr;
 			auto assignCurve = [&]<typename CurveType>()
 			{
-				newObject = std::make_shared<CurveType>(id, std::move(controlPoints), std::move(nameData));
+				auto newCurve = std::make_shared<CurveType>(id, std::move(controlPoints), std::move(nameData));
+				for (const auto& cpWeak : newCurve->m_controlPoints)
+				{
+					if (auto cp = cpWeak.lock())
+						cp->AddDependent(newCurve);
+				}
+				newCurve->MarkDirty();
+				newObject = std::move(newCurve);
 			};
 
 			if (type == BezierSurface::SchemaName || type == BSplineSurface::SchemaName)
@@ -1475,10 +1486,8 @@ void CadApplication::DrawMenu()
 
 	if (m_menuState == MenuState::List)
 	{
-		Curve* activeCurve = nullptr;
-		if (auto curve = selectedCurve.lock())
-			activeCurve = curve.get();
-		DrawListMenu(selectedCount, selectedPoints, activeCurve);
+		//if (auto curve = selectedCurve.lock())
+			DrawListMenu(selectedCount, selectedPoints, selectedCurve.lock());
 
 		if (auto curve = selectedCurve.lock())
 		{
@@ -1505,7 +1514,7 @@ void CadApplication::DrawMenu()
 	ImGui::Render();
 }
 
-void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* activeCurve)
+void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, std::shared_ptr<Curve> activeCurve)
 {
 
 	if (ImGui::Button("Add Torus"))
@@ -1518,19 +1527,75 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 		auto newPoint = std::make_shared<Point>(m_cursorPosition);
 		m_sceneObjects.push_back(newPoint);
 		if (activeCurve)
+		{
 			activeCurve->m_controlPoints.push_back(newPoint);
+			newPoint->AddDependent(activeCurve);
+			activeCurve->MarkDirty();
+		}
 	}
 
-	ImGui::BeginDisabled(selectedPoints == 0);
-	if (ImGui::Button("Add Bezier Curve"))
-	{
+	auto getSelectedPoints = [&]() {
 		std::vector<std::weak_ptr<Point>> pts;
 		for (const auto& obj : m_sceneObjects)
 		{
 			if (obj->selected && obj->type == ObjectType::Point)
 				pts.push_back(std::static_pointer_cast<Point>(obj));
 		}
-		m_sceneObjects.push_back(std::make_shared<BezierCurve>(std::move(pts)));
+		return pts;
+		};
+
+	auto createAndRegisterCurve = [&]<typename CurveType>()
+	{
+		auto pts = getSelectedPoints();
+		auto newCurve = std::make_shared<CurveType>(std::move(pts));
+		for (const auto& cpWeak : newCurve->m_controlPoints)
+		{
+			if (auto cp = cpWeak.lock())
+				cp->AddDependent(newCurve);
+		}
+		newCurve->MarkDirty();
+		m_sceneObjects.push_back(newCurve);
+	};
+
+	ImGui::BeginDisabled(selectedPoints == 0);
+	if (ImGui::Button("Add Bezier Curve"))
+	{
+		createAndRegisterCurve.operator() < BezierCurve > ();
+		//std::vector<std::weak_ptr<Point>> pts;
+		//for (const auto& obj : m_sceneObjects)
+		//{
+		//	if (obj->selected && obj->type == ObjectType::Point)
+		//		pts.push_back(std::static_pointer_cast<Point>(obj));
+		//}
+		//m_sceneObjects.push_back(std::make_shared<BezierCurve>(std::move(pts)));
+	}
+	//ImGui::EndDisabled();
+
+	//ImGui::BeginDisabled(selectedPoints == 0);
+	if (ImGui::Button("Add B-Spline (C2) Curve"))
+	{
+		createAndRegisterCurve.operator() < BSplineCurve > ();
+		//std::vector<std::weak_ptr<Point>> pts;
+		//for (const auto& obj : m_sceneObjects)
+		//{
+		//	if (obj->selected && obj->type == ObjectType::Point)
+		//		pts.push_back(std::static_pointer_cast<Point>(obj));
+		//}
+		//m_sceneObjects.push_back(std::make_shared<BSplineCurve>(std::move(pts)));
+	}
+	//ImGui::EndDisabled();
+
+	//ImGui::BeginDisabled(selectedPoints == 0);
+	if (ImGui::Button("Add Interpolating Spline (C2)"))
+	{
+		createAndRegisterCurve.operator() < InterpolatingCurve > ();
+		//std::vector<std::weak_ptr<Point>> pts;
+		//for (const auto& obj : m_sceneObjects)
+		//{
+		//	if (obj->selected && obj->type == ObjectType::Point)
+		//		pts.push_back(std::static_pointer_cast<Point>(obj));
+		//}
+		//m_sceneObjects.push_back(std::make_shared<InterpolatingCurve>(std::move(pts)));
 	}
 	ImGui::EndDisabled();
 
@@ -1559,36 +1624,16 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, Curve* 
 		}
 	}
 
-	ImGui::BeginDisabled(selectedPoints == 0);
-	if (ImGui::Button("Add B-Spline (C2) Curve"))
-	{
-		std::vector<std::weak_ptr<Point>> pts;
-		for (const auto& obj : m_sceneObjects)
-		{
-			if (obj->selected && obj->type == ObjectType::Point)
-				pts.push_back(std::static_pointer_cast<Point>(obj));
-		}
-		m_sceneObjects.push_back(std::make_shared<BSplineCurve>(std::move(pts)));
-	}
-	ImGui::EndDisabled();
 
-	ImGui::BeginDisabled(selectedPoints == 0);
-	if (ImGui::Button("Add Interpolating Spline (C2)"))
-	{
-		std::vector<std::weak_ptr<Point>> pts;
-		for (const auto& obj : m_sceneObjects)
-		{
-			if (obj->selected && obj->type == ObjectType::Point)
-				pts.push_back(std::static_pointer_cast<Point>(obj));
-		}
-		m_sceneObjects.push_back(std::make_shared<InterpolatingCurve>(std::move(pts)));
-	}
-	ImGui::EndDisabled();
 
 	ImGui::BeginDisabled(pointsToAdd.empty());
 	if (ImGui::Button("Add Points to Curve"))
 	{
 		activeCurve->m_controlPoints.insert(activeCurve->m_controlPoints.end(), pointsToAdd.begin(), pointsToAdd.end());
+		for (const auto& pt : pointsToAdd)
+			pt->AddDependent(activeCurve);
+
+		activeCurve->MarkDirty();
 	}
 	ImGui::EndDisabled();
 
@@ -1834,18 +1879,20 @@ void CadApplication::DrawCurveList(Curve* curve, int selectedCount)
 	ImGui::BeginDisabled(!pointSelected);
 	if (ImGui::Button("Remove Selected Points from Curve", ImVec2(-1, 0)))
 	{
-		std::erase_if(curve->m_controlPoints, [](const auto& cpWeak) {
+		std::erase_if(curve->m_controlPoints, [curve](const auto& cpWeak) {
 			if (auto cp = cpWeak.lock())
 			{
 				if (cp->selected)
 				{
 					cp->selected = false;
+					cp->RemoveDependent(curve);
 					return true;
 				}
 				return false;
 			}
 			return true;
 			});
+		curve->MarkDirty();
 		m_selectionDirty = true;
 	}
 	ImGui::EndDisabled();
@@ -2119,7 +2166,10 @@ void CadApplication::DrawTorusMenu(Torus& torus)
 void CadApplication::DrawPointMenu(Point& selectedObj)
 {
 	if (ImGui::DragFloat3("Position", &selectedObj.m_position.x, 0.01f))
+	{
 		m_selectionDirty = true;
+		selectedObj.NotifyDependents();
+	}
 }
 
 void CadApplication::DrawSurfaceMenu(Surface& surface)

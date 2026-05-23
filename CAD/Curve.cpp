@@ -12,7 +12,9 @@ Curve::Curve(unsigned int id, std::string && name, ObjectType type, std::vector<
 
 void Curve::CleanExpiredPoints()
 {
-    std::erase_if(m_controlPoints, [](const std::weak_ptr<Point>& wp) { return wp.expired(); });
+    size_t removedCount = std::erase_if(m_controlPoints, [](const std::weak_ptr<Point>& wp) { return wp.expired(); });
+    if (removedCount > 0)
+		MarkDirty();
 }
 
 nlohmann::json Curve::Serialize() const

@@ -39,6 +39,15 @@ void Point::AddDependent(std::weak_ptr<SceneObject> obj)
 	m_dependents.push_back(std::move(obj));
 }
 
+void Point::RemoveDependent(SceneObject* obj)
+{
+	std::erase_if(m_dependents, [obj](const std::weak_ptr<SceneObject>& weakDep) {
+		if (auto dep = weakDep.lock())
+			return dep.get() == obj;
+		return true; // Remove expired dependents
+		});
+}
+
 void Point::NotifyDependents()
 {
 	std::erase_if(m_dependents, [](const std::weak_ptr<SceneObject>& weakDep) {

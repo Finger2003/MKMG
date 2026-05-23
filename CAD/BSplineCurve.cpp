@@ -28,51 +28,67 @@ BSplineCurve::BSplineCurve(unsigned int id, std::vector<std::weak_ptr<Point>> &&
 void BSplineCurve::UpdatePolyline(const DxDevice& device)
 {
 	CleanExpiredPoints();
+	if (!m_isDirty)
+		return;
 
 	if (m_controlPoints.size() < 2)
 	{
 		m_lineVertexCount = 0;
 		m_curveVertexCount = 0;
+		m_bernsteinVertexCount = 0;
+		m_isDirty = false;
 		return;
 	}
 
-	bool needUpdate = false;
-	if (m_lastPositions.size() != m_controlPoints.size())
-		needUpdate = true;
-	else
+	//bool needUpdate = false;
+	//if (m_lastPositions.size() != m_controlPoints.size())
+	//	needUpdate = true;
+	//else
+	//{
+	//	for (size_t i = 0; i < m_controlPoints.size(); ++i)
+	//	{
+	//		auto sp = m_controlPoints[i].lock();
+	//		if (!sp ||
+	//			sp->m_position.x != m_lastPositions[i].x ||
+	//			sp->m_position.y != m_lastPositions[i].y ||
+	//			sp->m_position.z != m_lastPositions[i].z)
+	//		{
+	//			needUpdate = true;
+	//			break;
+	//		}
+	//	}
+	//}
+	std::vector<Vec3f> currentPositions;
+	currentPositions.reserve(m_controlPoints.size());
+	for (const auto& wp : m_controlPoints)
 	{
-		for (size_t i = 0; i < m_controlPoints.size(); ++i)
-		{
-			auto sp = m_controlPoints[i].lock();
-			if (!sp ||
-				sp->m_position.x != m_lastPositions[i].x ||
-				sp->m_position.y != m_lastPositions[i].y ||
-				sp->m_position.z != m_lastPositions[i].z)
-			{
-				needUpdate = true;
-				break;
-			}
-		}
+		if (auto sp = wp.lock())
+			currentPositions.push_back(sp->m_position.ToVec3f());
 	}
+	size_t n = currentPositions.size();
 
-	if (needUpdate)
-	{
-		m_lastPositions.clear();
-		for (const auto& wp : m_controlPoints)
-		{
-			if (auto sp = wp.lock())
-				m_lastPositions.push_back(sp->m_position);
-		}
+	//if (needUpdate)
+	//{
+	//	m_lastPositions.clear();
+	//	for (const auto& wp : m_controlPoints)
+	//	{
+	//		if (auto sp = wp.lock())
+	//			m_lastPositions.push_back(sp->m_position);
+	//	}
 
-		size_t n = m_lastPositions.size();
+	//	size_t n = m_lastPositions.size();
 
 		// 1. Control Polygon (Straight lines between De Boor points)
 		std::vector<VertexPosition> lineVertices;
 		if (n > 2)
 		{
+		//	lineVertices.reserve(n);
+		//	for (size_t i = 0; i < n; i++)
+		//		lineVertices.push_back({ m_lastPositions[i].x, m_lastPositions[i].y, m_lastPositions[i].z });
+		//}
 			lineVertices.reserve(n);
 			for (size_t i = 0; i < n; i++)
-				lineVertices.push_back({ m_lastPositions[i].x, m_lastPositions[i].y, m_lastPositions[i].z });
+				lineVertices.push_back({ currentPositions[i].x, currentPositions[i].y, currentPositions[i].z });
 		}
 		// 2. Convert De Boor to Bernstein for the GS Pipeline
 		std::vector<VertexPosition> vertices;
@@ -80,13 +96,20 @@ void BSplineCurve::UpdatePolyline(const DxDevice& device)
 
 		std::vector<Vec3f> augPoints;
 		augPoints.reserve(n + 2);
-		Vec3f pFirst = m_lastPositions[0].ToVec3f();
-		Vec3f pSecond = m_lastPositions[1].ToVec3f();
+		//Vec3f pFirst = m_lastPositions[0].ToVec3f();
+		//Vec3f pSecond = m_lastPositions[1].ToVec3f();
+		Vec3f pFirst = currentPositions[0];
+		Vec3f pSecond = currentPositions[1];
 		augPoints.push_back(pFirst * 2.0f - pSecond);
+		//for (size_t i = 0; i < n; i++)
+		//	augPoints.push_back(m_lastPositions[i].ToVec3f());
+		//Vec3f pLast = m_lastPositions[n - 1].ToVec3f();
+		//Vec3f pPrev = m_lastPositions[n - 2].ToVec3f();
+
 		for (size_t i = 0; i < n; ++i)
-			augPoints.push_back(m_lastPositions[i].ToVec3f());
-		Vec3f pLast = m_lastPositions[n - 1].ToVec3f();
-		Vec3f pPrev = m_lastPositions[n - 2].ToVec3f();
+			augPoints.push_back(currentPositions[i]);
+		Vec3f pLast = currentPositions[n - 1];
+		Vec3f pPrev = currentPositions[n - 2];
 		augPoints.push_back(pLast * 2.0f - pPrev);
 		size_t augN = augPoints.size();
 
@@ -132,5 +155,6 @@ void BSplineCurve::UpdatePolyline(const DxDevice& device)
 		UpdateBuffer(device, m_lineVertexBuffer, m_lineBufferCapacity, lineVertices, m_lineVertexCount, 2);
 		UpdateBuffer(device, m_curveVertexBuffer, m_curveBufferCapacity, vertices, m_curveVertexCount, 4);
 		UpdateBuffer(device, m_bernsteinVertexBuffer, m_bernsteinBufferCapacity, bernsteinPts, m_bernsteinVertexCount, 2);
-	}
+	//}
+		m_isDirty = false;
 }

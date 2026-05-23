@@ -19,6 +19,7 @@ struct Point : public TransformableObject, public NamedObjectCounter<Point>
 	bool isLockedToSurface = false;
 
 	void AddDependent(std::weak_ptr<SceneObject> obj);
+	void RemoveDependent(SceneObject* obj);
 	void NotifyDependents();
 	MathLib::Mat4f GetModelMatrix() const;
 private:
