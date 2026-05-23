@@ -1344,42 +1344,11 @@ void CadApplication::LoadScene(const std::wstring& filePath)
 			{
 				uint2 size = geomJson["size"];
 				uint2 samples = geomJson["samples"];
-				bool isCylinder = false;
-
-				if (size.u > 1)
-				{
-					isCylinder = true;
-					for (unsigned int v = 0; v < size.v; v++)
-					{
-						auto firstInRow = controlPoints[static_cast<size_t>(v) * size.u].lock();
-						auto lastInRow = controlPoints[static_cast<size_t>(v) * size.u + (static_cast<size_t>(size.u) - 1)].lock();
-
-						if (!firstInRow || !lastInRow || firstInRow->m_id != lastInRow->m_id)
-						{
-							isCylinder = false;
-							break;
-						}
-					}
-				}
-
-				SurfaceShape shape = isCylinder ? SurfaceShape::Cylinder : SurfaceShape::Flat;
-				unsigned int internalU = isCylinder ? (size.u - 1) : size.u;
-				unsigned int internalV = size.v;
-
-				std::vector<std::weak_ptr<Point>> finalControlPoints;
-				finalControlPoints.reserve(static_cast<size_t>(internalU) * internalV);
-
-				for (unsigned int v = 0; v < internalV; v++)
-				{
-					for (unsigned int u = 0; u < internalU; u++)
-						finalControlPoints.push_back(controlPoints[static_cast<size_t>(v) * size.u + u]);
-				}
-				uint2 internalGrid = { internalU, internalV };
 
 				std::shared_ptr<Surface> newSurface;
 				auto assignSurface = [&]<typename SurfaceType>()
 				{
-					newSurface = std::make_shared<SurfaceType>(id, internalGrid, samples, std::move(finalControlPoints), std::move(nameData));
+					newSurface = std::make_shared<SurfaceType>(id, size, samples, std::move(controlPoints), std::move(nameData));
 				};
 				if (type == BezierSurface::SchemaName)
 					assignSurface.operator() < BezierSurface > ();

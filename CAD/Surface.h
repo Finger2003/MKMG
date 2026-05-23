@@ -49,10 +49,6 @@ struct Surface : public SceneObject
 		: SceneObject(std::move(name), ObjectType::Surface), m_gridPointsU(uGrid), m_gridPointsV(vGrid), m_linesPerSegmentU(linesPerSegmentU), m_linesPerSegmentV(linesPerSegmentV), m_controlPoints(std::move(controlPoints))
 	{}
 
-	//Surface(int uGrid, int vGrid, std::string&& name)
-	//	: SceneObject(std::move(name), ObjectType::Surface), m_gridPointsU(uGrid), m_gridPointsV(vGrid)
-	//{}
-
 	Surface(unsigned int id, std::string&& name, 
 		int gridPointsU, int gridPointsV, int linesPerSegmentU, int linesPerSegmentV, 
 		std::vector<std::weak_ptr<Point>>&& controlPoints)

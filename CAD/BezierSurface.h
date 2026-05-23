@@ -13,7 +13,6 @@ struct BezierSurface : public Surface, public NamedObjectCounter<BezierSurface>
 	DEFINE_SCHEMA("bezierSurfaceC0");
 
 	BezierSurface(int uGrid, int vGrid, int linesPerSegmentU, int linesPerSegmentV, std::vector<std::weak_ptr<Point>> controlPoints);
-	//BezierSurface(int uGrid, int vGrid);
 	BezierSurface(unsigned int id, uint2 grid, uint2 samples, std::vector<std::weak_ptr<Point>>&& controlPoints, std::optional<ParsedNameData>&& nameData);
 
 	void InitGeometry(const DxDevice& device) override;

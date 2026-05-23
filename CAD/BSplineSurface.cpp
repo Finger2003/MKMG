@@ -4,11 +4,6 @@
 
 using namespace MathLib;
 
-//
-//BSplineSurface::BSplineSurface(int uGrid, int vGrid)
-//	: Surface(uGrid, vGrid, "Surface C2 - " + std::to_string(s_nextId++))
-//{}
-
 BSplineSurface::BSplineSurface(int uGrid, int vGrid, int linesPerSegmentU, int linesPerSegmentV, std::vector<std::weak_ptr<Point>> controlPoints)
 	: Surface(uGrid, vGrid, linesPerSegmentU, linesPerSegmentV, std::move(controlPoints), "Surface C2 - " + std::to_string(s_nextId++))
 {}
@@ -23,9 +18,6 @@ BSplineSurface::BSplineSurface(unsigned int id, uint2 grid, uint2 samples, std::
 unsigned int BSplineSurface::GetBernsteinPointsU() const
 {
 	return 3 * (m_gridPointsU - 3) + 1;
-	//return (shapeType == SurfaceShape::Cylinder)
-	//	? (3 * m_gridPointsU)
-	//	: (3 * (m_gridPointsU - 3) + 1);
 }
 unsigned int BSplineSurface::GetBernsteinPointsV() const
 {
@@ -35,15 +27,11 @@ unsigned int BSplineSurface::GetBernsteinPointsV() const
 unsigned int BSplineSurface::GetBernsteinIndex(int u, int v) const
 {
 	return static_cast<unsigned int>(v * GetBernsteinPointsU() + u);
-	//unsigned int pointsU = GetBernsteinPointsU();
-	//int wrappedU = (shapeType == SurfaceShape::Cylinder) ? (u % pointsU) : u;
-	//return static_cast<unsigned int>(v * pointsU + wrappedU);
 }
 
 unsigned int BSplineSurface::GetSegmentsU() const
 {
 	return m_gridPointsU - 3;
-	//return (shapeType == SurfaceShape::Cylinder) ? m_gridPointsU : (m_gridPointsU - 3);
 }
 
 unsigned int BSplineSurface::GetSegmentsV() const

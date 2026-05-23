@@ -6,7 +6,6 @@ struct BSplineSurface : public Surface, public NamedObjectCounter<BSplineSurface
 	DEFINE_TYPE(Surface, ObjectType::BSplineSurface);
 	DEFINE_SCHEMA("bezierSurfaceC2");
 
-	BSplineSurface(int uGrid, int vGrid);
 	BSplineSurface(int uGrid, int vGrid, int linesPerSegmentU, int linesPerSegmentV, std::vector<std::weak_ptr<Point>> controlPoints);
 	BSplineSurface(unsigned int id, uint2 grid, uint2 samples, std::vector<std::weak_ptr<Point>>&& controlPoints, std::optional<ParsedNameData>&& nameData);
 
