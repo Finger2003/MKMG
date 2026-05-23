@@ -121,7 +121,6 @@ std::optional<VirtualPointMapping> CadApplication::PickVirtualPoint(int mouseX, 
 
 		if (auto curve = obj->As<BSplineCurve>())
 		{
-			//auto curve = static_cast<BSplineCurve*>(obj.get());
 			for (const auto& mapping : curve->m_virtualPoints)
 			{
 				Vec4f worldPos = mapping.virtualPosition.ToVec4f(1.0f);
@@ -181,6 +180,7 @@ void CadApplication::ApplyVirtualEditTransform(int mouseX, int mouseY)
 	if (auto pt = m_activeVirtualEdit->targetPoint.lock())
 	{
 		pt->m_position = pt->m_basePosition.ToVec3f() + worldDelta;
+		pt->NotifyDependents();
 	}
 }
 
@@ -1347,7 +1347,6 @@ void CadApplication::LoadScene(const std::wstring& filePath)
 					if (auto cp = cpWeak.lock())
 						cp->AddDependent(newCurve);
 				}
-				newCurve->MarkDirty();
 				newObject = std::move(newCurve);
 			};
 
@@ -1486,8 +1485,7 @@ void CadApplication::DrawMenu()
 
 	if (m_menuState == MenuState::List)
 	{
-		//if (auto curve = selectedCurve.lock())
-			DrawListMenu(selectedCount, selectedPoints, selectedCurve.lock());
+		DrawListMenu(selectedCount, selectedPoints, selectedCurve.lock());
 
 		if (auto curve = selectedCurve.lock())
 		{
@@ -1553,50 +1551,16 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, std::sh
 			if (auto cp = cpWeak.lock())
 				cp->AddDependent(newCurve);
 		}
-		newCurve->MarkDirty();
 		m_sceneObjects.push_back(newCurve);
 	};
 
 	ImGui::BeginDisabled(selectedPoints == 0);
 	if (ImGui::Button("Add Bezier Curve"))
-	{
 		createAndRegisterCurve.operator() < BezierCurve > ();
-		//std::vector<std::weak_ptr<Point>> pts;
-		//for (const auto& obj : m_sceneObjects)
-		//{
-		//	if (obj->selected && obj->type == ObjectType::Point)
-		//		pts.push_back(std::static_pointer_cast<Point>(obj));
-		//}
-		//m_sceneObjects.push_back(std::make_shared<BezierCurve>(std::move(pts)));
-	}
-	//ImGui::EndDisabled();
-
-	//ImGui::BeginDisabled(selectedPoints == 0);
 	if (ImGui::Button("Add B-Spline (C2) Curve"))
-	{
 		createAndRegisterCurve.operator() < BSplineCurve > ();
-		//std::vector<std::weak_ptr<Point>> pts;
-		//for (const auto& obj : m_sceneObjects)
-		//{
-		//	if (obj->selected && obj->type == ObjectType::Point)
-		//		pts.push_back(std::static_pointer_cast<Point>(obj));
-		//}
-		//m_sceneObjects.push_back(std::make_shared<BSplineCurve>(std::move(pts)));
-	}
-	//ImGui::EndDisabled();
-
-	//ImGui::BeginDisabled(selectedPoints == 0);
 	if (ImGui::Button("Add Interpolating Spline (C2)"))
-	{
 		createAndRegisterCurve.operator() < InterpolatingCurve > ();
-		//std::vector<std::weak_ptr<Point>> pts;
-		//for (const auto& obj : m_sceneObjects)
-		//{
-		//	if (obj->selected && obj->type == ObjectType::Point)
-		//		pts.push_back(std::static_pointer_cast<Point>(obj));
-		//}
-		//m_sceneObjects.push_back(std::make_shared<InterpolatingCurve>(std::move(pts)));
-	}
 	ImGui::EndDisabled();
 
 	std::vector<std::shared_ptr<Point>> pointsToAdd;
@@ -1955,7 +1919,6 @@ void CadApplication::DrawSurfaceList(Surface* surface, int selectedCount)
 	const ImGuiIO& io = ImGui::GetIO();
 	if (ImGui::BeginListBox(("##SurfacePointsList_" + surface->name).c_str(), ImVec2(-1.0f, 0.0f)))
 	{
-		//int pointsU = (surface->shapeType == SurfaceShape::Cylinder) ? (3 * surface->segmentsU) : (3 * surface->segmentsU + 1);
 		unsigned int pointsU = surface->m_gridPointsU;
 		for (size_t i = 0; i < surface->m_controlPoints.size(); i++)
 		{

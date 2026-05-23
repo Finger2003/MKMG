@@ -92,6 +92,8 @@ void BSplineSurface::InitGeometry(const DxDevice& device, const PrecalculatedSur
 	std::vector<unsigned int> lineIndices = GenerateLineIndices();
 	m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
 	m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
+
+	m_isDirty = false;
 }
 
 void BSplineSurface::InitGeometry(const DxDevice& device)

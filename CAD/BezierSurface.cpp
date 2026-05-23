@@ -51,6 +51,8 @@ void BezierSurface::InitGeometry(const DxDevice& device, const PrecalculatedSurf
 	std::vector<unsigned int> lineIndices = GenerateLineIndices();
 	m_polylineIndexCount = static_cast<UINT>(lineIndices.size());
 	m_polylineIndexBuffer = device.CreateIndexBuffer(lineIndices);
+
+	m_isDirty = false;
 }
 
 void BezierSurface::UpdateVertices(const DxDevice& device)
