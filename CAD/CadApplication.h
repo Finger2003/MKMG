@@ -279,6 +279,8 @@ private:
 	template <IsFileDialog DialogType>
 	std::wstring ShowFileDialog();
 #pragma endregion
+
+	void ActionMergeSelectedPoints();
 };
 
 

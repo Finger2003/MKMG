@@ -40,7 +40,10 @@ struct Surface : public SceneObject, public IPointDependent
 	virtual void InitGeometry(const DxDevice& device, const PrecalculatedSurfaceData& precalculatedData) = 0;
 	virtual void InitGeometry(const DxDevice& device) = 0;
 	virtual void UpdateVertices(const DxDevice& device) = 0;
+
 	void MarkDirty() override { m_isDirty = true; }
+	void ReplacePoint(Point* oldPoint, std::shared_ptr<Point> newPoint) override;
+
 	friend SurfaceBuilder;
 
 	std::vector<unsigned int> GenerateLineIndices() const;

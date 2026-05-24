@@ -32,6 +32,21 @@ nlohmann::json Curve::Serialize() const
     return j;
 }
 
+void Curve::ReplacePoint(Point* oldPoint, std::shared_ptr<Point> newPoint)
+{
+	for (auto& cpWeak : m_controlPoints)
+	{
+		if (auto cp = cpWeak.lock())
+		{
+			if (cp.get() == oldPoint)
+			{
+				cpWeak = newPoint;
+			}
+		}
+	}
+	MarkDirty();
+}
+
 void Curve::UpdateBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data, UINT& vertexCount, UINT minCount)
 {
     if (data.size() >= minCount)

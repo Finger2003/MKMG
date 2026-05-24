@@ -6,7 +6,22 @@ std::shared_ptr<Point> Surface::GetPoint(int u, int v) const
 {
     return m_controlPoints[GetControlPointIndex(u, v)].lock();
 }
-//
+void Surface::ReplacePoint(Point* oldPoint, std::shared_ptr<Point> newPoint)
+{
+	for (auto& cpWeak : m_controlPoints)
+	{
+		if (auto cp = cpWeak.lock())
+		{
+			if (cp.get() == oldPoint)
+			{
+				cpWeak = newPoint;
+				newPoint->m_surfaceLockCount++;
+			}
+		}
+	}
+
+	MarkDirty();
+}
 std::vector<unsigned int> Surface::GenerateLineIndices() const
 {
 	std::vector<unsigned int> indices;

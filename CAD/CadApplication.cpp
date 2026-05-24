@@ -502,7 +502,12 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 	{
 		bool ctrlHeld = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
 		bool shiftHeld = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
-		if (msg.wParam == 'S')
+		if (msg.wParam == 'M')
+		{
+			ActionMergeSelectedPoints();
+			return true;
+		}
+		else if (msg.wParam == 'S')
 		{
 			if (ctrlHeld)
 			{
@@ -1397,6 +1402,47 @@ void CadApplication::LoadScene(const std::wstring& filePath)
 				m_sceneObjects.push_back(newObject);
 		}
 	}
+}
+
+void CadApplication::ActionMergeSelectedPoints()
+{
+	std::vector<std::shared_ptr<Point>> pointsToMerge;
+	MathLib::Vec3f sumPos(0, 0, 0);
+
+	for (const auto& obj : m_sceneObjects)
+	{
+		if (obj->selected && obj->type == ObjectType::Point)
+		{
+			auto pt = std::static_pointer_cast<Point>(obj);
+			pointsToMerge.push_back(pt);
+			sumPos += pt->m_position.ToVec3f();
+		}
+	}
+	if (pointsToMerge.size() < 2)
+		return;
+
+	MathLib::Vec3f avgPos = sumPos / pointsToMerge.size();
+	auto mergedPoint = std::make_shared<Point>(avgPos);
+	m_sceneObjects.push_back(mergedPoint);
+
+	for (auto& oldPt : pointsToMerge)
+	{
+		for (auto& weakDep : oldPt->m_dependents)
+		{
+			if (auto dep = weakDep.lock())
+			{
+				dep->ReplacePoint(oldPt.get(), mergedPoint);
+				mergedPoint->AddDependent(dep);
+			}
+		}
+	}
+
+	ClearSelection();
+	mergedPoint->selected = true;
+	std::erase_if(m_sceneObjects, [&](const std::shared_ptr<SceneObject>& obj) {
+		return obj->type == ObjectType::Point && std::find(pointsToMerge.begin(), pointsToMerge.end(), obj) != pointsToMerge.end();
+		});
+	m_selectionDirty = true;
 }
 
 void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
