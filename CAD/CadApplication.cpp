@@ -1425,6 +1425,19 @@ void CadApplication::ActionMergeSelectedPoints()
 	auto mergedPoint = std::make_shared<Point>(avgPos);
 	m_sceneObjects.push_back(mergedPoint);
 
+	//for (auto& oldPt : pointsToMerge)
+	//{
+	//	for (auto& weakDep : oldPt->m_dependents)
+	//	{
+	//		if (auto dep = weakDep.lock())
+	//		{
+	//			dep->ReplacePoint(oldPt.get(), mergedPoint);
+	//			mergedPoint->AddDependent(dep);
+	//		}
+	//	}
+	//}
+
+	std::vector<std::shared_ptr<IPointDependent>> uniqueDependents;
 	for (auto& oldPt : pointsToMerge)
 	{
 		for (auto& weakDep : oldPt->m_dependents)
@@ -1432,10 +1445,14 @@ void CadApplication::ActionMergeSelectedPoints()
 			if (auto dep = weakDep.lock())
 			{
 				dep->ReplacePoint(oldPt.get(), mergedPoint);
-				mergedPoint->AddDependent(dep);
+				if (std::find(uniqueDependents.begin(), uniqueDependents.end(), dep) == uniqueDependents.end())
+					uniqueDependents.push_back(dep);
 			}
 		}
 	}
+
+	for (const auto& dep : uniqueDependents)
+		mergedPoint->AddDependent(dep);
 
 	ClearSelection();
 	mergedPoint->selected = true;
