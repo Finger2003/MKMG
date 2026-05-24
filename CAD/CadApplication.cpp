@@ -1451,8 +1451,7 @@ void CadApplication::ActionMergeSelectedPoints()
 		}
 	}
 
-	for (const auto& dep : uniqueDependents)
-		mergedPoint->AddDependent(dep);
+	mergedPoint->AddDependents(uniqueDependents);
 
 	ClearSelection();
 	mergedPoint->selected = true;

@@ -35,6 +35,7 @@ void Point::AddDependent(std::weak_ptr<IPointDependent> obj)
 	m_dependents.push_back(std::move(obj));
 }
 
+
 void Point::RemoveDependent(IPointDependent* obj)
 {
 	std::erase_if(m_dependents, [obj](const std::weak_ptr<IPointDependent>& weakDep) {
