@@ -10,14 +10,15 @@ struct Point : public TransformableObject, public NamedObjectCounter<Point>
 	DEFINE_TYPE(TransformableObject, ObjectType::Point);
 	static void InitSharedGeometry(const DxDevice& device);
 	static void ReleaseSharedGeometry();
-	Point(float3 position, bool lockToSurface = false);
+	Point(float3 position);
 	Point(unsigned int id, float3 position, std::optional<ParsedNameData>&& nameData);
 	
 
 	static const Microsoft::WRL::ComPtr<ID3D11Buffer>& GetSharedVertexBuffer() { return s_vertexBuffer; }
 	const Microsoft::WRL::ComPtr<ID3D11Buffer>& GetVertexBuffer() const { return s_vertexBuffer; }
 	std::vector<std::weak_ptr<IPointDependent>> m_dependents;
-	bool isLockedToSurface = false;
+	int m_surfaceLockCount = 0;
+	//bool isLockedToSurface = false;
 
 	void AddDependent(std::weak_ptr<IPointDependent> obj);
 	void RemoveDependent(IPointDependent* obj);
@@ -32,4 +33,5 @@ struct IPointDependent
 {
 	virtual ~IPointDependent() = default;
 	virtual void MarkDirty() {}// = 0;
+	virtual void ReplacePoint(Point* oldPoint, std::shared_ptr<Point> newPoint) = 0;
 };

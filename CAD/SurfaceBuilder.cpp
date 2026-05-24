@@ -65,7 +65,7 @@ SurfaceGenerationResult SurfaceBuilder::Build(const DxDevice& device) const
 			{
 				size_t index = static_cast<size_t>(v * gridU + u);
 				const auto& pos = rawPoints[index];
-				generatedPoints[id] = std::make_shared<Point>(float3{ pos.x, pos.y, pos.z }, true);
+				generatedPoints[id] = std::make_shared<Point>(float3{ pos.x, pos.y, pos.z });
 			}
 		}
 	}
@@ -85,6 +85,10 @@ SurfaceGenerationResult SurfaceBuilder::Build(const DxDevice& device) const
 		surface = std::make_unique<BezierSurface>(gridU, gridV, linesPerSegmentU, linesPerSegmentV, std::move(surfaceControlPoints));
 	else
 		surface = std::make_unique<BSplineSurface>(gridU, gridV, linesPerSegmentU, linesPerSegmentV, std::move(surfaceControlPoints));
+
+	for(auto& pt : surface->m_controlPoints)
+		if (auto sp = pt.lock())
+			sp->m_surfaceLockCount++;
 
 	PrecalculatedSurfaceData precalcData
 	{

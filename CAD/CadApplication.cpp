@@ -432,7 +432,7 @@ void CadApplication::DeleteSelectedObjects()
 			for (const auto& cpWeak : surface->m_controlPoints)
 			{
 				if (auto cp = cpWeak.lock())
-					cp->isLockedToSurface = false;
+					cp->m_surfaceLockCount = std::max(0, cp->m_surfaceLockCount - 1);
 			}
 		}
 	}
@@ -442,10 +442,7 @@ void CadApplication::DeleteSelectedObjects()
 			return false;
 
 		if (auto pt = obj->As<Point>())
-		{
-			if (pt->isLockedToSurface)
-				return false;
-		}
+			return pt->m_surfaceLockCount == 0;
 
 		return true;
 		});
@@ -1369,7 +1366,10 @@ void CadApplication::LoadScene(const std::wstring& filePath)
 				for (const auto& cpWeak : newSurface->m_controlPoints)
 				{
 					if (auto cpShared = cpWeak.lock())
+					{
 						cpShared->AddDependent(newSurface);
+						cpShared->m_surfaceLockCount++;
+					}
 				}
 
 				newSurface->InitGeometry(m_device);
@@ -1590,7 +1590,7 @@ void CadApplication::DrawListMenu(int selectedCount, int selectedPoints, std::sh
 
 
 
-	ImGui::BeginDisabled(pointsToAdd.empty());
+	ImGui::BeginDisabled(pointsToAdd.empty() || !activeCurve);
 	if (ImGui::Button("Add Points to Curve"))
 	{
 		activeCurve->m_controlPoints.insert(activeCurve->m_controlPoints.end(), pointsToAdd.begin(), pointsToAdd.end());
@@ -1951,7 +1951,7 @@ void CadApplication::DrawSurfaceList(Surface* surface, int selectedCount)
 		for (const auto& cpWeak : surface->m_controlPoints)
 		{
 			if (auto cp = cpWeak.lock())
-				cp->isLockedToSurface = false;
+				cp->m_surfaceLockCount = std::max(0, cp->m_surfaceLockCount - 1);
 		}
 
 		// Delete just the surface object

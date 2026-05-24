@@ -19,16 +19,12 @@ void Point::ReleaseSharedGeometry()
 	s_vertexBuffer.Reset();
 }
 
-Point::Point(float3 position, bool lockToSurface)
-	: TransformableObject(position,
-		"Point" + to_string(s_nextId++),
-		ObjectType::Point), isLockedToSurface(lockToSurface)
+Point::Point(float3 position)
+	: TransformableObject(position, "Point" + to_string(s_nextId++), ObjectType::Point)
 {}
 
 Point::Point(unsigned int id, float3 position, std::optional<ParsedNameData>&& nameData)
-	: TransformableObject(id, position,
-		nameData ? std::move(nameData->name) : "Point" + to_string(s_nextId++),
-		ObjectType::Point), isLockedToSurface(false)
+	: TransformableObject(id, position, nameData ? std::move(nameData->name) : "Point" + to_string(s_nextId++), ObjectType::Point)
 {
 	if (nameData)
 		AdvanceCounter(nameData->index);
