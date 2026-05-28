@@ -13,6 +13,7 @@
 #include "Cursor3D.h"
 #include "Camera.h"
 #include "SurfaceBuilder.h"
+#include "GregoryPatch.h"
 
 struct PerPointBuffer
 {
@@ -138,6 +139,9 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D11DomainShader> m_surfaceDomainShader;
 	Microsoft::WRL::ComPtr<ID3D11HullShader> m_surfaceHullShader;
 
+	Microsoft::WRL::ComPtr<ID3D11DomainShader> m_gregoryDomainShader;
+	Microsoft::WRL::ComPtr<ID3D11HullShader> m_gregoryHullShader;
+
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerObject;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerPass;
@@ -200,6 +204,7 @@ private:
 	void DrawTorusMenu(Torus& torus);
 	void DrawPointMenu(Point& selectedObj);
 	void DrawSurfaceMenu(Surface& surface);
+	void DrawPatchMenu(GregoryPatch& patch);
 	void DrawActionCombo();
 	void DrawEditGroupMenu(int selectedCount);
 	void DrawCameraSettingsMenu();
@@ -236,6 +241,8 @@ private:
 	void DrawSurfaces(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context, Surface* surface, MathLib::Vec4f color);
 	void DrawSurfacesPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void DrawGregoryPatches(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void DrawGregoryPatchesTangents(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 #pragma endregion
 
 #pragma region stereoscopy
@@ -281,6 +288,7 @@ private:
 #pragma endregion
 
 	void ActionMergeSelectedPoints();
+	void ActionSealHoles();
 };
 
 

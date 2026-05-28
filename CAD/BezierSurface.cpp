@@ -5,11 +5,11 @@ using namespace MathLib;
 
 
 BezierSurface::BezierSurface(int uGrid, int vGrid, int linesPerSegmentU, int linesPerSegmentV, std::vector<std::weak_ptr<Point>> controlPoints)
-	: Base(uGrid, vGrid, linesPerSegmentU, linesPerSegmentV, std::move(controlPoints), "Surface C0 - " + std::to_string(s_nextId++))
+	: Base(uGrid, vGrid, linesPerSegmentU, linesPerSegmentV, std::move(controlPoints), "Surface C0 - " + std::to_string(s_nextId++), ObjectType::BezierSurface)
 {}
 
 BezierSurface::BezierSurface(unsigned int id, uint2 grid, uint2 samples, std::vector<std::weak_ptr<Point>>&& controlPoints, std::optional<ParsedNameData>&& nameData)
-	: Base(id, nameData ? std::move(nameData->name) : "Surface C0 - " + std::to_string(s_nextId++), grid.u, grid.v, samples.u, samples.v, std::move(controlPoints))
+	: Base(id, nameData ? std::move(nameData->name) : "Surface C0 - " + std::to_string(s_nextId++), grid.u, grid.v, samples.u, samples.v, std::move(controlPoints), ObjectType::BezierSurface)
 {
 	if (nameData)
 		AdvanceCounter(nameData->index);

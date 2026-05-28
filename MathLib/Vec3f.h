@@ -63,6 +63,12 @@ namespace MathLib
 			return _mm_div_ps(vec.v, _mm_set1_ps(scalar));
 		}
 
+		friend Vec3f& operator/=(Vec3f& vec, float scalar)
+		{
+			vec = vec / scalar;
+			return vec;
+		}
+
 		static float dot(const Vec3f& a, const Vec3f& b)
 		{
 			// 0x71 mask: 

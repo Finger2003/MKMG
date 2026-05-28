@@ -12,7 +12,8 @@
     X(InterpolatingCurve)	 \
 	X(Surface)				 \
 	X(BezierSurface)		 \
-	X(BSplineSurface)
+	X(BSplineSurface)		 \
+	X(GregoryPatch)
 
 
 enum class ObjectType
@@ -32,7 +33,7 @@ enum class ObjectType
     static constexpr const char* SchemaName = SchemaString; \
     const char* GetSchemaType() const override { return SchemaName; }
 
-struct SceneObject
+struct SceneObject : public std::enable_shared_from_this<SceneObject>
 {
 	std::string name;
 	ObjectType type;
@@ -48,8 +49,14 @@ struct SceneObject
 		return IsA(T::ClassType) ? static_cast<T*>(this) : nullptr;
 	}
 
+	template<typename T>
+	std::shared_ptr<T> AsShared()
+	{
+		return IsA(T::ClassType) ? std::static_pointer_cast<T>(shared_from_this()) : nullptr;
+	}
+
 	virtual const char* GetSchemaType() const { return nullptr; }
-	virtual nlohmann::json Serialize() const = 0;
+	virtual nlohmann::json Serialize() const;
 protected:
 	static void AdvanceGlobalId(unsigned int loadedId)
 	{

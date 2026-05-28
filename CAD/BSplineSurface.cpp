@@ -5,11 +5,11 @@
 using namespace MathLib;
 
 BSplineSurface::BSplineSurface(int uGrid, int vGrid, int linesPerSegmentU, int linesPerSegmentV, std::vector<std::weak_ptr<Point>> controlPoints)
-	: Surface(uGrid, vGrid, linesPerSegmentU, linesPerSegmentV, std::move(controlPoints), "Surface C2 - " + std::to_string(s_nextId++))
+	: Surface(uGrid, vGrid, linesPerSegmentU, linesPerSegmentV, std::move(controlPoints), "Surface C2 - " + std::to_string(s_nextId++), ObjectType::BSplineSurface)
 {}
 
 BSplineSurface::BSplineSurface(unsigned int id, uint2 grid, uint2 samples, std::vector<std::weak_ptr<Point>> && controlPoints, std::optional<ParsedNameData> && nameData)
-	: Surface(id, nameData ? std::move(nameData->name) : "Surface C2 - " + std::to_string(s_nextId++), grid.u, grid.v, samples.u, samples.v, std::move(controlPoints))
+	: Surface(id, nameData ? std::move(nameData->name) : "Surface C2 - " + std::to_string(s_nextId++), grid.u, grid.v, samples.u, samples.v, std::move(controlPoints), ObjectType::BSplineSurface)
 {
 	if (nameData)
 		AdvanceCounter(nameData->index);

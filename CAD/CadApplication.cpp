@@ -4,6 +4,7 @@
 #include "../ImGuiLib/imgui.h"
 #include "../ImGuiLib/imgui_impl_win32.h"
 #include "../ImGuiLib/imgui_impl_dx11.h"
+#include "HoleDetection.h"
 
 
 using namespace MathLib;
@@ -60,176 +61,6 @@ namespace
 			return 0;
 		}
 	}
-
-
-
-	struct PatchEdge
-	{
-		Point* startPoint;
-		Point* endPoint;
-		std::vector<std::shared_ptr<Point>> boundaryPoints; // P_3i dependencies
-		std::vector<std::shared_ptr<Point>> innerPoints;    // P_2i dependencies
-		std::shared_ptr<BezierSurface> surface;
-
-		PatchEdge(Point* start, Point* end, std::vector<std::shared_ptr<Point>>&& boundaryPts, std::vector<std::shared_ptr<Point>>&& innerPts, std::shared_ptr<BezierSurface> surf)
-			: startPoint(start), endPoint(end), boundaryPoints(std::move(boundaryPts)), innerPoints(std::move(innerPts)), surface(std::move(surf))
-		{}
-	};
-
-	struct Hole3Cycle
-	{
-		PatchEdge edges[3];
-	};
-
-	struct EdgeKey
-	{
-		Point* p1;
-		Point* p2;
-		bool operator==(const EdgeKey& other) const
-		{
-			return p1 == other.p1 && p2 == other.p2;
-		}
-	};
-
-	struct EdgeKeyHash
-	{
-		std::size_t operator()(const EdgeKey& k) const
-		{
-			auto h1 = std::hash<Point*>{}(k.p1);
-			auto h2 = std::hash<Point*>{}(k.p2);
-			return h1 ^ (h2 << 1);
-		}
-	};
-
-	std::vector<Hole3Cycle> Find3SidedHoles(const std::vector<std::shared_ptr<BezierSurface>>& surfaces)
-	{
-		std::vector<PatchEdge> allEdges;
-		for (const auto& surf : surfaces)
-		{
-			unsigned int u = surf->m_gridPointsU;
-			unsigned int v = surf->m_gridPointsV;
-
-			unsigned int segmentsU = surf->GetSegmentsU();
-			unsigned int segmentsV = surf->GetSegmentsV();
-
-			auto extractEdge = [&](unsigned int segments, auto getBoundaryIdx, auto getInnerIdx)
-				{
-					for (unsigned int seg = 0; seg < segments; seg++)
-					{
-						auto startShared = surf->m_controlPoints[getBoundaryIdx(seg, 0)].lock();
-						auto endShared = surf->m_controlPoints[getBoundaryIdx(seg, 3)].lock();
-						if (!startShared || !endShared || (startShared == endShared))
-							continue;
-
-						std::vector<std::shared_ptr<Point>> boundaryPts;
-						std::vector<std::shared_ptr<Point>> innerPts;
-						bool edgeValid = true;
-
-						for (unsigned int i = 0; i < 4; i++)
-						{
-							auto bPt = surf->m_controlPoints[getBoundaryIdx(seg, i)].lock();
-							auto iPt = surf->m_controlPoints[getInnerIdx(seg, i)].lock();
-
-							if (!bPt || !iPt)
-							{
-								edgeValid = false;
-								break;
-							}
-							boundaryPts.push_back(std::move(bPt));
-							innerPts.push_back(std::move(iPt));
-						}
-
-						if (edgeValid)
-						{
-							allEdges.emplace_back(startShared.get(), endShared.get(),
-								std::move(boundaryPts), std::move(innerPts), surf);
-						}
-}
-				};
-
-			// 1. Bottom Edges (V = 0), Inner Row (V = 1)
-			extractEdge(segmentsU,
-				[u](unsigned int seg, unsigned int i) { return (seg * 3) + i; },
-				[u](unsigned int seg, unsigned int i) { return 1 * u + (seg * 3) + i; }
-			);
-			// 2. Top Edges (V = v-1), Inner Row (V = v-2)
-			extractEdge(segmentsU,
-				[u, v](unsigned int seg, unsigned int i) { return (v - 1) * u + (seg * 3) + i; },
-				[u, v](unsigned int seg, unsigned int i) { return (v - 2) * u + (seg * 3) + i; }
-			);
-			// 3. Left Edges (U = 0), Inner Row (U = 1)
-			extractEdge(segmentsV,
-				[u](unsigned int seg, unsigned int j) { return ((seg * 3) + j) * u; },
-				[u](unsigned int seg, unsigned int j) { return ((seg * 3) + j) * u + 1; }
-			);
-			// 4. Right Edges (U = u-1), Inner Row (U = u-2)
-			extractEdge(segmentsV,
-				[u](unsigned int seg, unsigned int j) { return ((seg * 3) + j) * u + (u - 1); },
-				[u](unsigned int seg, unsigned int j) { return ((seg * 3) + j) * u + (u - 2); }
-			);
-		}
-
-
-
-		// Filter for boundary edges
-		std::unordered_map<EdgeKey, std::vector<PatchEdge>, EdgeKeyHash> edgeFrequencyMap;
-		for (const auto& edge : allEdges)
-		{
-			Point* minPt = std::min(edge.startPoint, edge.endPoint);
-			Point* maxPt = std::max(edge.startPoint, edge.endPoint);
-
-			edgeFrequencyMap[{minPt, maxPt}].push_back(edge);
-		}
-
-		std::vector<PatchEdge> boundaryEdges;
-		for (auto& [key, edgesOnSeam] : edgeFrequencyMap)
-		{
-			// A hole edge must belong to exactly one surface. 
-			// If size > 1, it's a shared internal seam.
-			if (edgesOnSeam.size() == 1)
-				boundaryEdges.push_back(std::move(edgesOnSeam[0]));
-		}
-
-		// Build adjacency list 
-		std::unordered_map<Point*, std::vector<PatchEdge>> graph;
-		for (const auto& edge : boundaryEdges)
-		{
-			graph[edge.startPoint].push_back(edge);
-			graph[edge.endPoint].push_back(edge);
-		}
-
-		// Traverse graph to find 3-cycles
-		std::vector<Hole3Cycle> holes;
-		for (const auto& [nodeU, neighborsU] : graph)
-		{
-			for (const auto& edge1 : neighborsU)
-			{
-				Point* nodeV = (edge1.startPoint == nodeU) ? edge1.endPoint : edge1.startPoint;
-				if (nodeV <= nodeU)
-					continue;
-
-				for (const auto& edge2 : graph[nodeV])
-				{
-					Point* nodeW = (edge2.startPoint == nodeV) ? edge2.endPoint : edge2.startPoint;
-					if (nodeW <= nodeV)
-						continue;
-
-					for (const auto& edge3 : graph[nodeW])
-					{
-						Point* nodeX = (edge3.startPoint == nodeW) ? edge3.endPoint : edge3.startPoint;
-
-						// The loop closes if nodeX connects back to nodeU
-						if (nodeX == nodeU)
-						{
-							holes.push_back({ {edge1, edge2, edge3} });
-							break;
-						}
-					}
-				}
-			}
-		}
-		return holes;
-	}
 }
 
 CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight, std::wstring wndTitle)
@@ -252,6 +83,8 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	const auto surfaceVsByteCode = DxDevice::LoadByteCode(L"SurfaceVS.cso");
 	const auto surfaceHsByteCode = DxDevice::LoadByteCode(L"SurfaceHS.cso");
 	const auto surfaceDsByteCode = DxDevice::LoadByteCode(L"SurfaceDS.cso");
+	const auto gregoryHsByteCode = DxDevice::LoadByteCode(L"GregoryHS.cso");
+	const auto gregoryDsByteCode = DxDevice::LoadByteCode(L"GregoryDS.cso");
 
 	m_vertexShader = m_device.CreateVertexShader(vsByteCode);
 	m_pixelShader = m_device.CreatePixelShader(psByteCode);
@@ -263,6 +96,8 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	m_surfaceVertexShader = m_device.CreateVertexShader(surfaceVsByteCode);
 	m_surfaceDomainShader = m_device.CreateDomainShader(surfaceDsByteCode);
 	m_surfaceHullShader = m_device.CreateHullShader(surfaceHsByteCode);
+	m_gregoryDomainShader = m_device.CreateDomainShader(gregoryDsByteCode);
+	m_gregoryHullShader = m_device.CreateHullShader(gregoryHsByteCode);
 
 	vector<D3D11_INPUT_ELEMENT_DESC> inputElements = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
@@ -606,6 +441,23 @@ void CadApplication::DeleteSelectedObjects()
 					cp->m_surfaceLockCount = std::max(0, cp->m_surfaceLockCount - 1);
 			}
 		}
+		else if (auto patch = obj->As<GregoryPatch>())
+		{
+			for (int i = 0; i < 3; i++)
+			{
+				const auto& edge = patch->m_hole.edges[i];
+				for (const auto& cpWeak : edge.boundaryPoints)
+				{
+					if (auto cp = cpWeak.lock())
+						cp->m_surfaceLockCount = std::max(0, cp->m_surfaceLockCount - 1);
+				}
+				for (const auto& cpWeak : edge.innerPoints)
+				{
+					if (auto cp = cpWeak.lock())
+						cp->m_surfaceLockCount = std::max(0, cp->m_surfaceLockCount - 1);
+				}
+			}
+		}
 	}
 
 	erase_if(m_sceneObjects, [](const auto& obj) {
@@ -676,6 +528,11 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		if (msg.wParam == 'M')
 		{
 			ActionMergeSelectedPoints();
+			return true;
+		}
+		else if (msg.wParam == 'G')
+		{
+			ActionSealHoles();
 			return true;
 		}
 		else if (msg.wParam == 'S')
@@ -1291,6 +1148,63 @@ void CadApplication::DrawSurfacesPolylines(const Microsoft::WRL::ComPtr<ID3D11De
 	}
 }
 
+void CadApplication::DrawGregoryPatches(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+{
+	for (auto& obj : m_sceneObjects)
+	{
+		if (obj->type == ObjectType::GregoryPatch)
+		{
+			auto gregoryPatch = static_cast<GregoryPatch*>(obj.get());
+			gregoryPatch->UpdateVertices(m_device);
+
+			UINT stride = sizeof(VertexPosition);
+			UINT offset = 0;
+			context->IASetVertexBuffers(0, 1, gregoryPatch->m_vertexBuffer.GetAddressOf(), &stride, &offset);
+
+			PerObjectBuffer objData;
+			objData.color = gregoryPatch->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+			auto updateAndDraw = [&](float xParam, float yParam) {
+				objData.surfaceParams =
+				{
+					xParam,
+					yParam,
+					static_cast<float>(gregoryPatch->m_smoothness),
+					0.0f
+				};
+				m_device.UpdateBuffer(m_cbPerObject, objData);
+				context->Draw(gregoryPatch->m_vertexCount, 0);
+				};
+			updateAndDraw(0.0f, static_cast<float>(gregoryPatch->m_linesPerSegmentU));
+			updateAndDraw(1.0f, static_cast<float>(gregoryPatch->m_linesPerSegmentV));
+		}
+	}
+}
+
+
+void CadApplication::DrawGregoryPatchesTangents(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+{
+	PerObjectBuffer objData;
+	objData.model = Mat4f::Identity();
+	objData.color = Vec4f(0.7f, 0.1f, 0.1f, 1.0f);
+	m_device.UpdateBuffer(m_cbPerObject, objData);
+
+	for (auto& obj : m_sceneObjects)
+	{
+		if (auto patch = obj->As<GregoryPatch>())
+		{
+			patch->UpdateVertices(m_device);
+			if (patch->selected)
+			{
+				UINT stride = sizeof(VertexPosition);
+				UINT offset = 0;
+				context->IASetVertexBuffers(0, 1, patch->m_continuityVertexBuffer.GetAddressOf(), &stride, &offset);
+				context->Draw(patch->m_continuityVertexCount, 0);
+			}
+		}
+	}
+}
+
 void CadApplication::InitStereoBlendStates()
 {
 	m_blendStateDefault = m_device.CreateBlendState();
@@ -1351,6 +1265,7 @@ void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>
 	DrawPolylines(context);
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 	DrawSurfacesPolylines(context);
+	DrawGregoryPatchesTangents(context);
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST_ADJ);
 	context->VSSetShader(m_bezierVertexShader.Get(), nullptr, 0);
@@ -1375,6 +1290,12 @@ void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>
 	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
 
 	DrawSurfaces(context);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_20_CONTROL_POINT_PATCHLIST);
+	context->HSSetShader(m_gregoryHullShader.Get(), nullptr, 0);
+	context->DSSetShader(m_gregoryDomainShader.Get(), nullptr, 0);
+
+	DrawGregoryPatches(context);
 
 	context->HSSetShader(nullptr, nullptr, 0);
 	context->DSSetShader(nullptr, nullptr, 0);
@@ -1630,6 +1551,44 @@ void CadApplication::ActionMergeSelectedPoints()
 		return obj->type == ObjectType::Point && std::find(pointsToMerge.begin(), pointsToMerge.end(), obj) != pointsToMerge.end();
 		});
 	m_selectionDirty = true;
+}
+
+void CadApplication::ActionSealHoles()
+{
+	std::vector<std::shared_ptr<BezierSurface>> selectedSurfaces;
+	for (const auto& obj : m_sceneObjects)
+	{
+		if (obj->selected && obj->type == ObjectType::BezierSurface)
+			selectedSurfaces.push_back(std::static_pointer_cast<BezierSurface>(obj));
+	}
+
+	std::vector<Hole3Cycle> holes = Find3SidedHoles(selectedSurfaces);
+	for (auto& hole : holes)
+	{
+		auto patch = std::make_shared<GregoryPatch>(std::move(hole));
+		for (int i = 0; i < 3; i++)
+		{
+			auto& edge = patch->m_hole.edges[i];
+			for (auto& cpWeak : edge.boundaryPoints)
+			{
+				if (auto cpShared = cpWeak.lock())
+				{
+					cpShared->AddDependent(patch);
+					cpShared->m_surfaceLockCount++;
+				}
+			}
+			for (auto& cpWeak : edge.innerPoints)
+			{
+				if (auto cpShared = cpWeak.lock())
+				{
+					cpShared->AddDependent(patch);
+					cpShared->m_surfaceLockCount++;
+				}
+			}
+		}
+		patch->InitGeometry(m_device);
+		m_sceneObjects.push_back(patch);
+	}
 }
 
 void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
@@ -2292,8 +2251,9 @@ void CadApplication::DrawEditMenu()
 			DrawTorusMenu(*torus);
 		else if (auto surface = selectedObj->As<Surface>())
 			DrawSurfaceMenu(*surface);
+		else if (auto patch = selectedObj->As<GregoryPatch>())
+			DrawPatchMenu(*patch);
 	}
-
 }
 
 void CadApplication::DrawTorusMenu(Torus& torus)
@@ -2372,12 +2332,21 @@ void CadApplication::DrawSurfaceMenu(Surface& surface)
 {
 	ImGui::Text("Tessellation Parameters");
 	ImGui::Spacing();
-
 	// Sliders to control the shader density
 	ImGui::SliderInt("Lines per Segment (U)", &surface.m_linesPerSegmentU, 2, 64);
 	ImGui::SliderInt("Lines per Segment (V)", &surface.m_linesPerSegmentV, 2, 64);
 	ImGui::SliderInt("Smoothness", &surface.m_smoothness, 2, 64);
+	ImGui::Separator();
+}
 
+void CadApplication::DrawPatchMenu(GregoryPatch& patch)
+{
+	ImGui::Text("Tessellation Parameters");
+	ImGui::Spacing();
+	// Sliders to control the shader density
+	ImGui::SliderInt("Lines per Segment (U)", &patch.m_linesPerSegmentU, 2, 64);
+	ImGui::SliderInt("Lines per Segment (V)", &patch.m_linesPerSegmentV, 2, 64);
+	ImGui::SliderInt("Smoothness", &patch.m_smoothness, 2, 64);
 	ImGui::Separator();
 }
 

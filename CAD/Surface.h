@@ -24,7 +24,7 @@ struct Surface : public SceneObject, public IPointDependent
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_polylineVertexBuffer;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_polylineIndexBuffer;
 	UINT m_polylineIndexCount = 0;
-
+	 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_patchVertexBuffer;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_patchIndexBuffer;
 	UINT m_patchIndexCount = 0;
@@ -48,14 +48,14 @@ struct Surface : public SceneObject, public IPointDependent
 
 	std::vector<unsigned int> GenerateLineIndices() const;
 
-	Surface(int uGrid, int vGrid, int linesPerSegmentU, int linesPerSegmentV, std::vector<std::weak_ptr<Point>>&& controlPoints, std::string&& name)
-		: SceneObject(std::move(name), ObjectType::Surface), m_gridPointsU(uGrid), m_gridPointsV(vGrid), m_linesPerSegmentU(linesPerSegmentU), m_linesPerSegmentV(linesPerSegmentV), m_controlPoints(std::move(controlPoints))
+	Surface(int uGrid, int vGrid, int linesPerSegmentU, int linesPerSegmentV, std::vector<std::weak_ptr<Point>>&& controlPoints, std::string&& name, ObjectType type)
+		: SceneObject(std::move(name), type), m_gridPointsU(uGrid), m_gridPointsV(vGrid), m_linesPerSegmentU(linesPerSegmentU), m_linesPerSegmentV(linesPerSegmentV), m_controlPoints(std::move(controlPoints))
 	{}
 
 	Surface(unsigned int id, std::string&& name, 
 		int gridPointsU, int gridPointsV, int linesPerSegmentU, int linesPerSegmentV, 
-		std::vector<std::weak_ptr<Point>>&& controlPoints)
-		: SceneObject(id, std::move(name), ObjectType::Surface),
+		std::vector<std::weak_ptr<Point>>&& controlPoints, ObjectType type)
+		: SceneObject(id, std::move(name), type),
 		m_gridPointsU(gridPointsU), m_gridPointsV(gridPointsV), m_linesPerSegmentU(linesPerSegmentU), m_linesPerSegmentV(linesPerSegmentV), 
 		m_controlPoints(std::move(controlPoints))
 	{}
