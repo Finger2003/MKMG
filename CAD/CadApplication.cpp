@@ -807,7 +807,8 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 
 	Vec3f editPivot = m_groupEditCenter.ToVec3f();
 	Mat4f deltaRot = Mat4f::Identity();
-	float scaleFactor = 1.0f;
+	Vec3f scaleMultiplier(1.0f, 1.0f, 1.0f);
+	//float scaleFactor = 1.0f;
 	Vec3f worldDelta(0, 0, 0);
 	bool isTranslating = false, isRotating = false, isScaling = false;
 
@@ -849,9 +850,13 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 		else if (m_currentEditAction == EditAction::RotateZ) deltaRot = Mat4f::RotationZ(angle);
 		isRotating = true;
 	}
-	else if (m_currentEditAction == EditAction::Scale)
+	else if (m_currentEditAction >= EditAction::Scale && m_currentEditAction <= EditAction::ScaleZ)
 	{
-		scaleFactor = std::max(0.01f, 1.0f + totalDx * 0.01f);
+		float scale = std::max(0.01f, 1.0f + totalDx * 0.01f);
+		if (m_currentEditAction == EditAction::Scale) scaleMultiplier = { scale, scale, scale };
+		else if (m_currentEditAction == EditAction::ScaleX) scaleMultiplier.x = scale;
+		else if (m_currentEditAction == EditAction::ScaleY) scaleMultiplier.y = scale;
+		else if (m_currentEditAction == EditAction::ScaleZ) scaleMultiplier.z = scale;
 		isScaling = true;
 	}
 
@@ -869,11 +874,11 @@ void CadApplication::ApplyEditTransform(int mouseX, int mouseY)
 				else if (isScaling)
 				{
 					Vec3f offset = objBasePos - editPivot;
-					Vec3f newPos = editPivot + offset * scaleFactor;
+					Vec3f newPos = editPivot + offset * scaleMultiplier;
 					obj->m_position = newPos;
 
 					if (auto torus = obj->As<Torus>())
-						torus->SetScale(torus->m_baseScale.ToVec3f() * scaleFactor);
+						torus->SetScale(torus->m_baseScale.ToVec3f() * scaleMultiplier);
 				}
 				else if (isRotating)
 				{
@@ -2436,7 +2441,7 @@ void CadApplication::DrawActionCombo()
 	ImGui::Text("Interactive Action");
 	const char* actions[] = {
 		"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",
-		"Free Arcball", "Rotate X", "Rotate Y", "Rotate Z", "Scale"
+		"Free Arcball", "Rotate X", "Rotate Y", "Rotate Z", "Scale", "Scale X", "Scale Y", "Scale Z"
 	};
 	int actionIndex = static_cast<int>(m_currentEditAction);
 

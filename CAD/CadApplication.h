@@ -58,7 +58,7 @@ enum class EditAction
 	None,
 	TranslateFree, TranslateX, TranslateY, TranslateZ,
 	RotateFree, RotateX, RotateY, RotateZ,
-	Scale
+	Scale, ScaleX, ScaleY, ScaleZ
 };
 
 

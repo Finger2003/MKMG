@@ -69,6 +69,17 @@ namespace MathLib
 			return vec;
 		}
 
+		friend Vec3f operator*(const Vec3f& a, const Vec3f& b)
+		{
+			return _mm_mul_ps(a.v, b.v);
+		}
+
+		friend Vec3f& operator*=(Vec3f& a, const Vec3f& b)
+		{
+			a = a * b;
+			return a;
+		}
+
 		static float dot(const Vec3f& a, const Vec3f& b)
 		{
 			// 0x71 mask: 
