@@ -674,6 +674,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 
 			m_isBoxSelecting = false;
 		}
+		[[fallthrough]];
 	case WM_RBUTTONUP:
 	case WM_MBUTTONUP:
 		m_isEditing = false;
@@ -689,6 +690,8 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			ApplyEditTransform(xPos, yPos);
 
 		HandleCameraInteraction(xPos, yPos);
+		if (m_isBoxSelecting)
+			m_boxSelectCurrent = { xPos, yPos };
 		return true;
 	}
 	case WM_MOUSEWHEEL:
@@ -1767,6 +1770,18 @@ void CadApplication::DrawMenu()
 	DrawCursorSettingsMenu();
 
 	ImGui::End();
+
+	if (m_isBoxSelecting)
+	{
+		ImDrawList* drawList = ImGui::GetForegroundDrawList();
+		auto [minX, maxX] = std::minmax(m_boxSelectStart.x, m_boxSelectCurrent.x);
+		auto [minY, maxY] = std::minmax(m_boxSelectStart.y, m_boxSelectCurrent.y);
+		ImVec2 p_min(static_cast<float>(minX), static_cast<float>(minY));
+		ImVec2 p_max(static_cast<float>(maxX), static_cast<float>(maxY));
+		drawList->AddRectFilled(p_min, p_max, IM_COL32(0, 130, 255, 50));
+		drawList->AddRect(p_min, p_max, IM_COL32(0, 130, 255, 255));
+	}
+
 	ImGui::Render();
 }
 
