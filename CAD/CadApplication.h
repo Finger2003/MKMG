@@ -289,6 +289,12 @@ private:
 
 	void ActionMergeSelectedPoints();
 	void ActionSealHoles();
+
+
+	POINT m_boxSelectStart{};
+	POINT m_boxSelectCurrent{};
+	bool m_isBoxSelecting = false;
+	void PerformBoxSelection();
 };
 
 

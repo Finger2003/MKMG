@@ -559,6 +559,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		bool ctrlHeld = (fwKeys & MK_CONTROL) != 0;
 		bool shiftHeld = (fwKeys & MK_SHIFT) != 0;
 		bool pPressed = (GetAsyncKeyState('P') & 0x8000) != 0;
+		bool sPressed = (GetAsyncKeyState('S') & 0x8000) != 0;
 
 		if (m_enableVirtualEdit)
 		{
@@ -608,6 +609,31 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		}
 		else
 		{
+			if (m_currentEditAction != EditAction::None && !ctrlHeld)
+				BeginEditAction(xPos, yPos, shiftHeld);
+			else
+			{
+				if (sPressed)
+				{
+					if (!ctrlHeld)
+						ClearSelection();
+
+					m_isBoxSelecting = true;
+					m_boxSelectStart = { xPos, yPos };
+					m_boxSelectCurrent = { xPos, yPos };
+					SetCapture(m_window.getHandle());
+				}
+				else
+				{
+					auto [normX, normY] = CalculateCoordsFromPixel(static_cast<float>(xPos), static_cast<float>(yPos),
+						static_cast<float>(m_renderSize.cx), static_cast<float>(m_renderSize.cy));
+					m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
+
+					if (!ctrlHeld)
+						ClearSelection();
+				}
+			}
+
 			if (ctrlHeld)
 			{
 				auto [normX, normY] = CalculateCoordsFromPixel(static_cast<float>(xPos), static_cast<float>(yPos),
@@ -637,6 +663,17 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		SetCapture(m_window.getHandle());
 		return true;
 	case WM_LBUTTONUP:
+		if (m_isBoxSelecting)
+		{
+			m_boxSelectCurrent = { xPos, yPos };
+			int dx = std::abs(m_boxSelectCurrent.x - m_boxSelectStart.x);
+			int dy = std::abs(m_boxSelectCurrent.y - m_boxSelectStart.y);
+
+			if (dx >= 3 || dy >= 3)
+				PerformBoxSelection();
+
+			m_isBoxSelecting = false;
+		}
 	case WM_RBUTTONUP:
 	case WM_MBUTTONUP:
 		m_isEditing = false;
@@ -1589,6 +1626,35 @@ void CadApplication::ActionSealHoles()
 		patch->InitGeometry(m_device);
 		m_sceneObjects.push_back(patch);
 	}
+}
+
+void CadApplication::PerformBoxSelection()
+{
+	auto [minX, maxX] = std::minmax(m_boxSelectStart.x, m_boxSelectCurrent.x);
+	auto [minY, maxY] = std::minmax(m_boxSelectStart.y, m_boxSelectCurrent.y);
+
+	Mat4f projView = m_camera.GetProjViewMatrix();
+
+	for (const auto& obj : m_sceneObjects)
+	{
+		if (auto point = obj->As<Point>())
+		{
+			Vec4f worldPos = point->m_position.ToVec4f(1.0f);
+			Vec4f clipPos = projView * worldPos;
+
+			if (clipPos.w <= 0.0f)
+				continue;
+
+			clipPos /= clipPos.w;
+			float screenX = (clipPos.x + 1.0f) * 0.5f * m_renderSize.cx;
+			float screenY = (1.0f - clipPos.y) * 0.5f * m_renderSize.cy;
+
+			if (screenX >= minX && screenX <= maxX && screenY >= minY && screenY <= maxY)
+				point->selected = true;
+		}
+	}
+
+	m_selectionDirty = true;
 }
 
 void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
