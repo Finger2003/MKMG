@@ -599,6 +599,18 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			return true;
 		}
 
+		if (sPressed)
+		{
+			if (!ctrlHeld)
+				ClearSelection();
+
+			m_isBoxSelecting = true;
+			m_boxSelectStart = { xPos, yPos };
+			m_boxSelectCurrent = { xPos, yPos };
+			SetCapture(m_window.getHandle());
+			return true;
+		}
+
 		auto pickedIndex = PickClosestPoint(xPos, yPos);
 		if (pickedIndex.has_value())
 		{
@@ -613,25 +625,12 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 				BeginEditAction(xPos, yPos, shiftHeld);
 			else
 			{
-				if (sPressed)
-				{
-					if (!ctrlHeld)
-						ClearSelection();
+				auto [normX, normY] = CalculateCoordsFromPixel(static_cast<float>(xPos), static_cast<float>(yPos),
+					static_cast<float>(m_renderSize.cx), static_cast<float>(m_renderSize.cy));
+				m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
 
-					m_isBoxSelecting = true;
-					m_boxSelectStart = { xPos, yPos };
-					m_boxSelectCurrent = { xPos, yPos };
-					SetCapture(m_window.getHandle());
-				}
-				else
-				{
-					auto [normX, normY] = CalculateCoordsFromPixel(static_cast<float>(xPos), static_cast<float>(yPos),
-						static_cast<float>(m_renderSize.cx), static_cast<float>(m_renderSize.cy));
-					m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
-
-					if (!ctrlHeld)
-						ClearSelection();
-				}
+				if (!ctrlHeld)
+					ClearSelection();
 			}
 
 			if (ctrlHeld)
