@@ -294,7 +294,7 @@ private:
 	POINT m_boxSelectStart{};
 	POINT m_boxSelectCurrent{};
 	bool m_isBoxSelecting = false;
-	void PerformBoxSelection();
+	void PerformBoxSelection(bool ctrlHeld, bool shiftHeld);
 };
 
 

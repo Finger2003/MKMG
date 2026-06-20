@@ -523,8 +523,13 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 	}
 	case WM_KEYDOWN:
 	{
+		bool isRepeat = (msg.lParam & 0x40000000) != 0;
+		if (isRepeat) 
+			break;
+
 		bool ctrlHeld = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
 		bool shiftHeld = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+
 		if (msg.wParam == 'M')
 		{
 			ActionMergeSelectedPoints();
@@ -551,6 +556,49 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			ActionLoad();
 			return true;
 		}
+		else if (msg.wParam == 'B')
+		{
+			if (!m_isBoxSelecting)
+			{
+				POINT pt;
+				GetCursorPos(&pt);
+				ScreenToClient(m_window.getHandle(), &pt);
+
+				m_isBoxSelecting = true;
+				m_boxSelectStart = pt;
+				m_boxSelectCurrent = pt;
+				SetCapture(m_window.getHandle());
+			}
+			return true;
+		}
+		break;
+	}
+	case WM_KEYUP:
+	{
+		if (msg.wParam == 'B')
+		{
+			if (m_isBoxSelecting)
+			{
+				POINT pt;
+				GetCursorPos(&pt);
+				ScreenToClient(m_window.getHandle(), &pt);
+				m_boxSelectCurrent = pt;
+
+				int dx = std::abs(m_boxSelectCurrent.x - m_boxSelectStart.x);
+				int dy = std::abs(m_boxSelectCurrent.y - m_boxSelectStart.y);
+
+				if (dx >= 3 || dy >= 3)
+				{
+					bool ctrlHeld = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+					bool shiftHeld = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+					PerformBoxSelection(ctrlHeld, shiftHeld);
+				}
+
+				m_isBoxSelecting = false;
+				ReleaseCapture();
+			}
+			return true;
+		}
 		break;
 	}
 	case WM_LBUTTONDOWN:
@@ -559,7 +607,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		bool ctrlHeld = (fwKeys & MK_CONTROL) != 0;
 		bool shiftHeld = (fwKeys & MK_SHIFT) != 0;
 		bool pPressed = (GetAsyncKeyState('P') & 0x8000) != 0;
-		bool sPressed = (GetAsyncKeyState('S') & 0x8000) != 0;
 
 		if (m_enableVirtualEdit)
 		{
@@ -599,17 +646,17 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			return true;
 		}
 
-		if (sPressed)
-		{
-			if (!ctrlHeld)
-				ClearSelection();
+		//if (bPressed)
+		//{
+		//	if (!ctrlHeld)
+		//		ClearSelection();
 
-			m_isBoxSelecting = true;
-			m_boxSelectStart = { xPos, yPos };
-			m_boxSelectCurrent = { xPos, yPos };
-			SetCapture(m_window.getHandle());
-			return true;
-		}
+		//	m_isBoxSelecting = true;
+		//	m_boxSelectStart = { xPos, yPos };
+		//	m_boxSelectCurrent = { xPos, yPos };
+		//	SetCapture(m_window.getHandle());
+		//	return true;
+		//}
 
 		auto pickedIndex = PickClosestPoint(xPos, yPos);
 		if (pickedIndex.has_value())
@@ -662,18 +709,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		SetCapture(m_window.getHandle());
 		return true;
 	case WM_LBUTTONUP:
-		if (m_isBoxSelecting)
-		{
-			m_boxSelectCurrent = { xPos, yPos };
-			int dx = std::abs(m_boxSelectCurrent.x - m_boxSelectStart.x);
-			int dy = std::abs(m_boxSelectCurrent.y - m_boxSelectStart.y);
-
-			if (dx >= 3 || dy >= 3)
-				PerformBoxSelection();
-
-			m_isBoxSelecting = false;
-		}
-		[[fallthrough]];
 	case WM_RBUTTONUP:
 	case WM_MBUTTONUP:
 		m_isEditing = false;
@@ -1635,12 +1670,17 @@ void CadApplication::ActionSealHoles()
 	}
 }
 
-void CadApplication::PerformBoxSelection()
+void CadApplication::PerformBoxSelection(bool ctrlHeld, bool shiftHeld)
 {
 	auto [minX, maxX] = std::minmax(m_boxSelectStart.x, m_boxSelectCurrent.x);
 	auto [minY, maxY] = std::minmax(m_boxSelectStart.y, m_boxSelectCurrent.y);
 
 	Mat4f projView = m_camera.GetProjViewMatrix();
+
+	if (!ctrlHeld && !shiftHeld)
+		ClearSelection();
+
+	bool select = !ctrlHeld;
 
 	for (const auto& obj : m_sceneObjects)
 	{
@@ -1657,7 +1697,7 @@ void CadApplication::PerformBoxSelection()
 			float screenY = (1.0f - clipPos.y) * 0.5f * m_renderSize.cy;
 
 			if (screenX >= minX && screenX <= maxX && screenY >= minY && screenY <= maxY)
-				point->selected = true;
+				point->selected = select;
 		}
 	}
 
@@ -1782,8 +1822,25 @@ void CadApplication::DrawMenu()
 		auto [minY, maxY] = std::minmax(m_boxSelectStart.y, m_boxSelectCurrent.y);
 		ImVec2 p_min(static_cast<float>(minX), static_cast<float>(minY));
 		ImVec2 p_max(static_cast<float>(maxX), static_cast<float>(maxY));
-		drawList->AddRectFilled(p_min, p_max, IM_COL32(0, 130, 255, 50));
-		drawList->AddRect(p_min, p_max, IM_COL32(0, 130, 255, 255));
+		bool ctrlHeld = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+		bool shiftHeld = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+
+		ImU32 fillCol = IM_COL32(0, 130, 255, 40);   // Default Blue
+		ImU32 borderCol = IM_COL32(0, 130, 255, 220);
+
+		if (ctrlHeld)
+		{
+			fillCol = IM_COL32(255, 50, 50, 40);   // Subtract Red
+			borderCol = IM_COL32(255, 50, 50, 220);
+		}
+		else if (shiftHeld)
+		{
+			fillCol = IM_COL32(50, 220, 50, 40);   // Append Green
+			borderCol = IM_COL32(50, 220, 50, 220);
+		}
+
+		drawList->AddRectFilled(p_min, p_max, fillCol);
+		drawList->AddRect(p_min, p_max, borderCol);
 	}
 
 	ImGui::Render();
