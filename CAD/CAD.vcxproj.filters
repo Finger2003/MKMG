@@ -141,6 +141,9 @@
     <ClCompile Include="GregoryPatch.cpp">
       <Filter>Pliki źródłowe\geometry</Filter>
     </ClCompile>
+    <ClCompile Include="Intersection.cpp">
+      <Filter>Pliki źródłowe</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -220,6 +223,9 @@
     </ClInclude>
     <ClInclude Include="GregoryPatch.h">
       <Filter>Pliki nagłówkowe\geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="Intersection.h">
+      <Filter>Pliki nagłówkowe</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -14,6 +14,7 @@
 #include "Camera.h"
 #include "SurfaceBuilder.h"
 #include "GregoryPatch.h"
+#include "Intersection.h"
 
 struct PerPointBuffer
 {
@@ -243,6 +244,7 @@ private:
 	void DrawSurfacesPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawGregoryPatches(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawGregoryPatchesTangents(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void DrawIntersections(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 #pragma endregion
 
 #pragma region stereoscopy
@@ -295,6 +297,13 @@ private:
 	POINT m_boxSelectCurrent{};
 	bool m_isBoxSelecting = false;
 	void PerformBoxSelection(bool ctrlHeld, bool shiftHeld);
+
+
+#pragma region Intersections
+	MathLib::Vec4f m_intersectionStartParams{ 0.0f, 0.0f, 0.0f, 0.0f };
+	float m_intersectionStep = 0.1f;
+	void ActionFindIntersection();
+#pragma endregion
 };
 
 

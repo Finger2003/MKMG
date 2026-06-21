@@ -17,6 +17,7 @@ namespace MathLib
 		Vec4f() : v(_mm_setzero_ps()) {}
 		Vec4f(__m128 val) : v(val) {}
 		Vec4f(float x, float y, float z, float w) : v(_mm_set_ps(w, z, y, x)) {}
+		Vec4f(float x) : v(_mm_set1_ps(x)) {}
 
 		friend Vec4f operator+(const Vec4f& a, const Vec4f& b)
 		{
@@ -44,6 +45,12 @@ namespace MathLib
 			return vec * scalar;
 		}
 
+		friend Vec4f& operator*=(Vec4f& vec, float scalar)
+		{
+			vec = vec * scalar;
+			return vec;
+		}
+
 		friend Vec4f operator/(const Vec4f& vec, float scalar)
 		{
 			return _mm_div_ps(vec.v, _mm_set1_ps(scalar));
@@ -68,6 +75,11 @@ namespace MathLib
 		float length() const
 		{
 			return sqrtf(length_sqr());
+		}
+
+		static Vec4f Clamp(const Vec4f& vec, const Vec4f& min, const Vec4f& max)
+		{
+			return _mm_max_ps(min.v, _mm_min_ps(max.v, vec.v));
 		}
 	};
 }

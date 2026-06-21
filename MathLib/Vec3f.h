@@ -17,6 +17,7 @@ namespace MathLib
 		Vec3f() : v(_mm_setzero_ps()) {}
 		Vec3f(__m128 val) : v(_mm_blend_ps(val, _mm_setzero_ps(), 0b1000)) {}
 		Vec3f(float x, float y, float z) : v(_mm_set_ps(0.0f, z, y, x)) {}
+		Vec3f(float x) : v(_mm_set_ps(0.0f, x, x, x)) {}
 
 		static Vec3f FromVec4f(const Vec4f& vec4) {
 			return _mm_blend_ps(vec4.v, _mm_setzero_ps(), 0b1000);
@@ -122,6 +123,11 @@ namespace MathLib
 
 			// Subtract to get the final cross product
 			return _mm_sub_ps(mul1, mul2);
+		}
+
+		Vec3f operator-() const
+		{
+			return _mm_sub_ps(_mm_setzero_ps(), v);
 		}
 	};
 }

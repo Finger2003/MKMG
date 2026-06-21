@@ -13,7 +13,8 @@
 	X(Surface)				 \
 	X(BezierSurface)		 \
 	X(BSplineSurface)		 \
-	X(GregoryPatch)
+	X(GregoryPatch)			 \
+	X(Intersection)
 
 
 enum class ObjectType
