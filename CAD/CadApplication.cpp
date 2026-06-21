@@ -916,7 +916,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		}
 		else if (msg.wParam == 'I')
 		{
-			ActionFindIntersection();
+			m_showIntersectionPopup = true;
 			return true;
 		}
 		break;
@@ -2144,21 +2144,52 @@ void CadApplication::ActionFindIntersection()
 	}
 
 	Vec4f currentParams{ 0.0f, 0.0f, 0.0f, 0.0f };
-	float minVal = std::numeric_limits<float>::max();
 
-	for (const auto& s1 : samples1)
+	if (m_useCursorAsHint)
 	{
+		float minVal1 = std::numeric_limits<float>::max();
+		float minVal2 = std::numeric_limits<float>::max();
+		Vec3f cursorPos(m_cursorPosition.x, m_cursorPosition.y, m_cursorPosition.z);
+
+		for (const auto& s1 : samples1)
+		{
+			float dist = (s1.p - cursorPos).length_sqr();
+			if (dist < minVal1)
+			{
+				minVal1 = dist;
+				currentParams.x = s1.u;
+				currentParams.y = s1.v;
+			}
+		}
+
 		for (const auto& s2 : samples2)
 		{
-			float dist = (s1.p - s2.p).length_sqr();
-			if (dist < minVal)
+			float dist = (s2.p - cursorPos).length_sqr();
+			if (dist < minVal2)
 			{
-				minVal = dist;
-				currentParams = Vec4f(s1.u, s1.v, s2.u, s2.v);
+				minVal2 = dist;
+				currentParams.z = s2.u;
+				currentParams.w = s2.v;
 			}
 		}
 	}
+	else
+	{
+		float minVal = std::numeric_limits<float>::max();
 
+		for (const auto& s1 : samples1)
+		{
+			for (const auto& s2 : samples2)
+			{
+				float dist = (s1.p - s2.p).length_sqr();
+				if (dist < minVal)
+				{
+					minVal = dist;
+					currentParams = Vec4f(s1.u, s1.v, s2.u, s2.v);
+				}
+			}
+		}
+	}
 	// =============================================================
 	// STAGE 2: GRADIENT DESCENT
 	// =============================================================
@@ -2574,6 +2605,25 @@ void CadApplication::DrawMenu()
 
 		drawList->AddRectFilled(p_min, p_max, fillCol);
 		drawList->AddRect(p_min, p_max, borderCol);
+	}
+
+	if (m_showIntersectionPopup)
+	{
+		ImGui::Begin("Intersection Parameters", &m_showIntersectionPopup, ImGuiWindowFlags_AlwaysAutoResize);
+
+		ImGui::Checkbox("Use cursor as hint", &m_useCursorAsHint);
+		ImGui::InputFloat("d", &m_intersectionStep);
+		ImGui::Spacing();
+		if (ImGui::Button("OK", ImVec2(120, 0)))
+		{
+			m_showIntersectionPopup = false;
+			ActionFindIntersection();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel", ImVec2(120, 0)))
+			m_showIntersectionPopup = false;
+		ImGui::End();
+
 	}
 
 	ImGui::Render();
