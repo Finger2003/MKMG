@@ -12,14 +12,16 @@ struct BSplineSurface : public Surface, public NamedObjectCounter<BSplineSurface
 	void InitGeometry(const DxDevice& device, const PrecalculatedSurfaceData& precalculatedData) override;
 	void InitGeometry(const DxDevice& device) override;
 	void UpdateVertices(const DxDevice& device) override;
+
+	unsigned int GetSegmentsU() const override;
+	unsigned int GetSegmentsV() const override;
 protected:
 	std::vector<unsigned int> GeneratePatchIndices() const;
 	unsigned int GetPatchDataIndex(int u, int v) const override;
 	unsigned int GetBernsteinPointsU() const;
 	unsigned int GetBernsteinPointsV() const;
 	unsigned int GetBernsteinIndex(int u, int v) const;
-	unsigned int GetSegmentsU() const;
-	unsigned int GetSegmentsV() const;
+
 
 	void ConvertPatchToBernstein(int patchU, int patchV, std::vector<VertexPosition>& bernsteinGrid) const;
 	MathLib::Vec3f Evaluate1D(MathLib::Vec3f p0, MathLib::Vec3f p1, MathLib::Vec3f p2, MathLib::Vec3f p3, int index) const;

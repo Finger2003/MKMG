@@ -301,7 +301,7 @@ private:
 
 #pragma region Intersections
 	MathLib::Vec4f m_intersectionStartParams{ 0.0f, 0.0f, 0.0f, 0.0f };
-	float m_intersectionStep = 0.1f;
+	float m_intersectionStep = 0.01f;
 	void ActionFindIntersection();
 #pragma endregion
 };

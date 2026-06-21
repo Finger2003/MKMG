@@ -18,8 +18,8 @@ struct BezierSurface : public Surface, public NamedObjectCounter<BezierSurface>
 	void InitGeometry(const DxDevice& device) override;
 	void InitGeometry(const DxDevice& device, const PrecalculatedSurfaceData& precalculatedData) override;
 	void UpdateVertices(const DxDevice& device) override;
-	unsigned int GetSegmentsU() const;
-	unsigned int GetSegmentsV() const;
+	unsigned int GetSegmentsU() const override;
+	unsigned int GetSegmentsV() const override;
 protected:
 	std::vector<unsigned int> GeneratePatchIndices() const;
 	unsigned int GetPatchDataIndex(int u, int v) const override;

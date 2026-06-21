@@ -137,6 +137,76 @@ namespace
 		return { resV.p, resDu.p, resV.d };
 	}
 
+	CurveEvalResult EvaluateCubicDeBoor(float t, MathLib::Vec3f p0, MathLib::Vec3f p1, MathLib::Vec3f p2, MathLib::Vec3f p3)
+	{
+		// Level 1
+		MathLib::Vec3f p1_1 = p0 * ((1.0f - t) / 3.0f) + p1 * ((t + 2.0f) / 3.0f);
+		MathLib::Vec3f p2_1 = p1 * ((2.0f - t) / 3.0f) + p2 * ((t + 1.0f) / 3.0f);
+		MathLib::Vec3f p3_1 = p2 * ((3.0f - t) / 3.0f) + p3 * (t / 3.0f);
+
+		// Level 2
+		MathLib::Vec3f p2_2 = p1_1 * ((1.0f - t) / 2.0f) + p2_1 * ((t + 1.0f) / 2.0f);
+		MathLib::Vec3f p3_2 = p2_1 * ((2.0f - t) / 2.0f) + p3_1 * (t / 2.0f);
+
+		// Level 3
+		MathLib::Vec3f p3_3 = p2_2 * (1.0f - t) + p3_2 * t;
+
+		// Derivative calculation
+		MathLib::Vec3f derivative = (p3_2 - p2_2) * 3.0f;
+
+		return { p3_3, derivative };
+	}
+
+	SurfaceEvalResult EvaluateBSplineSurface(BSplineSurface* surf, float u, float v)
+	{
+		int segU = surf->GetSegmentsU();
+		int segV = surf->GetSegmentsV();
+
+		int pu = std::clamp(static_cast<int>(u), 0, segU - 1);
+		int pv = std::clamp(static_cast<int>(v), 0, segV - 1);
+
+		float lu = u - pu;
+		float lv = v - pv;
+
+		Vec3f P[4][4];
+		for (int i = 0; i < 4; i++)
+		{
+			for (int j = 0; j < 4; j++)
+			{
+				int idx = (pv + j) * surf->m_gridPointsU + (pu + i);
+				if (auto pt = surf->m_controlPoints[idx].lock())
+					P[i][j] = pt->m_position.ToVec3f();
+				else
+					P[i][j] = Vec3f(0.0f);
+			}
+		}
+
+		Vec3f Q[4];
+		Vec3f dQu[4];
+		for (int j = 0; j < 4; j++)
+		{
+			// Evaluate De Boor in the U direction
+			auto [pt, deriv] = EvaluateCubicDeBoor(lu, P[0][j], P[1][j], P[2][j], P[3][j]);
+			Q[j] = pt;
+			dQu[j] = deriv;
+		}
+
+		auto resV = EvaluateCubicDeBoor(lv, Q[0], Q[1], Q[2], Q[3]);
+		auto resDu = EvaluateCubicDeBoor(lv, dQu[0], dQu[1], dQu[2], dQu[3]);
+
+		return { resV.p, resDu.p, resV.d };
+	}
+
+	SurfaceEvalResult EvaluateSurface(Surface* surf, float u, float v)
+	{
+		if (surf->type == ObjectType::BezierSurface)
+			return EvaluateBezierSurface(static_cast<BezierSurface*>(surf), u, v);
+		else if (surf->type == ObjectType::BSplineSurface)
+			return EvaluateBSplineSurface(static_cast<BSplineSurface*>(surf), u, v);
+		else
+			return { Vec3f(0.0f), Vec3f(0.0f), Vec3f(0.0f) };
+	}
+
 	std::optional<MathLib::Vec4f> SolveLinearSystem(MathLib::Mat4f J, MathLib::Vec4f F)
 	{
 		for (int i = 0; i < 4; i++)
@@ -177,8 +247,8 @@ namespace
 	}
 
 	std::optional<MathLib::Vec4f> FindIntersectionNextPoint(
-		BezierSurface* surf1,
-		BezierSurface* surf2,
+		Surface* surf1,
+		Surface* surf2,
 		MathLib::Vec4f startParams,
 		MathLib::Vec3f p0,
 		MathLib::Vec3f t,
@@ -198,8 +268,8 @@ namespace
 
 		for (int iter = 0; iter < maxIterations; iter++)
 		{
-			auto [p1, du1, dv1] = EvaluateBezierSurface(surf1, currentParams.x, currentParams.y);
-			auto [p2, du2, dv2] = EvaluateBezierSurface(surf2, currentParams.z, currentParams.w);
+			auto [p1, du1, dv1] = EvaluateSurface(surf1, currentParams.x, currentParams.y);
+			auto [p2, du2, dv2] = EvaluateSurface(surf2, currentParams.z, currentParams.w);
 
 			Vec3f F_dist = p1 - p2;
 			float planeDist = Vec3f::dot(p1 - p0, t) - d;
@@ -234,7 +304,7 @@ namespace
 			if (!halfStep1)
 				return std::nullopt;
 
-			auto [p_mid, _1, _2] = EvaluateBezierSurface(surf1, halfStep1->x, halfStep1->y);
+			auto [p_mid, _1, _2] = EvaluateSurface(surf1, halfStep1->x, halfStep1->y);
 
 			auto halfStep2 = FindIntersectionNextPoint(surf1, surf2, *halfStep1, p_mid, t, d / 2.0f, depth + 1);
 			return halfStep2;
@@ -242,8 +312,8 @@ namespace
 	}
 
 	std::optional<MathLib::Vec4f> FindExactEdgePoint(
-		BezierSurface* surf1,
-		BezierSurface* surf2,
+		Surface* surf1,
+		Surface* surf2,
 		MathLib::Vec4f startGuess,
 		int boundaryDim,
 		float boundaryValue
@@ -256,8 +326,8 @@ namespace
 
 		for (int iter = 0; iter < maxIterations; iter++)
 		{
-			auto [p1, du1, dv1] = EvaluateBezierSurface(surf1, currentParams.x, currentParams.y);
-			auto [p2, du2, dv2] = EvaluateBezierSurface(surf2, currentParams.z, currentParams.w);
+			auto [p1, du1, dv1] = EvaluateSurface(surf1, currentParams.x, currentParams.y);
+			auto [p2, du2, dv2] = EvaluateSurface(surf2, currentParams.z, currentParams.w);
 			Vec3f F_dist = p1 - p2;
 
 			if (F_dist.length_sqr() < F_dist_tolerance)
@@ -1960,23 +2030,25 @@ void CadApplication::PerformBoxSelection(bool ctrlHeld, bool shiftHeld)
 
 void CadApplication::ActionFindIntersection()
 {
-	std::vector<std::shared_ptr<BezierSurface>> selectedSurfaces;
+	std::vector<Surface*> selectedSurfaces;
 	for (const auto& obj : m_sceneObjects)
 	{
-		if (obj->selected && obj->type == ObjectType::BezierSurface)
-			selectedSurfaces.push_back(std::static_pointer_cast<BezierSurface>(obj));
+		if (!obj->selected)
+			continue;
+		if (auto surface = obj->As<Surface>())
+			selectedSurfaces.push_back(surface);
 	}
 
 	if (selectedSurfaces.size() != 2)
 		return;
 
-	auto surf1 = selectedSurfaces[0].get();
-	auto surf2 = selectedSurfaces[1].get();
+	auto surf1 = selectedSurfaces[0];
+	auto surf2 = selectedSurfaces[1];
 
-	float maxU1 = static_cast<float>((surf1->m_gridPointsU - 1) / 3);
-	float maxV1 = static_cast<float>((surf1->m_gridPointsV - 1) / 3);
-	float maxU2 = static_cast<float>((surf2->m_gridPointsU - 1) / 3);
-	float maxV2 = static_cast<float>((surf2->m_gridPointsV - 1) / 3);
+	float maxU1 = static_cast<float>(surf1->GetSegmentsU());
+	float maxV1 = static_cast<float>(surf1->GetSegmentsV());
+	float maxU2 = static_cast<float>(surf2->GetSegmentsU());
+	float maxV2 = static_cast<float>(surf2->GetSegmentsV());
 
 	// =============================================================
 	// STAGE 1: GRID SEARCH (find closest points on coarse grid)
@@ -1994,7 +2066,7 @@ void CadApplication::ActionFindIntersection()
 		for (int j = 0; j <= sampleCount; j++)
 		{
 			float v = (j / static_cast<float>(sampleCount)) * maxV1;
-			auto res = EvaluateBezierSurface(surf1, u, v);
+			auto res = EvaluateSurface(surf1, u, v);
 			samples1.push_back({ res.p, u, v });
 		}
 	}
@@ -2006,7 +2078,7 @@ void CadApplication::ActionFindIntersection()
 		for (int j = 0; j <= sampleCount; j++)
 		{
 			float v = (j / static_cast<float>(sampleCount)) * maxV2;
-			auto res = EvaluateBezierSurface(surf2, u, v);
+			auto res = EvaluateSurface(surf2, u, v);
 			samples2.push_back({ res.p, u, v });
 		}
 	}
@@ -2035,8 +2107,8 @@ void CadApplication::ActionFindIntersection()
 	constexpr float alphaReduction = 0.5f;
 	constexpr float tolerance = 1e-6f;
 	constexpr int maxIterations = 100;
-	auto eval1 = EvaluateBezierSurface(surf1, currentParams.x, currentParams.y);
-	auto eval2 = EvaluateBezierSurface(surf2, currentParams.z, currentParams.w);
+	auto eval1 = EvaluateSurface(surf1, currentParams.x, currentParams.y);
+	auto eval2 = EvaluateSurface(surf2, currentParams.z, currentParams.w);
 
 	for (int iter = 0; iter < maxIterations; iter++)
 	{
@@ -2054,8 +2126,8 @@ void CadApplication::ActionFindIntersection()
 
 		nextParams = Vec4f::Clamp(nextParams, Vec4f(0.0f), Vec4f(maxU1, maxV1, maxU2, maxV2));
 
-		auto nextEval1 = EvaluateBezierSurface(surf1, nextParams.x, nextParams.y);
-		auto nextEval2 = EvaluateBezierSurface(surf2, nextParams.z, nextParams.w);
+		auto nextEval1 = EvaluateSurface(surf1, nextParams.x, nextParams.y);
+		auto nextEval2 = EvaluateSurface(surf2, nextParams.z, nextParams.w);
 
 		if ((nextEval1.p - nextEval2.p).length_sqr() < distSqr)
 		{
@@ -2071,6 +2143,11 @@ void CadApplication::ActionFindIntersection()
 	}
 
 	m_intersectionStartParams = currentParams;
+	eval1 = EvaluateSurface(surf1, currentParams.x, currentParams.y);
+	eval2 = EvaluateSurface(surf2, currentParams.z, currentParams.w);
+	float d = m_intersectionStep;
+	if ((eval1.p - eval2.p).length_sqr() > 1e-5)
+		return;
 
 	// =============================================================
 	// STAGE 3: TRACE THE INTERSECTION CURVE
@@ -2081,11 +2158,12 @@ void CadApplication::ActionFindIntersection()
 		};
 
 	Vec3f startPos = eval1.p;
-	float d = m_intersectionStep;
 
 	std::vector<Vec3f> forwardPoints;
 	std::vector<Vec3f> backwardPoints;
 	bool isClosedLoop = false;
+	bool forwardHitEdge = false;
+	bool backwardHitEdge = false;
 
 	for (float direction : {1.0f, -1.0f })
 	{
@@ -2097,8 +2175,8 @@ void CadApplication::ActionFindIntersection()
 		int stepCount = 0;
 		while (true)
 		{
-			auto [p1, du1, dv1] = EvaluateBezierSurface(surf1, marchingParams.x, marchingParams.y);
-			auto [p2, du2, dv2] = EvaluateBezierSurface(surf2, marchingParams.z, marchingParams.w);
+			auto [p1, du1, dv1] = EvaluateSurface(surf1, marchingParams.x, marchingParams.y);
+			auto [p2, du2, dv2] = EvaluateSurface(surf2, marchingParams.z, marchingParams.w);
 
 			Vec3f np = Vec3f::cross(du1, dv1).normalize();
 			Vec3f nq = Vec3f::cross(du2, dv2).normalize();
@@ -2125,6 +2203,11 @@ void CadApplication::ActionFindIntersection()
 			auto nextParamsOpt = FindIntersectionNextPoint(surf1, surf2, marchingParams, p1, t, d);
 
 			if (!nextParamsOpt)
+				break;
+
+			auto [v_p1, v_du1, v_dv1] = EvaluateSurface(surf1, nextParamsOpt->x, nextParamsOpt->y);
+			auto [v_p2, v_du2, v_dv2] = EvaluateSurface(surf2, nextParamsOpt->z, nextParamsOpt->w);
+			if ((v_p1 - v_p2).length_sqr() > 1e-5f)
 				break;
 
 			if (isOutOfBounds(*nextParamsOpt))
@@ -2165,8 +2248,33 @@ void CadApplication::ActionFindIntersection()
 					Vec4f guess = P0 + Delta * T;
 					auto exactEdgeOpt = FindExactEdgePoint(surf1, surf2, guess, hitDim, hitTarget);
 
-					Vec4f finalParams = exactEdgeOpt ? *exactEdgeOpt : guess;
-					auto [edgePos, _u, _v] = EvaluateBezierSurface(surf1, finalParams.x, finalParams.y);
+					Vec4f finalParams = guess;
+					bool exactValid = false;
+
+					if (exactEdgeOpt)
+					{
+						auto isStrictlyOutOfBounds = [&](const Vec4f& p) {
+							constexpr float eps = 1e-4f;
+							return p.x < -eps || p.x > maxU1 + eps ||
+								p.y < -eps || p.y > maxV1 + eps ||
+								p.z < -eps || p.z > maxU2 + eps ||
+								p.w < -eps || p.w > maxV2 + eps;
+							};
+						if (!isStrictlyOutOfBounds(*exactEdgeOpt))
+						{
+							finalParams = *exactEdgeOpt;
+							exactValid = true;
+						}
+					}
+					if (!exactValid)
+					{
+						auto [g_p1, g_du1, g_dv1] = EvaluateSurface(surf1, guess.x, guess.y);
+						auto [g_p2, g_du2, g_dv2] = EvaluateSurface(surf2, guess.z, guess.w);
+						if ((g_p1 - g_p2).length_sqr() > 1e-5)
+							break;
+					}
+
+					auto [edgePos, _u, _v] = EvaluateSurface(surf1, finalParams.x, finalParams.y);
 
 
 					Vec4f oppositeParams = finalParams;
@@ -2185,21 +2293,21 @@ void CadApplication::ActionFindIntersection()
 					Vec3f seamEdgePos, seamOppositePos;
 					if (hitDim == 0 || hitDim == 1)
 					{
-						seamEdgePos = EvaluateBezierSurface(surf1, finalParams.x, finalParams.y).p;
-						seamOppositePos = EvaluateBezierSurface(surf1, oppositeParams.x, oppositeParams.y).p;
+						seamEdgePos = EvaluateSurface(surf1, finalParams.x, finalParams.y).p;
+						seamOppositePos = EvaluateSurface(surf1, oppositeParams.x, oppositeParams.y).p;
 					}
 					else
 					{
-						seamEdgePos = EvaluateBezierSurface(surf2, finalParams.z, finalParams.w).p;
-						seamOppositePos = EvaluateBezierSurface(surf2, oppositeParams.z, oppositeParams.w).p;
+						seamEdgePos = EvaluateSurface(surf2, finalParams.z, finalParams.w).p;
+						seamOppositePos = EvaluateSurface(surf2, oppositeParams.z, oppositeParams.w).p;
 					}
 
 					// If the opposite edge physically touches this edge, it's a seam
 					if ((seamOppositePos - seamEdgePos).length_sqr() < 1e-6f)
 					{
-						if (direction == 1.0f) 
+						if (direction == 1.0f)
 							forwardPoints.push_back(edgePos);
-						else 
+						else
 							backwardPoints.push_back(edgePos);
 
 						marchingParams = oppositeParams;
@@ -2207,16 +2315,22 @@ void CadApplication::ActionFindIntersection()
 					}
 
 					if (direction == 1.0f)
+					{
 						forwardPoints.push_back(edgePos);
+						forwardHitEdge = true;
+					}
 					else
+					{
 						backwardPoints.push_back(edgePos);
+						backwardHitEdge = true;
+					}
 				}
 
 				break; // hit the edge, stop marching in this direction
 			}
 
 			marchingParams = *nextParamsOpt;
-			auto [newPos, _u, _v] = EvaluateBezierSurface(surf1, marchingParams.x, marchingParams.y);
+			auto [newPos, _u, _v] = EvaluateSurface(surf1, marchingParams.x, marchingParams.y);
 			if (stepCount > 3 && (newPos - startPos).length_sqr() < (d * d) && Vec3f::dot(t, startTangent) > 0.0f)
 			{
 				isClosedLoop = true;
@@ -2233,6 +2347,9 @@ void CadApplication::ActionFindIntersection()
 			stepCount++;
 		}
 	}
+
+	if (!isClosedLoop && (!forwardHitEdge || !backwardHitEdge))
+		return;
 
 	std::vector<Vec3f> intersectionPoints;
 	intersectionPoints.reserve(backwardPoints.size() + forwardPoints.size() + 1);

@@ -48,6 +48,9 @@ struct Surface : public SceneObject, public IPointDependent
 
 	std::vector<unsigned int> GenerateLineIndices() const;
 
+	virtual unsigned int GetSegmentsU() const = 0;
+	virtual unsigned int GetSegmentsV() const = 0;
+
 	Surface(int uGrid, int vGrid, int linesPerSegmentU, int linesPerSegmentV, std::vector<std::weak_ptr<Point>>&& controlPoints, std::string&& name, ObjectType type)
 		: SceneObject(std::move(name), type), m_gridPointsU(uGrid), m_gridPointsV(vGrid), m_linesPerSegmentU(linesPerSegmentU), m_linesPerSegmentV(linesPerSegmentV), m_controlPoints(std::move(controlPoints))
 	{}
