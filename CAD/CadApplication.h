@@ -300,12 +300,18 @@ private:
 
 
 #pragma region Intersections
+	std::weak_ptr<Intersection> m_previewIntersection;
 	MathLib::Vec4f m_intersectionStartParams{ 0.0f, 0.0f, 0.0f, 0.0f };
 	float m_intersectionStep = 0.01f;
+	int m_previewSurfaceIndex = 0;
 	bool m_showIntersectionPopup = false;
 	bool m_useCursorAsHint = false;
 
 	void ActionFindIntersection();
+	void RenderTrimTextures(Intersection* intersection, const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void DrawIntersectionList(std::shared_ptr<Intersection> intersection);
+	
+
 #pragma endregion
 };
 

@@ -2079,20 +2079,23 @@ void CadApplication::PerformBoxSelection(bool ctrlHeld, bool shiftHeld)
 
 void CadApplication::ActionFindIntersection()
 {
-	std::vector<SceneObject*> selectedObjects;
+	std::vector<std::weak_ptr<SceneObject>> selectedObjects;
 	for (const auto& obj : m_sceneObjects)
 	{
 		if (!obj->selected)
 			continue;
 		if (obj->type == ObjectType::Torus || obj->IsA(ObjectType::Surface))
-			selectedObjects.push_back(obj.get());
+			selectedObjects.push_back(obj);
 	}
 
 	if (selectedObjects.size() != 2)
 		return;
 
-	auto obj1 = selectedObjects[0];
-	auto obj2 = selectedObjects[1];
+	auto& obj1W = selectedObjects[0];
+	auto& obj2W = selectedObjects[1];
+
+	auto obj1 = obj1W.lock().get();
+	auto obj2 = obj2W.lock().get();
 
 	float maxU1 = 1.0f;
 	float maxV1 = 1.0f;
@@ -2267,6 +2270,8 @@ void CadApplication::ActionFindIntersection()
 
 	std::vector<Vec3f> forwardPoints;
 	std::vector<Vec3f> backwardPoints;
+	std::vector<Vec4f> forwardParams;
+	std::vector<Vec4f> backwardParams;
 	bool isClosedLoop = false;
 	bool forwardHitEdge = false;
 	bool backwardHitEdge = false;
@@ -2412,9 +2417,15 @@ void CadApplication::ActionFindIntersection()
 					if ((seamOppositePos - seamEdgePos).length_sqr() < 1e-6f)
 					{
 						if (direction == 1.0f)
+						{
 							forwardPoints.push_back(edgePos);
+							forwardParams.push_back(finalParams);
+						}
 						else
+						{
 							backwardPoints.push_back(edgePos);
+							backwardParams.push_back(finalParams);
+						}
 
 						marchingParams = oppositeParams;
 						continue;
@@ -2423,11 +2434,13 @@ void CadApplication::ActionFindIntersection()
 					if (direction == 1.0f)
 					{
 						forwardPoints.push_back(edgePos);
+						forwardParams.push_back(finalParams);
 						forwardHitEdge = true;
 					}
 					else
 					{
 						backwardPoints.push_back(edgePos);
+						backwardParams.push_back(finalParams);
 						backwardHitEdge = true;
 					}
 				}
@@ -2441,14 +2454,23 @@ void CadApplication::ActionFindIntersection()
 			{
 				isClosedLoop = true;
 				if (direction == 1.0f)
+				{
 					forwardPoints.push_back(startPos);
+					forwardParams.push_back(marchingParams);
+				}
 				break;
 			}
 
 			if (direction == 1.0f)
+			{
 				forwardPoints.push_back(newPos);
+				forwardParams.push_back(marchingParams);
+			}
 			else
+			{
 				backwardPoints.push_back(newPos);
+				backwardParams.push_back(marchingParams);
+			}
 
 			stepCount++;
 		}
@@ -2457,15 +2479,143 @@ void CadApplication::ActionFindIntersection()
 	if (!isClosedLoop && (!forwardHitEdge || !backwardHitEdge))
 		return;
 
+	// Assemble points
 	std::vector<Vec3f> intersectionPoints;
 	intersectionPoints.reserve(backwardPoints.size() + forwardPoints.size() + 1);
 	intersectionPoints.insert(intersectionPoints.end(), backwardPoints.rbegin(), backwardPoints.rend());
 	intersectionPoints.push_back(startPos);
 	intersectionPoints.insert(intersectionPoints.end(), forwardPoints.begin(), forwardPoints.end());
 
-	auto intersection = std::make_shared<Intersection>();
+	// Assemble params
+	std::vector<Vec4f> intersectionParams;
+	intersectionParams.reserve(backwardParams.size() + forwardParams.size() + 1);
+	intersectionParams.insert(intersectionParams.end(), backwardParams.rbegin(), backwardParams.rend());
+	intersectionParams.push_back(currentParams);
+	intersectionParams.insert(intersectionParams.end(), forwardParams.begin(), forwardParams.end());
+
+	Vec4f maxDomains(maxU1, maxV1, maxU2, maxV2);
+
+	auto intersection = std::make_shared<Intersection>(std::move(intersectionParams), obj1W, obj2W, std::move(maxDomains));
 	intersection->InitGeometry(intersectionPoints, m_device);
+	RenderTrimTextures(intersection.get(), m_device.getContext());
 	m_sceneObjects.push_back(std::move(intersection));
+}
+
+void CadApplication::RenderTrimTextures(Intersection* intersection, const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+{
+	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> oldRTV;
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> oldDSV;
+	context->OMGetRenderTargets(1, oldRTV.GetAddressOf(), oldDSV.GetAddressOf());
+
+	UINT numViewports = 1;
+	D3D11_VIEWPORT oldViewport;
+	context->RSGetViewports(&numViewports, &oldViewport);
+
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
+	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
+
+
+	context->GSSetShader(nullptr, nullptr, 0);
+	context->HSSetShader(nullptr, nullptr, 0);
+	context->DSSetShader(nullptr, nullptr, 0);
+
+	PerPassBuffer passData;
+	passData.stereoTint = Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+	passData.viewProj = Mat4f::Identity();
+
+	PerObjectBuffer objData;
+	objData.model = Mat4f::Identity();
+	objData.color = Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+	m_device.UpdateBuffer(m_cbPerPass, passData);
+	m_device.UpdateBuffer(m_cbPerObject, objData);
+
+
+	const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+	if (intersection->m_uvLineCount1 > 0)
+	{
+		D3D11_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(intersection->m_trimTexture1.width), static_cast<float>(intersection->m_trimTexture1.height), 0.0f, 1.0f };
+		context->RSSetViewports(1, &vp);
+
+		context->OMSetRenderTargets(1, intersection->m_trimTexture1.rtv.GetAddressOf(), nullptr);
+		context->ClearRenderTargetView(intersection->m_trimTexture1.rtv.Get(), clearColor);
+
+		UINT stride = sizeof(VertexPosition);
+		UINT offset = 0;
+		context->IASetVertexBuffers(0, 1, intersection->m_uvLinesBuffer1.GetAddressOf(), &stride, &offset);
+		context->Draw(intersection->m_uvLineCount1, 0);
+	}
+
+	if (intersection->m_uvLineCount2 > 0)
+	{
+		D3D11_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(intersection->m_trimTexture2.width), static_cast<float>(intersection->m_trimTexture2.height), 0.0f, 1.0f };
+		context->RSSetViewports(1, &vp);
+
+		context->OMSetRenderTargets(1, intersection->m_trimTexture2.rtv.GetAddressOf(), nullptr);
+		context->ClearRenderTargetView(intersection->m_trimTexture2.rtv.Get(), clearColor);
+
+		UINT stride = sizeof(VertexPosition);
+		UINT offset = 0;
+		context->IASetVertexBuffers(0, 1, intersection->m_uvLinesBuffer2.GetAddressOf(), &stride, &offset);
+		context->Draw(intersection->m_uvLineCount2, 0);
+	}
+
+	context->OMSetRenderTargets(1, oldRTV.GetAddressOf(), oldDSV.Get());
+	context->RSSetViewports(1, &oldViewport);
+}
+
+void CadApplication::DrawIntersectionList(std::shared_ptr<Intersection> intersection)
+{
+	ImGui::Separator();
+	ImGui::Text("Intersection Actions");
+	bool changed = false;
+	//if (ImGui::Button("Reverse S1 Trim", ImVec2(-1, 0)))
+	//{
+	//	intersection->m_reverseTrimS1 = !intersection->m_reverseTrimS1;
+	//	changed = true;
+	//}
+	//if (ImGui::Button("Reverse S2 Trim", ImVec2(-1, 0)))
+	//{
+	//	intersection->m_reverseTrimS2 = !intersection->m_reverseTrimS2;
+	//	changed = true;
+	//}
+
+	//if (changed)
+	//	UpdateIntersectionTrimTextures(intersection.get());
+
+	bool isPreviewS1 = (m_previewIntersection.lock() == intersection && m_previewSurfaceIndex == 1);
+	bool isPreviewS2 = (m_previewIntersection.lock() == intersection && m_previewSurfaceIndex == 2);
+
+	if (ImGui::Button(isPreviewS1 ? "Close S1 Parametrization" : "S1 Parametrization", ImVec2(-1, 0)))
+	{
+		if (isPreviewS1)
+		{
+			m_previewIntersection.reset();
+			m_previewSurfaceIndex = 0;
+		}
+		else
+		{
+			m_previewIntersection = intersection;
+			m_previewSurfaceIndex = 1;
+		}
+	}
+
+	if (ImGui::Button(isPreviewS2 ? "Close S2 Parametrization" : "S2 Parametrization", ImVec2(-1, 0)))
+	{
+		if (isPreviewS2)
+		{
+			m_previewIntersection.reset();
+			m_previewSurfaceIndex = 0;
+		}
+		else
+		{
+			m_previewIntersection = intersection;
+			m_previewSurfaceIndex = 2;
+		}
+	}
+	ImGui::Button("To Interpolation Bezier", ImVec2(-1, 0));
 }
 
 void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
@@ -2524,8 +2674,10 @@ void CadApplication::DrawMenu()
 	int selectedCount = 0;
 	int selectedCurves = 0;
 	int selectedSurfaces = 0;
+	int selectedIntersections = 0;
 	std::weak_ptr<Curve> selectedCurve;
 	std::weak_ptr<Surface> selectedSurface;
+	std::weak_ptr<Intersection> selectedIntersection;
 
 	for (const auto& obj : m_sceneObjects)
 	{
@@ -2545,6 +2697,11 @@ void CadApplication::DrawMenu()
 			{
 				selectedSurfaces++;
 				selectedSurface = std::static_pointer_cast<Surface>(obj);
+			}
+			else if (obj->type == ObjectType::Intersection)
+			{
+				selectedIntersections++;
+				selectedIntersection = std::static_pointer_cast<Intersection>(obj);
 			}
 		}
 	}
@@ -2567,6 +2724,16 @@ void CadApplication::DrawMenu()
 			if (surface->selected && selectedSurfaces == 1)
 				DrawSurfaceList(surface.get(), selectedCount);
 		}
+
+		if (auto intersection = selectedIntersection.lock())
+		{
+			if (intersection->selected && selectedIntersections == 1)
+				DrawIntersectionList(intersection);
+			else
+				m_previewIntersection.reset();
+		}
+		else
+			m_previewIntersection.reset();
 	}
 	else if (m_menuState == MenuState::Edit)
 		DrawEditMenu();
@@ -2624,6 +2791,52 @@ void CadApplication::DrawMenu()
 			m_showIntersectionPopup = false;
 		ImGui::End();
 
+	}
+
+	if (auto previewInt = m_previewIntersection.lock())
+	{
+		void* texToDraw = nullptr;
+		float aspect = 1.0f;
+
+		if (m_previewSurfaceIndex == 1 && previewInt->m_trimTexture1.texture)
+		{
+			texToDraw = (void*)previewInt->m_trimTexture1.srv.Get();
+			aspect = previewInt->m_maxDomains.x / previewInt->m_maxDomains.y;
+		}
+		else if (m_previewSurfaceIndex == 2 && previewInt->m_trimTexture2.texture)
+		{
+			texToDraw = (void*)previewInt->m_trimTexture2.srv.Get();
+			aspect = previewInt->m_maxDomains.z / previewInt->m_maxDomains.w;
+		}
+
+		if (texToDraw)
+		{
+			ImDrawList* bgDrawList = ImGui::GetBackgroundDrawList();
+
+			float padding = 40.0f;
+			float availableW = m_renderSize.cx - padding * 2.0f;
+			float availableH = m_renderSize.cy - padding * 2.0f;
+
+			float drawW = availableW;
+			float drawH = availableW / aspect;
+
+			if (drawH > availableH)
+			{
+				drawH = availableH;
+				drawW = availableH * aspect;
+			}
+
+			float offsetX = (m_renderSize.cx - drawW) * 0.5f;
+			float offsetY = (m_renderSize.cy - drawH) * 0.5f;
+
+			ImVec2 pMin(offsetX, offsetY);
+			ImVec2 pMax(offsetX + drawW, offsetY + drawH);
+
+			bgDrawList->AddRectFilled(pMin, pMax, IM_COL32(255, 255, 255, 255));
+			bgDrawList->AddImage(texToDraw, pMin, pMax);
+
+			bgDrawList->AddRect(pMin, pMax, IM_COL32(100, 100, 100, 255), 0.0f, 0, 2.0f);
+		}
 	}
 
 	ImGui::Render();

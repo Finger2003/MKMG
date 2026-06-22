@@ -179,6 +179,7 @@
     <ClCompile Include="Surface.cpp" />
     <ClCompile Include="SurfaceBuilder.cpp" />
     <ClCompile Include="Torus.cpp" />
+    <ClCompile Include="TrimTexture.cpp" />
     <ClCompile Include="Window.cpp" />
     <ClCompile Include="WindowApplication.cpp" />
   </ItemGroup>
@@ -208,6 +209,7 @@
     <ClInclude Include="Surface.h" />
     <ClInclude Include="SurfaceBuilder.h" />
     <ClInclude Include="Torus.h" />
+    <ClInclude Include="TrimTexture.h" />
     <ClInclude Include="Window.h" />
     <ClInclude Include="WindowApplication.h" />
   </ItemGroup>
