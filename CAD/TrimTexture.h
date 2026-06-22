@@ -6,6 +6,7 @@ struct TrimTexture
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> texture;
 	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> rtv;
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> dsv;
 	int width;
 	int height;
 
@@ -27,5 +28,19 @@ struct TrimTexture
 		device.get()->CreateTexture2D(&texDesc, nullptr, texture.GetAddressOf());
 		device.get()->CreateRenderTargetView(texture.Get(), nullptr, rtv.GetAddressOf());
 		device.get()->CreateShaderResourceView(texture.Get(), nullptr, srv.GetAddressOf());
+
+		D3D11_TEXTURE2D_DESC dsDesc = {};
+		dsDesc.Width = width;
+		dsDesc.Height = height;
+		dsDesc.MipLevels = 1;
+		dsDesc.ArraySize = 1;
+		dsDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+		dsDesc.SampleDesc.Count = 1;
+		dsDesc.Usage = D3D11_USAGE_DEFAULT;
+		dsDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+
+		Microsoft::WRL::ComPtr<ID3D11Texture2D> dsTexture;
+		device.get()->CreateTexture2D(&dsDesc, nullptr, dsTexture.GetAddressOf());
+		device.get()->CreateDepthStencilView(dsTexture.Get(), nullptr, dsv.GetAddressOf());
 	}
 };

@@ -2275,6 +2275,8 @@ void CadApplication::ActionFindIntersection()
 	bool isClosedLoop = false;
 	bool forwardHitEdge = false;
 	bool backwardHitEdge = false;
+	int forwardHitDim = -1;
+	int backwardHitDim = -1;
 
 	for (float direction : {1.0f, -1.0f })
 	{
@@ -2436,12 +2438,14 @@ void CadApplication::ActionFindIntersection()
 						forwardPoints.push_back(edgePos);
 						forwardParams.push_back(finalParams);
 						forwardHitEdge = true;
+						forwardHitDim = hitDim;
 					}
 					else
 					{
 						backwardPoints.push_back(edgePos);
 						backwardParams.push_back(finalParams);
 						backwardHitEdge = true;
+						backwardHitDim = hitDim;
 					}
 				}
 
@@ -2495,7 +2499,28 @@ void CadApplication::ActionFindIntersection()
 
 	Vec4f maxDomains(maxU1, maxV1, maxU2, maxV2);
 
-	auto intersection = std::make_shared<Intersection>(std::move(intersectionParams), obj1W, obj2W, std::move(maxDomains));
+	auto isS1Dim = [](int dim) { return dim == 0 || dim == 1; };
+	auto isS2Dim = [](int dim) { return dim == 2 || dim == 3; };
+
+	TrimFillMode trimModeS1 = TrimFillMode::None;
+	TrimFillMode trimModeS2 = TrimFillMode::None;
+
+	if (isClosedLoop)
+	{
+		trimModeS1 = TrimFillMode::ClosedLoop;
+		trimModeS2 = TrimFillMode::ClosedLoop;
+	}
+	else
+	{
+		if (isS1Dim(forwardHitDim) && isS1Dim(backwardHitDim))
+			trimModeS1 = TrimFillMode::BoundaryToBoundary;
+
+		if (isS2Dim(forwardHitDim) && isS2Dim(backwardHitDim))
+			trimModeS2 = TrimFillMode::BoundaryToBoundary;
+	}
+
+
+	auto intersection = std::make_shared<Intersection>(std::move(intersectionParams), obj1W, obj2W, std::move(maxDomains), trimModeS1, trimModeS2);
 	intersection->InitGeometry(intersectionPoints, m_device);
 	RenderTrimTextures(intersection.get(), m_device.getContext());
 	m_sceneObjects.push_back(std::move(intersection));
@@ -2503,6 +2528,88 @@ void CadApplication::ActionFindIntersection()
 
 void CadApplication::RenderTrimTextures(Intersection* intersection, const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
 {
+	static Microsoft::WRL::ComPtr<ID3D11DepthStencilState> dsMarkStencil, dsApplyMask;
+	static Microsoft::WRL::ComPtr<ID3D11BlendState> bsNoColor;
+	if (!dsMarkStencil)
+	{
+		D3D11_DEPTH_STENCIL_DESC desc = {};
+		desc.DepthEnable = FALSE;
+		desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+		desc.DepthFunc = D3D11_COMPARISON_ALWAYS;
+
+		desc.StencilEnable = TRUE;
+		desc.StencilReadMask = 0xFF;
+		desc.StencilWriteMask = 0xFF;
+
+		D3D11_DEPTH_STENCILOP_DESC stencilOp = {};
+		stencilOp.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+		stencilOp.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+		stencilOp.StencilPassOp = D3D11_STENCIL_OP_INVERT;
+		stencilOp.StencilFunc = D3D11_COMPARISON_ALWAYS;
+
+		desc.FrontFace = stencilOp;
+		desc.BackFace = stencilOp;
+
+		HRESULT hr = m_device.get()->CreateDepthStencilState(
+			&desc,
+			dsMarkStencil.GetAddressOf()
+		);
+		assert(SUCCEEDED(hr));
+
+		//desc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+		//desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_INVERT; // Toggle 0 -> 1 -> 0
+		//desc.BackFace = desc.FrontFace;
+		//m_device.get()->CreateDepthStencilState(&desc, dsMarkStencil.GetAddressOf());
+
+		//desc.FrontFace.StencilFunc = D3D11_COMPARISON_NOT_EQUAL;
+		//desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+		//desc.BackFace = desc.FrontFace;
+		//m_device.get()->CreateDepthStencilState(&desc, dsApplyMask.GetAddressOf());
+
+		D3D11_BLEND_DESC bDesc = {};
+		bDesc.RenderTarget[0].RenderTargetWriteMask = 0; // Write no color
+		hr = m_device.get()->CreateBlendState(
+			&bDesc,
+			bsNoColor.GetAddressOf()
+		);
+		assert(SUCCEEDED(hr));
+
+		stencilOp.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+		stencilOp.StencilFunc = D3D11_COMPARISON_NOT_EQUAL;
+
+		desc.FrontFace = stencilOp;
+		desc.BackFace = stencilOp;
+
+		hr = m_device.get()->CreateDepthStencilState(
+			&desc,
+			dsApplyMask.GetAddressOf()
+		);
+		assert(SUCCEEDED(hr));
+	}
+
+	static Microsoft::WRL::ComPtr<ID3D11RasterizerState> rsCullNone;
+	if (!rsCullNone)
+	{
+		D3D11_RASTERIZER_DESC rDesc = {};
+		rDesc.FillMode = D3D11_FILL_SOLID;
+		rDesc.CullMode = D3D11_CULL_NONE; // Prevent arbitrary winding deletion
+		rDesc.FrontCounterClockwise = FALSE;
+		rDesc.DepthClipEnable = TRUE;
+		m_device.get()->CreateRasterizerState(&rDesc, rsCullNone.GetAddressOf());
+	}
+
+	static Microsoft::WRL::ComPtr<ID3D11Buffer> s_fullscreenQuad;
+	if (!s_fullscreenQuad)
+	{
+		std::vector<VertexPosition> quadVerts = {
+			{ -1.0f, -1.0f, 0.0f }, // Bottom-Left
+			{ -1.0f,  1.0f, 0.0f }, // Top-Left
+			{  1.0f, -1.0f, 0.0f }, // Bottom-Right
+			{  1.0f,  1.0f, 0.0f }  // Top-Right
+		};
+		s_fullscreenQuad = m_device.CreateVertexBuffer(quadVerts);
+	}
+
 	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> oldRTV;
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> oldDSV;
 	context->OMGetRenderTargets(1, oldRTV.GetAddressOf(), oldDSV.GetAddressOf());
@@ -2520,50 +2627,138 @@ void CadApplication::RenderTrimTextures(Intersection* intersection, const Micros
 	context->HSSetShader(nullptr, nullptr, 0);
 	context->DSSetShader(nullptr, nullptr, 0);
 
+	context->IASetInputLayout(m_layout.Get());
+	ID3D11Buffer* cBuffers[] = { m_cbPerPass.Get(), m_cbPerObject.Get() };
+	context->VSSetConstantBuffers(0, 2, cBuffers);
+	context->PSSetConstantBuffers(0, 2, cBuffers);
+
 	PerPassBuffer passData;
 	passData.stereoTint = Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
 	passData.viewProj = Mat4f::Identity();
+	passData.aspectRatio = 1.0f;
+	passData.renderSize[0] = 512.0f;
+	passData.renderSize[1] = 512.0f;
 
-	PerObjectBuffer objData;
-	objData.model = Mat4f::Identity();
-	objData.color = Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+	//PerObjectBuffer objData;
+	//objData.model = Mat4f::Identity();
+	//objData.color = Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
 
 	m_device.UpdateBuffer(m_cbPerPass, passData);
-	m_device.UpdateBuffer(m_cbPerObject, objData);
+	//m_device.UpdateBuffer(m_cbPerObject, objData);
 
 
-	const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	//const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-	if (intersection->m_uvLineCount1 > 0)
-	{
-		D3D11_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(intersection->m_trimTexture1.width), static_cast<float>(intersection->m_trimTexture1.height), 0.0f, 1.0f };
+	//if (intersection->m_uvLineCount1 > 0)
+	//{
+	//	D3D11_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(intersection->m_trimTexture1.width), static_cast<float>(intersection->m_trimTexture1.height), 0.0f, 1.0f };
+	//	context->RSSetViewports(1, &vp);
+
+	//	context->OMSetRenderTargets(1, intersection->m_trimTexture1.rtv.GetAddressOf(), nullptr);
+	//	context->ClearRenderTargetView(intersection->m_trimTexture1.rtv.Get(), clearColor);
+
+	//	UINT stride = sizeof(VertexPosition);
+	//	UINT offset = 0;
+	//	context->IASetVertexBuffers(0, 1, intersection->m_uvLinesBuffer1.GetAddressOf(), &stride, &offset);
+	//	context->Draw(intersection->m_uvLineCount1, 0);
+	//}
+
+	//if (intersection->m_uvLineCount2 > 0)
+	//{
+	//	D3D11_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(intersection->m_trimTexture2.width), static_cast<float>(intersection->m_trimTexture2.height), 0.0f, 1.0f };
+	//	context->RSSetViewports(1, &vp);
+
+	//	context->OMSetRenderTargets(1, intersection->m_trimTexture2.rtv.GetAddressOf(), nullptr);
+	//	context->ClearRenderTargetView(intersection->m_trimTexture2.rtv.Get(), clearColor);
+
+	//	UINT stride = sizeof(VertexPosition);
+	//	UINT offset = 0;
+	//	context->IASetVertexBuffers(0, 1, intersection->m_uvLinesBuffer2.GetAddressOf(), &stride, &offset);
+	//	context->Draw(intersection->m_uvLineCount2, 0);
+	//}
+
+	auto renderMask = [&](TrimTexture& tex, UINT triCount, ID3D11Buffer* triBuffer, UINT lineCount,
+		ID3D11Buffer* lineBuffer, bool reverse) {
+
+		D3D11_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(tex.width), static_cast<float>(tex.height), 0.0f, 1.0f };
 		context->RSSetViewports(1, &vp);
 
-		context->OMSetRenderTargets(1, intersection->m_trimTexture1.rtv.GetAddressOf(), nullptr);
-		context->ClearRenderTargetView(intersection->m_trimTexture1.rtv.Get(), clearColor);
+		// Clear Target: White (keep) or Black (discard) based on reverse flag
+		const float clearColor[4] = { reverse ? 0.0f : 1.0f, reverse ? 0.0f : 1.0f, reverse ? 0.0f : 1.0f, 1.0f };
+		context->OMSetRenderTargets(1, tex.rtv.GetAddressOf(), tex.dsv.Get());
+		context->ClearRenderTargetView(tex.rtv.Get(), clearColor);
+		context->ClearDepthStencilView(tex.dsv.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+
+		MathLib::Vec4f drawColor = reverse
+			? MathLib::Vec4f(1.0f, 1.0f, 1.0f, 1.0f)
+			: MathLib::Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
+
+		//if (count == 0) return;
+		if (triCount == 0 || triBuffer == nullptr)
+		{
+			if (lineCount > 0 && lineBuffer != nullptr)
+			{
+				PerObjectBuffer objData{};
+				objData.model = Mat4f::Identity();
+				objData.color = drawColor;
+				m_device.UpdateBuffer(m_cbPerObject, objData);
+
+				context->RSSetState(nullptr);
+				context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+				context->OMSetDepthStencilState(nullptr, 0);
+				context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+
+				UINT stride = sizeof(VertexPosition);
+				UINT offset = 0;
+				context->IASetVertexBuffers(0, 1, &lineBuffer, &stride, &offset);
+				context->Draw(lineCount, 0);
+			}
+
+			return;
+		}
+
+		PerObjectBuffer objData{};
+		objData.model = Mat4f::Identity();
+		objData.color = Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+		m_device.UpdateBuffer(m_cbPerObject, objData);
+
+		// PASS 1: Draw invisible triangles to mark the Stencil Buffer
+		context->RSSetState(rsCullNone.Get());
+		context->OMSetBlendState(bsNoColor.Get(), nullptr, 0xFFFFFFFF);
+		context->OMSetDepthStencilState(dsMarkStencil.Get(), 0);
+		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		UINT stride = sizeof(VertexPosition);
 		UINT offset = 0;
-		context->IASetVertexBuffers(0, 1, intersection->m_uvLinesBuffer1.GetAddressOf(), &stride, &offset);
-		context->Draw(intersection->m_uvLineCount1, 0);
-	}
+		context->IASetVertexBuffers(0, 1, &triBuffer, &stride, &offset);
+		context->Draw(triCount, 0);
 
-	if (intersection->m_uvLineCount2 > 0)
-	{
-		D3D11_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(intersection->m_trimTexture2.width), static_cast<float>(intersection->m_trimTexture2.height), 0.0f, 1.0f };
-		context->RSSetViewports(1, &vp);
+		// PASS 2: Draw Fullscreen Quad where Stencil is 1
+		objData.color = drawColor;
+		m_device.UpdateBuffer(m_cbPerObject, objData);
 
-		context->OMSetRenderTargets(1, intersection->m_trimTexture2.rtv.GetAddressOf(), nullptr);
-		context->ClearRenderTargetView(intersection->m_trimTexture2.rtv.Get(), clearColor);
+		context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF); // Restore Color
+		context->OMSetDepthStencilState(dsApplyMask.Get(), 0); // Test Stencil == 1
+		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
-		UINT stride = sizeof(VertexPosition);
-		UINT offset = 0;
-		context->IASetVertexBuffers(0, 1, intersection->m_uvLinesBuffer2.GetAddressOf(), &stride, &offset);
-		context->Draw(intersection->m_uvLineCount2, 0);
-	}
+		context->IASetVertexBuffers(0, 1, s_fullscreenQuad.GetAddressOf(), &stride, &offset);
+		context->Draw(4, 0);
+		};
+
+
+	renderMask(intersection->m_trimTexture1, intersection->m_trimPolygonCount1, intersection->m_trimPolygonBuffer1.Get(), intersection->m_uvLineCount1, intersection->m_uvLinesBuffer1.Get(), intersection->m_reverseTrimS1);
+	renderMask(intersection->m_trimTexture2, intersection->m_trimPolygonCount2, intersection->m_trimPolygonBuffer2.Get(), intersection->m_uvLineCount2, intersection->m_uvLinesBuffer2.Get(), intersection->m_reverseTrimS2);
+
+	//renderMask(intersection->m_trimTexture1, intersection->m_trimPolygonCount1, intersection->m_trimPolygonBuffer1.Get(), intersection->m_reverseTrimS1);
+	//renderMask(intersection->m_trimTexture2, intersection->m_trimPolygonCount2, intersection->m_trimPolygonBuffer2.Get(), intersection->m_reverseTrimS2);
 
 	context->OMSetRenderTargets(1, oldRTV.GetAddressOf(), oldDSV.Get());
 	context->RSSetViewports(1, &oldViewport);
+
+	context->OMSetDepthStencilState(nullptr, 0);
+	context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+	context->RSSetState(nullptr);
 }
 
 void CadApplication::DrawIntersectionList(std::shared_ptr<Intersection> intersection)
@@ -2571,19 +2766,19 @@ void CadApplication::DrawIntersectionList(std::shared_ptr<Intersection> intersec
 	ImGui::Separator();
 	ImGui::Text("Intersection Actions");
 	bool changed = false;
-	//if (ImGui::Button("Reverse S1 Trim", ImVec2(-1, 0)))
-	//{
-	//	intersection->m_reverseTrimS1 = !intersection->m_reverseTrimS1;
-	//	changed = true;
-	//}
-	//if (ImGui::Button("Reverse S2 Trim", ImVec2(-1, 0)))
-	//{
-	//	intersection->m_reverseTrimS2 = !intersection->m_reverseTrimS2;
-	//	changed = true;
-	//}
+	if (ImGui::Button("Reverse S1 Trim", ImVec2(-1, 0)))
+	{
+		intersection->m_reverseTrimS1 = !intersection->m_reverseTrimS1;
+		changed = true;
+	}
+	if (ImGui::Button("Reverse S2 Trim", ImVec2(-1, 0)))
+	{
+		intersection->m_reverseTrimS2 = !intersection->m_reverseTrimS2;
+		changed = true;
+	}
 
-	//if (changed)
-	//	UpdateIntersectionTrimTextures(intersection.get());
+	if (changed)
+		RenderTrimTextures(intersection.get(), m_device.getContext());
 
 	bool isPreviewS1 = (m_previewIntersection.lock() == intersection && m_previewSurfaceIndex == 1);
 	bool isPreviewS2 = (m_previewIntersection.lock() == intersection && m_previewSurfaceIndex == 2);
