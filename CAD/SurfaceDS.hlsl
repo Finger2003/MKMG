@@ -17,11 +17,13 @@ cbuffer perObject : register(b1)
 struct DS_OUTPUT
 {
 	float4 PosH  : SV_POSITION;
+    float2 uv : TEXCOORD;
 };
 
 struct HS_CONTROL_POINT_OUTPUT
 {
     float4 PosW : SV_POSITION;
+    float2 uv : TEXCOORD;
 };
 
 struct HS_CONSTANT_DATA_OUTPUT
@@ -82,6 +84,11 @@ DS_OUTPUT main(
     float3 worldPos = DeCasteljau(vControl[0], vControl[1], vControl[2], vControl[3], v);
     
     Output.PosH = mul(float4(worldPos, 1.0f), viewProj);
+    
+    float2 uv_top = lerp(patch[0].uv, patch[3].uv, u);
+    float2 uv_bot = lerp(patch[12].uv, patch[15].uv, u);
+    Output.uv = lerp(uv_top, uv_bot, v);
+
 	//Output.PosH = float4(
 	//	patch[0].PosH*domain.x+patch[1].PosH*domain.y+patch[2].PosH*domain.z,1);
 

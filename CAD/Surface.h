@@ -6,7 +6,7 @@ enum class SurfaceShape { Flat, Cylinder };
 struct PrecalculatedSurfaceData
 {
 	std::vector<VertexPosition> controlPoints;
-	std::optional<std::vector<VertexPosition>> patchVertices;
+	std::optional<std::vector<VertexPositionUV>> patchVertices;
 	std::vector<unsigned int> patchIndices;
 };
 
@@ -34,6 +34,8 @@ struct Surface : public SceneObject, public IPointDependent
 	int m_linesPerSegmentV = 4;
 	int m_smoothness = 25;
 
+
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_trimTextureSRV;
 
 	std::shared_ptr<Point> GetPoint(int u, int v) const;
 

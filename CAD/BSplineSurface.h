@@ -23,6 +23,6 @@ protected:
 	unsigned int GetBernsteinIndex(int u, int v) const;
 
 
-	void ConvertPatchToBernstein(int patchU, int patchV, std::vector<VertexPosition>& bernsteinGrid) const;
+	void ConvertPatchToBernstein(int patchU, int patchV, std::vector<VertexPositionUV>& bernsteinGrid) const;
 	MathLib::Vec3f Evaluate1D(MathLib::Vec3f p0, MathLib::Vec3f p1, MathLib::Vec3f p2, MathLib::Vec3f p3, int index) const;
 };

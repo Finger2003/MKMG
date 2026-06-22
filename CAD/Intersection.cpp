@@ -66,9 +66,8 @@ std::vector<VertexPosition> Intersection::GenerateLinesInUVSpace(bool isSurface1
 	float thresholdU = maxU * 0.5f;
 	float thresholdV = maxV * 0.5f;
 
-	auto toNDC = [](float val, float maxVal) {
-		return (val / maxVal) * 2.0f - 1.0f;
-	};
+	auto toNDCU = [](float val, float maxVal) { return (val / maxVal) * 2.0f - 1.0f; };
+	auto toNDCV = [](float val, float maxVal) { return 1.0f - (val / maxVal) * 2.0f; };
 
 	for (size_t i = 0; i < m_params.size() - 1; i++)
 	{
@@ -93,17 +92,17 @@ std::vector<VertexPosition> Intersection::GenerateLinesInUVSpace(bool isSurface1
 		if (offsetU != 0.0f || offsetV != 0.0f)
 		{
 			// 1. Line leaving the edge (from P1 to a shifted P2)
-			lines.push_back({ toNDC(u1, maxU), toNDC(v1, maxV), 0.0f });
-			lines.push_back({ toNDC(u2 + offsetU, maxU), toNDC(v2 + offsetV, maxV), 0.0f });
+			lines.push_back({ toNDCU(u1, maxU), toNDCV(v1, maxV), 0.0f });
+			lines.push_back({ toNDCU(u2 + offsetU, maxU), toNDCV(v2 + offsetV, maxV), 0.0f });
 
 			// 2. Line entering the opposite edge (from a shifted P1 to P2)
-			lines.push_back({ toNDC(u1 - offsetU, maxU), toNDC(v1 - offsetV, maxV), 0.0f });
-			lines.push_back({ toNDC(u2, maxU), toNDC(v2, maxV), 0.0f });
+			lines.push_back({ toNDCU(u1 - offsetU, maxU), toNDCV(v1 - offsetV, maxV), 0.0f });
+			lines.push_back({ toNDCU(u2, maxU), toNDCV(v2, maxV), 0.0f });
 		}
 		else
 		{
-			lines.push_back({ toNDC(u1, maxU), toNDC(v1, maxV), 0.0f });
-			lines.push_back({ toNDC(u2, maxU), toNDC(v2, maxV), 0.0f });
+			lines.push_back({ toNDCU(u1, maxU), toNDCV(v1, maxV), 0.0f });
+			lines.push_back({ toNDCU(u2, maxU), toNDCV(v2, maxV), 0.0f });
 		}
 	}
 
@@ -120,7 +119,9 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 	float maxU = isSurface1 ? m_maxDomains.x : m_maxDomains.z;
 	float maxV = isSurface1 ? m_maxDomains.y : m_maxDomains.w;
 
-	auto toNDC = [](float val, float maxVal) { return (val / maxVal) * 2.0f - 1.0f; };
+	//auto toNDC = [](float val, float maxVal) { return (val / maxVal) * 2.0f - 1.0f; };
+	auto toNDCU = [](float val, float maxVal) { return (val / maxVal) * 2.0f - 1.0f; };
+	auto toNDCV = [](float val, float maxVal) { return 1.0f - (val / maxVal) * 2.0f; };
 	auto getEdge = [maxU, maxV](float u, float v) -> int
 		{
 			const float edgeEps = std::max(maxU, maxV) * 1e-3f;
@@ -311,20 +312,66 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 
 	if (mode == TrimFillMode::ClosedLoop)
 	{
-		bool wrappedThroughSeam = convertWrappedToOpenCut(contour, true); // U seam
-
-		if (!wrappedThroughSeam)
-			wrappedThroughSeam = convertWrappedToOpenCut(contour, false);
-
-		if (wrappedThroughSeam)
+		int crossU = 0, crossV = 0;
+		const float thresholdU = maxU * 0.5f;
+		const float thresholdV = maxV * 0.5f;
+		for (size_t i = 0; i < contour.size(); i++)
 		{
-			if (!closeThroughBoundary(contour))
-				return triangles;
+			auto p0 = contour[i];
+			auto p1 = contour[(i + 1) % contour.size()];
+			if (std::abs(p1.x - p0.x) > thresholdU) crossU++;
+			if (std::abs(p1.y - p0.y) > thresholdV) crossV++;
+		}
+
+		bool isEquatorU = (crossU % 2 != 0);
+		bool isEquatorV = (crossV % 2 != 0);
+
+		if (isEquatorU)
+		{
+			convertWrappedToOpenCut(contour, true);
+			if (!closeThroughBoundary(contour)) return triangles;
+		}
+		else if (isEquatorV)
+		{
+			convertWrappedToOpenCut(contour, false);
+			if (!closeThroughBoundary(contour)) return triangles;
 		}
 		else
 		{
-			contour.push_back(contour.front());
+			std::vector<MathLib::Vec2f> unwrapped;
+			unwrapped.push_back(contour[0]);
+
+			for (size_t i = 1; i < contour.size(); i++)
+			{
+				MathLib::Vec2f p = contour[i];
+				MathLib::Vec2f prev = unwrapped.back();
+
+				if (p.x - prev.x > thresholdU) p.x -= maxU;
+				else if (prev.x - p.x > thresholdU) p.x += maxU;
+
+				if (p.y - prev.y > thresholdV) p.y -= maxV;
+				else if (prev.y - p.y > thresholdV) p.y += maxV;
+
+				unwrapped.push_back(p);
+			}
+			contour = unwrapped;
+			contour.push_back(contour.front()); // Close the loop
 		}
+
+		//bool wrappedThroughSeam = convertWrappedToOpenCut(contour, true); // U seam
+
+		//if (!wrappedThroughSeam)
+		//	wrappedThroughSeam = convertWrappedToOpenCut(contour, false);
+
+		//if (wrappedThroughSeam)
+		//{
+		//	if (!closeThroughBoundary(contour))
+		//		return triangles;
+		//}
+		//else
+		//{
+		//	contour.push_back(contour.front());
+		//}
 	}
 	else if (mode == TrimFillMode::BoundaryToBoundary)
 	{
@@ -385,27 +432,70 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 			return MathLib::Vec2f(maxU * 0.37f, maxV * 0.61f);
 		};
 
-	MathLib::Vec2f anchor = pickSafeAnchor();
+	//MathLib::Vec2f anchor = pickSafeAnchor();
+
+	//for (size_t i = 0; i < contour.size() - 1; i++)
+	//{
+	//	triangles.push_back({
+	//		toNDCU(anchor.x, maxU),
+	//		toNDCV(anchor.y, maxV),
+	//		0.0f
+	//		});
+
+	//	triangles.push_back({
+	//		toNDCU(contour[i].x, maxU),
+	//		toNDCV(contour[i].y, maxV),
+	//		0.0f
+	//		});
+
+	//	triangles.push_back({
+	//		toNDCU(contour[i + 1].x, maxU),
+	//		toNDCV(contour[i + 1].y, maxV),
+	//		0.0f
+	//		});
+	//}
+
+	float minUnwrappedU = contour[0].x;
+	float maxUnwrappedU = contour[0].x;
+	float minUnwrappedV = contour[0].y;
+	float maxUnwrappedV = contour[0].y;
+	for (const auto& p : contour)
+	{
+		minUnwrappedU = std::min(minUnwrappedU, p.x);
+		maxUnwrappedU = std::max(maxUnwrappedU, p.x);
+		minUnwrappedV = std::min(minUnwrappedV, p.y);
+		maxUnwrappedV = std::max(maxUnwrappedV, p.y);
+	}
+
+	MathLib::Vec2f anchor = contour[0];
+	std::vector<VertexPosition> baseTriangles;
 
 	for (size_t i = 0; i < contour.size() - 1; i++)
 	{
-		triangles.push_back({
-			toNDC(anchor.x, maxU),
-			toNDC(anchor.y, maxV),
-			0.0f
-			});
+		baseTriangles.push_back({ toNDCU(anchor.x, maxU), toNDCV(anchor.y, maxV), 0.0f });
+		baseTriangles.push_back({ toNDCU(contour[i].x, maxU), toNDCV(contour[i].y, maxV), 0.0f });
+		baseTriangles.push_back({ toNDCU(contour[i + 1].x, maxU), toNDCV(contour[i + 1].y, maxV), 0.0f });
+	}
 
-		triangles.push_back({
-			toNDC(contour[i].x, maxU),
-			toNDC(contour[i].y, maxV),
-			0.0f
-			});
+	int startX = (maxUnwrappedU > maxU) ? -1 : 0;
+	int endX = (minUnwrappedU < 0.0f) ? 1 : 0;
+	int startY = (maxUnwrappedV > maxV) ? -1 : 0;
+	int endY = (minUnwrappedV < 0.0f) ? 1 : 0;
 
-		triangles.push_back({
-			toNDC(contour[i + 1].x, maxU),
-			toNDC(contour[i + 1].y, maxV),
-			0.0f
-			});
+	// Duplicate triangles in a 3x3 grid to ensure seamless texture wrapping
+	for (int offsetX = startX; offsetX <= endX; offsetX++)
+	{
+		for (int offsetY = startY; offsetY <= endY; offsetY++)
+		{
+			for (const auto& tri : baseTriangles)
+			{
+				triangles.push_back({
+					tri.x + offsetX * 2.0f,
+					tri.y - offsetY * 2.0f,
+					0.0f
+					});
+			}
+		}
 	}
 
 	return triangles;

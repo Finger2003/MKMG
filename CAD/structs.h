@@ -3,10 +3,15 @@
 #include "../MathLib/Vec4f.h"
 #include "../MathLib/Mat4f.h"
 
-//#include <nlohmann/json.hpp>
 struct VertexPosition
 {
 	float x, y, z;
+};
+
+struct VertexPositionUV
+{
+	float x, y, z;
+	float u, v;
 };
 
 inline MathLib::Vec3f ToVec3f(const VertexPosition& vp)

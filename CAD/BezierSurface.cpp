@@ -20,10 +20,14 @@ void BezierSurface::InitGeometry(const DxDevice& device)
 	if (!m_patchVertexBuffer)
 	{
 		UINT vertexCount = m_gridPointsU * m_gridPointsV;
-		m_patchVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(vertexCount);
+		m_patchVertexBuffer = device.CreateDynamicVertexBuffer<VertexPositionUV>(vertexCount);
 	}
 
-	m_polylineVertexBuffer = m_patchVertexBuffer;
+	if (!m_polylineVertexBuffer)
+	{
+		UINT vertexCount = m_gridPointsU * m_gridPointsV;
+		m_polylineVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(vertexCount);
+	}
 
 	if (!m_patchIndexBuffer)
 	{
@@ -42,8 +46,10 @@ void BezierSurface::InitGeometry(const DxDevice& device)
 
 void BezierSurface::InitGeometry(const DxDevice& device, const PrecalculatedSurfaceData& precalculatedData)
 {
-	m_patchVertexBuffer = device.CreateDynamicVertexBuffer(precalculatedData.controlPoints);
-	m_polylineVertexBuffer = m_patchVertexBuffer;
+	//m_patchVertexBuffer = device.CreateDynamicVertexBuffer(precalculatedData.controlPoints);
+	//m_polylineVertexBuffer = device.CreateDynamicVertexBuffer(precalculatedData.patchVertices.value());
+	m_patchVertexBuffer = device.CreateDynamicVertexBuffer(precalculatedData.patchVertices.value_or(std::vector<VertexPositionUV>()));
+	m_polylineVertexBuffer = device.CreateDynamicVertexBuffer(precalculatedData.controlPoints);
 
 	m_patchIndexCount = static_cast<UINT>(precalculatedData.patchIndices.size());
 	m_patchIndexBuffer = device.CreateIndexBuffer(precalculatedData.patchIndices);
@@ -62,23 +68,33 @@ void BezierSurface::UpdateVertices(const DxDevice& device)
 
 	UINT vertexCount = m_gridPointsU * m_gridPointsV;
 
-	std::vector<VertexPosition> positions;
-	positions.reserve(vertexCount);
+	std::vector<VertexPosition> polyPositions;
+	std::vector<VertexPositionUV> patchPositions;
+	polyPositions.reserve(vertexCount);
+	patchPositions.reserve(vertexCount);
 
 	for (unsigned int v = 0; v < m_gridPointsV; v++)
 	{
+		float uv_v = static_cast<float>(v) / (m_gridPointsV - 1);
 		for (unsigned int u = 0; u < m_gridPointsU; ++u)
 		{
+			float uv_u = static_cast<float>(u) / (m_gridPointsU - 1);
 			unsigned int idx = GetControlPointIndex(u, v);
 
 			if (auto pt = m_controlPoints[idx].lock())
-				positions.push_back({ pt->m_position.x, pt->m_position.y, pt->m_position.z });
+			{
+				polyPositions.push_back({ pt->m_position.x, pt->m_position.y, pt->m_position.z });
+				patchPositions.push_back({ pt->m_position.x, pt->m_position.y, pt->m_position.z, uv_u, uv_v});
+			}
 			else
-				positions.push_back({ 0.0f, 0.0f, 0.0f });
+			{
+				polyPositions.push_back({ 0.0f, 0.0f, 0.0f });
+				patchPositions.push_back({ 0.0f, 0.0f, 0.0f, uv_u, uv_v });
+			}
 		}
 	}
-
-	device.UpdateBuffer(m_polylineVertexBuffer, positions.data(), static_cast<UINT>(positions.size()) * sizeof(VertexPosition));
+	device.UpdateBuffer(m_polylineVertexBuffer, polyPositions.data(), static_cast<UINT>(polyPositions.size()) * sizeof(VertexPosition));
+	device.UpdateBuffer(m_patchVertexBuffer, patchPositions.data(), static_cast<UINT>(patchPositions.size()) * sizeof(VertexPositionUV));
 
 	m_isDirty = false;
 }

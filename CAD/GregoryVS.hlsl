@@ -16,19 +16,16 @@ cbuffer PerObjectBuffer : register(b1)
 struct VertexIn
 {
     float3 PosL : POSITION;
-    float2 uv : TEXCOORD;
 };
 
 struct VertexOut
 {
     float4 PosW : SV_POSITION;
-    float2 uv : TEXCOORD;
 };
 
 VertexOut main(VertexIn vin)
 {
     VertexOut vout;
     vout.PosW = float4(vin.PosL, 1.0f);
-    vout.uv = vin.uv;
     return vout;
 }

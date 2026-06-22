@@ -39,7 +39,7 @@ unsigned int BSplineSurface::GetSegmentsV() const
 	return m_gridPointsV - 3;
 }
 
-void BSplineSurface::ConvertPatchToBernstein(int patchU, int patchV, std::vector<VertexPosition>& bernsteinGrid) const
+void BSplineSurface::ConvertPatchToBernstein(int patchU, int patchV, std::vector<VertexPositionUV>& bernsteinGrid) const
 {
 	Vec3f P[4][4];
 	for (int v = 0; v < 4; v++)
@@ -56,12 +56,21 @@ void BSplineSurface::ConvertPatchToBernstein(int patchU, int patchV, std::vector
 		for (int u = 0; u < 4; u++)
 			Q[v][u] = Evaluate1D(P[v][0], P[v][1], P[v][2], P[v][3], u);
 
+
+	unsigned int bernU = GetBernsteinPointsU();
+	unsigned int bernV = GetBernsteinPointsV();
+
 	for (int v = 0; v < 4; v++)
 		for (int u = 0; u < 4; u++)
 		{
 			Vec3f B = Evaluate1D(Q[0][u], Q[1][u], Q[2][u], Q[3][u], v);
-			unsigned int bIdx = GetBernsteinIndex(patchU * 3 + u, patchV * 3 + v);
-			bernsteinGrid[bIdx] = { B.x, B.y, B.z };
+			unsigned int bu = patchU * 3 + u;
+			unsigned int bv = patchV * 3 + v;
+			unsigned int bIdx = GetBernsteinIndex(bu, bv);
+			float uv_u = static_cast<float>(bu) / (bernU - 1);
+			float uv_v = static_cast<float>(bv) / (bernV - 1);
+
+			bernsteinGrid[bIdx] = { B.x, B.y, B.z, uv_u, uv_v };
 		}
 }
 
@@ -84,7 +93,7 @@ MathLib::Vec3f BSplineSurface::Evaluate1D(MathLib::Vec3f p0, MathLib::Vec3f p1, 
 
 void BSplineSurface::InitGeometry(const DxDevice& device, const PrecalculatedSurfaceData& precalculatedData)
 {
-	m_patchVertexBuffer = device.CreateDynamicVertexBuffer(precalculatedData.patchVertices.value_or(std::vector<VertexPosition>()));
+	m_patchVertexBuffer = device.CreateDynamicVertexBuffer(precalculatedData.patchVertices.value_or(std::vector<VertexPositionUV>()));
 	m_patchIndexCount = static_cast<UINT>(precalculatedData.patchIndices.size());
 	m_patchIndexBuffer = device.CreateIndexBuffer(precalculatedData.patchIndices);
 
@@ -114,7 +123,7 @@ void BSplineSurface::InitGeometry(const DxDevice& device)
 	if (!m_patchVertexBuffer)
 	{
 		UINT bernsteinCount = GetBernsteinPointsU() * GetBernsteinPointsV();
-		m_patchVertexBuffer = device.CreateDynamicVertexBuffer<VertexPosition>(bernsteinCount);
+		m_patchVertexBuffer = device.CreateDynamicVertexBuffer<VertexPositionUV>(bernsteinCount);
 	}
 
 	if (!m_patchIndexBuffer)
@@ -148,7 +157,7 @@ void BSplineSurface::UpdateVertices(const DxDevice& device)
 
 	// 2. Convert and Upload Bernstein Points (Surface Patches)
 	UINT bernsteinCount = GetBernsteinPointsU() * GetBernsteinPointsV();
-	std::vector<VertexPosition> bernsteinPositions(bernsteinCount);
+	std::vector<VertexPositionUV> bernsteinPositions(bernsteinCount);
 	for (int patchV = 0; patchV < GetSegmentsV(); patchV++)
 	{
 		for (int patchU = 0; patchU < GetSegmentsU(); patchU++)
@@ -156,7 +165,7 @@ void BSplineSurface::UpdateVertices(const DxDevice& device)
 			ConvertPatchToBernstein(patchU, patchV, bernsteinPositions);
 		}
 	}
-	device.UpdateBuffer(m_patchVertexBuffer, bernsteinPositions.data(), bernsteinCount * sizeof(VertexPosition));
+	device.UpdateBuffer(m_patchVertexBuffer, bernsteinPositions.data(), bernsteinCount * sizeof(VertexPositionUV));
 
 	m_isDirty = false;
 }

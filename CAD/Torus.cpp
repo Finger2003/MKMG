@@ -107,21 +107,28 @@ void Torus::GenerateMesh()
 void Torus::GenerateVertices()
 {
 	vertices.clear();
+	int vertsMajor = majorSegments + 1;
+	int vertsMinor = minorSegments + 1;
 	vertices.reserve(static_cast<size_t>(majorSegments) * minorSegments);
-	for (int i = 0; i < majorSegments; i++)
+	for (int i = 0; i <= majorSegments; i++)
 	{
 		float beta = i * 2.0f * numbers::pi_v<float> / majorSegments;
 		float cosBeta = cos(beta);
 		float sinBeta = sin(beta);
-		for (int j = 0; j < minorSegments; j++)
+
+		float u = static_cast<float>(i) / majorSegments;
+		for (int j = 0; j <= minorSegments; j++)
 		{
 			float alpha = j * 2.0f * numbers::pi_v<float> / minorSegments;
 			float cosAlpha = cos(alpha);
 			float sinAlpha = sin(alpha);
+			float v = static_cast<float>(j) / minorSegments;
 			vertices.emplace_back(
 				(majorRadius + minorRadius * cosAlpha) * cosBeta,
 				minorRadius * sinAlpha,
-				-(majorRadius + minorRadius * cosAlpha) * sinBeta
+				-(majorRadius + minorRadius * cosAlpha) * sinBeta,
+				u,
+				v
 			);
 		}
 	}
@@ -130,22 +137,25 @@ void Torus::GenerateVertices()
 void Torus::GenerateIndices()
 {
 	indices.clear();
+	int vertsMinor = minorSegments + 1;
 	vertices.reserve(static_cast<size_t>(majorSegments) * minorSegments * 2 * 2); // 2 edges per vertex, 2 vertices per edge
 	for (int i = 0; i < majorSegments; i++)
 	{
 		for (int j = 0; j < minorSegments; j++)
 		{
-			int current = i * minorSegments + j;
+			int current = i * vertsMinor + j;
+			int nextMinor = current + 1;
+			int nextMajor = (i + 1) * vertsMinor + j;
 
 			// Minor Circle Edges
 			// (i, j) -> (i, j + 1)
-			int nextMinor = i * minorSegments + (j + 1) % minorSegments;
+			//int nextMinor = i * minorSegments + (j + 1) % minorSegments;
 			indices.push_back(current);
 			indices.push_back(nextMinor);
 
 			// Major Circle Edges
 			// (i, j) -> (i + 1, j)
-			int nextMajor = ((i + 1) % majorSegments) * minorSegments + j;
+			//int nextMajor = ((i + 1) % majorSegments) * minorSegments + j;
 			indices.push_back(current);
 			indices.push_back(nextMajor);
 		}

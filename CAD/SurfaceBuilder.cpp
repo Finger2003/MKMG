@@ -20,14 +20,16 @@ void SurfaceBuilder::UpdateGeometry(const DxDevice& device, SurfaceType type, Su
 	center = centerPos;
 
 	rawPoints.clear();
-	const std::vector<VertexPosition>* dataToUpload = nullptr;
+	//const std::vector<VertexPosition>* dataToUpload = nullptr;
 	if (surfaceType == SurfaceType::C0)
 	{
 		if (surfaceShape == SurfaceShape::Flat)
 			GenerateC0Flat();
 		else
 			GenerateC0Cylinder();
-		dataToUpload = &rawPoints;
+
+		patchPointsUV = GenerateC0PatchPointsUV();
+		//dataToUpload = &rawPoints;
 	}
 	else
 	{
@@ -36,11 +38,13 @@ void SurfaceBuilder::UpdateGeometry(const DxDevice& device, SurfaceType type, Su
 		else
 			GenerateC2Cylinder();
 
-		bernsteinPoints = GenerateC2BernsteinPoints();
-		dataToUpload = &bernsteinPoints;
+		patchPointsUV = GenerateC2BernsteinPointsUV();
+
+		//bernsteinPoints = GenerateC2BernsteinPoints();
+		//dataToUpload = &bernsteinPoints;
 	}
 
-	UpdateVertexBuffer(device, m_patchVertexBuffer, m_patchVertexBufferCapacity, *dataToUpload);
+	UpdateVertexBuffer(device, m_patchVertexBuffer, m_patchVertexBufferCapacity, patchPointsUV);
 
 	if (topologyChanged)
 	{
@@ -93,7 +97,7 @@ SurfaceGenerationResult SurfaceBuilder::Build(const DxDevice& device) const
 	PrecalculatedSurfaceData precalcData
 	{
 		.controlPoints = rawPoints,
-		.patchVertices = (surfaceType == SurfaceType::C2) ? std::make_optional(bernsteinPoints) : std::nullopt,
+		.patchVertices = patchPointsUV,
 		.patchIndices = patchIndices
 	};
 
@@ -101,15 +105,73 @@ SurfaceGenerationResult SurfaceBuilder::Build(const DxDevice& device) const
 	return { std::move(surface), std::move(generatedPoints) };
 }
 
-void SurfaceBuilder::UpdateVertexBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data)
+std::vector<VertexPositionUV> SurfaceBuilder::GenerateC0PatchPointsUV() const
 {
-	if (data.size() > capacity)
+	std::vector<VertexPositionUV> pts;
+	pts.reserve(rawPoints.size());
+	int pointsU = 3 * segmentsU + 1;
+	int pointsV = 3 * segmentsV + 1;
+
+	for (int v = 0; v < pointsV; v++)
 	{
-		capacity = std::max(static_cast<UINT>(data.size()), static_cast<UINT>(capacity * 1.5));
-		buffer = device.CreateDynamicVertexBuffer<VertexPosition>(capacity);
+		float uv_v = static_cast<float>(v) / (pointsV - 1);
+		for (int u = 0; u < pointsU; u++)
+		{
+			float uv_u = static_cast<float>(u) / (pointsU - 1);
+			size_t idx = static_cast<size_t>(v * pointsU + u);
+			VertexPosition vp = rawPoints[idx];
+			pts.push_back({ vp.x, vp.y, vp.z, uv_u, uv_v });
+		}
 	}
-	device.UpdateBuffer(buffer, data.data(), static_cast<size_t>(data.size()) * sizeof(VertexPosition));
+	return pts;
 }
+
+std::vector<VertexPositionUV> SurfaceBuilder::GenerateC2BernsteinPointsUV() const
+{
+	int bernU = 3 * segmentsU + 1;
+	int bernV = 3 * segmentsV + 1;
+	int deBoorU = segmentsU + 3;
+
+	std::vector<VertexPositionUV> bernsteinGrid(bernU * bernV);
+
+	auto getDeBoorPoint = [&](int u, int v) -> VertexPosition {
+		return rawPoints[static_cast<size_t>(v) * deBoorU + u];
+		};
+	auto getBernsteinIndex = [&](int u, int v) -> int {
+		return v * bernU + u;
+		};
+
+	for (int patchV = 0; patchV < segmentsV; patchV++)
+	{
+		for (int patchU = 0; patchU < segmentsU; patchU++)
+		{
+			Vec3f P[4][4];
+			for (int v = 0; v < 4; v++)
+				for (int u = 0; u < 4; u++)
+					P[v][u] = ToVec3f(getDeBoorPoint(patchU + u, patchV + v));
+
+			Vec3f Q[4][4];
+			for (int v = 0; v < 4; v++)
+				for (int u = 0; u < 4; u++)
+					Q[v][u] = SplineMath::EvaluateBSpline1D(P[v][0], P[v][1], P[v][2], P[v][3], u);
+
+			for (int v = 0; v < 4; v++)
+				for (int u = 0; u < 4; u++)
+				{
+					Vec3f B = SplineMath::EvaluateBSpline1D(Q[0][u], Q[1][u], Q[2][u], Q[3][u], v);
+					int bu = patchU * 3 + u;
+					int bv = patchV * 3 + v;
+					int bIdx = getBernsteinIndex(patchU * 3 + u, patchV * 3 + v);
+					float uv_u = static_cast<float>(bu) / (bernU - 1);
+					float uv_v = static_cast<float>(bv) / (bernV - 1);
+					bernsteinGrid[bIdx] = { B.x, B.y, B.z, uv_u, uv_v };
+				}
+		}
+	}
+
+	return bernsteinGrid;
+}
+
 
 void SurfaceBuilder::GenerateC0Flat()
 {

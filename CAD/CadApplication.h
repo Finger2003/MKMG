@@ -125,11 +125,14 @@ protected:
 
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_depthBuffer;
 	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_vertexShader;
+	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_torusVertexShader;
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_pixelShader;
 	Microsoft::WRL::ComPtr<ID3D11InputLayout> m_layout;
+	Microsoft::WRL::ComPtr<ID3D11InputLayout> m_layoutUV;
 
 	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_pointVertexShader;
 	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_pointPixelShader;
+	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_trimPixelShader;
 	Microsoft::WRL::ComPtr<ID3D11GeometryShader> m_pointGeometryShader;
 	//Microsoft::WRL::ComPtr<ID3D11InputLayout> m_pointLayout;
 
@@ -140,6 +143,7 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D11DomainShader> m_surfaceDomainShader;
 	Microsoft::WRL::ComPtr<ID3D11HullShader> m_surfaceHullShader;
 
+	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_gregoryVertexShader;
 	Microsoft::WRL::ComPtr<ID3D11DomainShader> m_gregoryDomainShader;
 	Microsoft::WRL::ComPtr<ID3D11HullShader> m_gregoryHullShader;
 
@@ -149,6 +153,9 @@ protected:
 
 	Microsoft::WRL::ComPtr<ID3D11BlendState> m_blendStateAnaglyph;
 	Microsoft::WRL::ComPtr<ID3D11BlendState> m_blendStateDefault;
+
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_dummyTrimTextureSRV;
+	Microsoft::WRL::ComPtr<ID3D11SamplerState> m_trimSampler;
 private:
 #pragma region Constants
 	static constexpr float cMenuWidth = 400.0f;

@@ -15,8 +15,10 @@ struct Torus : public TransformableObject, public NamedObjectCounter<Torus>
 	Torus(unsigned int id, float3 position, float3 scale, const MathLib::Mat4f& rotationMatrix,
 		float majorRadius, float minorRadius, uint2 samples, std::optional<ParsedNameData>&& nameData);
 
-	std::vector<VertexPosition> vertices;
+	std::vector<VertexPositionUV> vertices;
 	std::vector<unsigned int> indices;
+
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_trimTextureSRV;
 
 #pragma region Constants
 	static constexpr float cMinMajorRadius = 0.1f;

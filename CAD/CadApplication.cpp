@@ -428,6 +428,8 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	const auto surfaceDsByteCode = DxDevice::LoadByteCode(L"SurfaceDS.cso");
 	const auto gregoryHsByteCode = DxDevice::LoadByteCode(L"GregoryHS.cso");
 	const auto gregoryDsByteCode = DxDevice::LoadByteCode(L"GregoryDS.cso");
+	const auto torusVSByteCode = DxDevice::LoadByteCode(L"TorusVS.cso");
+	const auto trimPSByteCode = DxDevice::LoadByteCode(L"TrimPS.cso");
 
 	m_vertexShader = m_device.CreateVertexShader(vsByteCode);
 	m_pixelShader = m_device.CreatePixelShader(psByteCode);
@@ -441,11 +443,19 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	m_surfaceHullShader = m_device.CreateHullShader(surfaceHsByteCode);
 	m_gregoryDomainShader = m_device.CreateDomainShader(gregoryDsByteCode);
 	m_gregoryHullShader = m_device.CreateHullShader(gregoryHsByteCode);
+	m_torusVertexShader = m_device.CreateVertexShader(torusVSByteCode);
+	m_trimPixelShader = m_device.CreatePixelShader(trimPSByteCode);
 
 	vector<D3D11_INPUT_ELEMENT_DESC> inputElements = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
 	m_layout = m_device.CreateInputLayout(inputElements, vsByteCode);
+
+	std::vector<D3D11_INPUT_ELEMENT_DESC> uvInputElements = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	};
+	m_layoutUV = m_device.CreateInputLayout(uvInputElements, torusVSByteCode);
 
 
 	// Create the constant buffers for MVP matrices
@@ -453,6 +463,30 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	m_cbPerObject = m_device.CreateConstantBuffer<PerObjectBuffer>();
 	InitStereoBlendStates();
 	InitImGui();
+
+	D3D11_TEXTURE2D_DESC texDesc = {};
+	texDesc.Width = 1;
+	texDesc.Height = 1;
+	texDesc.MipLevels = 1;
+	texDesc.ArraySize = 1;
+	texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	texDesc.SampleDesc.Count = 1;
+	texDesc.Usage = D3D11_USAGE_IMMUTABLE;
+	texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+	uint32_t whitePixel = 0xFFFFFFFF;
+	D3D11_SUBRESOURCE_DATA initData = { &whitePixel, sizeof(uint32_t), 0 };
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> dummyTex;
+	m_device.get()->CreateTexture2D(&texDesc, &initData, dummyTex.GetAddressOf());
+	m_device.get()->CreateShaderResourceView(dummyTex.Get(), nullptr, m_dummyTrimTextureSRV.GetAddressOf());
+
+	D3D11_SAMPLER_DESC sampDesc = {};
+	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	m_device.get()->CreateSamplerState(&sampDesc, m_trimSampler.GetAddressOf());
 
 
 	Cursor3D::InitSharedGeometry(m_device);
@@ -771,6 +805,23 @@ void CadApplication::DrawCursor(float3 position, float scale)
 
 void CadApplication::DeleteSelectedObjects()
 {
+	auto unbindTexture = [](std::weak_ptr<SceneObject> objWeak, ID3D11ShaderResourceView* texToMatch) {
+		if (auto obj = objWeak.lock())
+		{
+			if (auto surf = obj->As<Surface>())
+			{
+				if (surf->m_trimTextureSRV.Get() == texToMatch)
+					surf->m_trimTextureSRV.Reset();
+			}
+			else if (obj->type == ObjectType::Torus)
+			{
+				auto torus = static_cast<Torus*>(obj.get());
+				if (torus->m_trimTextureSRV.Get() == texToMatch)
+					torus->m_trimTextureSRV.Reset();
+			}
+		}
+		};
+
 	for (auto& obj : m_sceneObjects)
 	{
 		if (!obj->selected)
@@ -800,6 +851,11 @@ void CadApplication::DeleteSelectedObjects()
 						cp->m_surfaceLockCount = std::max(0, cp->m_surfaceLockCount - 1);
 				}
 			}
+		}
+		else if (auto intersection = obj->As<Intersection>())
+		{
+			unbindTexture(intersection->m_surface1, intersection->m_trimTexture1.srv.Get());
+			unbindTexture(intersection->m_surface2, intersection->m_trimTexture2.srv.Get());
 		}
 	}
 
@@ -1487,10 +1543,10 @@ void CadApplication::DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3
 
 void CadApplication::DrawSurfaces(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
 {
-
+	context->IASetInputLayout(m_layoutUV.Get());
 	if (m_showSurfacePopup && m_surfaceBuilder.m_patchIndexCount > 0)// && m_previewSurface)
 	{
-		UINT stride = sizeof(VertexPosition);
+		UINT stride = sizeof(VertexPositionUV);
 		UINT offset = 0;
 		context->IASetVertexBuffers(0, 1, m_surfaceBuilder.m_patchVertexBuffer.GetAddressOf(), &stride, &offset);
 		context->IASetIndexBuffer(m_surfaceBuilder.m_patchIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
@@ -1519,6 +1575,9 @@ void CadApplication::DrawSurfaces(const Microsoft::WRL::ComPtr<ID3D11DeviceConte
 		if (auto surface = obj->As<Surface>())
 			DrawSurface(context, surface, surface->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f));
 	}
+
+	context->PSSetShaderResources(0, 1, m_dummyTrimTextureSRV.GetAddressOf());
+	context->IASetInputLayout(m_layout.Get());
 }
 
 void CadApplication::DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context, Surface* surface, MathLib::Vec4f color)
@@ -1526,10 +1585,12 @@ void CadApplication::DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContex
 	surface->UpdateVertices(m_device);
 	if (surface->m_patchIndexCount > 0)
 	{
-		UINT stride = sizeof(VertexPosition);
+		UINT stride = sizeof(VertexPositionUV);
 		UINT offset = 0;
 		context->IASetVertexBuffers(0, 1, surface->m_patchVertexBuffer.GetAddressOf(), &stride, &offset);
 		context->IASetIndexBuffer(surface->m_patchIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+		ID3D11ShaderResourceView* srvToBind = surface->m_trimTextureSRV ? surface->m_trimTextureSRV.Get() : m_dummyTrimTextureSRV.Get();
+		context->PSSetShaderResources(0, 1, &srvToBind);
 		PerObjectBuffer objData;
 		objData.color = color;
 
@@ -1702,15 +1763,18 @@ void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>
 	context->DSSetConstantBuffers(0, 2, buffers);
 	context->GSSetConstantBuffers(0, 2, buffers);
 	context->PSSetConstantBuffers(0, 2, buffers);
+	context->PSSetSamplers(0, 1, m_trimSampler.GetAddressOf());
 
 	context->IASetInputLayout(m_layout.Get());
 	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
+	//context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+	context->PSSetShader(m_trimPixelShader.Get(), nullptr, 0);
+	DrawToruses(context);
+	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
 
 	DrawCursors(context);
-	DrawToruses(context);
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
 	DrawPolylines(context);
@@ -1739,13 +1803,15 @@ void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>
 	context->VSSetShader(m_surfaceVertexShader.Get(), nullptr, 0);
 	context->HSSetShader(m_surfaceHullShader.Get(), nullptr, 0);
 	context->DSSetShader(m_surfaceDomainShader.Get(), nullptr, 0);
-	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
+	context->PSSetShader(m_trimPixelShader.Get(), nullptr, 0);
 
 	DrawSurfaces(context);
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_20_CONTROL_POINT_PATCHLIST);
+	context->VSSetShader(m_gregoryVertexShader.Get(), nullptr, 0);
 	context->HSSetShader(m_gregoryHullShader.Get(), nullptr, 0);
 	context->DSSetShader(m_gregoryDomainShader.Get(), nullptr, 0);
+	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
 
 	DrawGregoryPatches(context);
 
@@ -2523,6 +2589,20 @@ void CadApplication::ActionFindIntersection()
 	auto intersection = std::make_shared<Intersection>(std::move(intersectionParams), obj1W, obj2W, std::move(maxDomains), trimModeS1, trimModeS2);
 	intersection->InitGeometry(intersectionPoints, m_device);
 	RenderTrimTextures(intersection.get(), m_device.getContext());
+
+	auto bindTrimTex = [&](SceneObject* obj, const Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& srv) {
+		if (auto surf = obj->As<Surface>())
+			surf->m_trimTextureSRV = srv;
+		else if (obj->type == ObjectType::Torus)
+		{
+			auto torus = static_cast<Torus*>(obj);
+			torus->m_trimTextureSRV = srv;
+		}
+		};
+
+	bindTrimTex(obj1, intersection->m_trimTexture1.srv);
+	bindTrimTex(obj2, intersection->m_trimTexture2.srv);
+
 	m_sceneObjects.push_back(std::move(intersection));
 }
 
@@ -2681,69 +2761,69 @@ void CadApplication::RenderTrimTextures(Intersection* intersection, const Micros
 	auto renderMask = [&](TrimTexture& tex, UINT triCount, ID3D11Buffer* triBuffer, UINT lineCount,
 		ID3D11Buffer* lineBuffer, bool reverse) {
 
-		D3D11_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(tex.width), static_cast<float>(tex.height), 0.0f, 1.0f };
-		context->RSSetViewports(1, &vp);
+			D3D11_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(tex.width), static_cast<float>(tex.height), 0.0f, 1.0f };
+			context->RSSetViewports(1, &vp);
 
-		// Clear Target: White (keep) or Black (discard) based on reverse flag
-		const float clearColor[4] = { reverse ? 0.0f : 1.0f, reverse ? 0.0f : 1.0f, reverse ? 0.0f : 1.0f, 1.0f };
-		context->OMSetRenderTargets(1, tex.rtv.GetAddressOf(), tex.dsv.Get());
-		context->ClearRenderTargetView(tex.rtv.Get(), clearColor);
-		context->ClearDepthStencilView(tex.dsv.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+			// Clear Target: White (keep) or Black (discard) based on reverse flag
+			const float clearColor[4] = { reverse ? 0.0f : 1.0f, reverse ? 0.0f : 1.0f, reverse ? 0.0f : 1.0f, 1.0f };
+			context->OMSetRenderTargets(1, tex.rtv.GetAddressOf(), tex.dsv.Get());
+			context->ClearRenderTargetView(tex.rtv.Get(), clearColor);
+			context->ClearDepthStencilView(tex.dsv.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
-		MathLib::Vec4f drawColor = reverse
-			? MathLib::Vec4f(1.0f, 1.0f, 1.0f, 1.0f)
-			: MathLib::Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
+			MathLib::Vec4f drawColor = reverse
+				? MathLib::Vec4f(1.0f, 1.0f, 1.0f, 1.0f)
+				: MathLib::Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
 
-		//if (count == 0) return;
-		if (triCount == 0 || triBuffer == nullptr)
-		{
-			if (lineCount > 0 && lineBuffer != nullptr)
+			//if (count == 0) return;
+			if (triCount == 0 || triBuffer == nullptr)
 			{
-				PerObjectBuffer objData{};
-				objData.model = Mat4f::Identity();
-				objData.color = drawColor;
-				m_device.UpdateBuffer(m_cbPerObject, objData);
+				if (lineCount > 0 && lineBuffer != nullptr)
+				{
+					PerObjectBuffer objData{};
+					objData.model = Mat4f::Identity();
+					objData.color = drawColor;
+					m_device.UpdateBuffer(m_cbPerObject, objData);
 
-				context->RSSetState(nullptr);
-				context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
-				context->OMSetDepthStencilState(nullptr, 0);
-				context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+					context->RSSetState(nullptr);
+					context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+					context->OMSetDepthStencilState(nullptr, 0);
+					context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
-				UINT stride = sizeof(VertexPosition);
-				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, &lineBuffer, &stride, &offset);
-				context->Draw(lineCount, 0);
+					UINT stride = sizeof(VertexPosition);
+					UINT offset = 0;
+					context->IASetVertexBuffers(0, 1, &lineBuffer, &stride, &offset);
+					context->Draw(lineCount, 0);
+				}
+
+				return;
 			}
 
-			return;
-		}
+			PerObjectBuffer objData{};
+			objData.model = Mat4f::Identity();
+			objData.color = Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+			m_device.UpdateBuffer(m_cbPerObject, objData);
 
-		PerObjectBuffer objData{};
-		objData.model = Mat4f::Identity();
-		objData.color = Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-		m_device.UpdateBuffer(m_cbPerObject, objData);
+			// PASS 1: Draw invisible triangles to mark the Stencil Buffer
+			context->RSSetState(rsCullNone.Get());
+			context->OMSetBlendState(bsNoColor.Get(), nullptr, 0xFFFFFFFF);
+			context->OMSetDepthStencilState(dsMarkStencil.Get(), 0);
+			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		// PASS 1: Draw invisible triangles to mark the Stencil Buffer
-		context->RSSetState(rsCullNone.Get());
-		context->OMSetBlendState(bsNoColor.Get(), nullptr, 0xFFFFFFFF);
-		context->OMSetDepthStencilState(dsMarkStencil.Get(), 0);
-		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			UINT stride = sizeof(VertexPosition);
+			UINT offset = 0;
+			context->IASetVertexBuffers(0, 1, &triBuffer, &stride, &offset);
+			context->Draw(triCount, 0);
 
-		UINT stride = sizeof(VertexPosition);
-		UINT offset = 0;
-		context->IASetVertexBuffers(0, 1, &triBuffer, &stride, &offset);
-		context->Draw(triCount, 0);
+			// PASS 2: Draw Fullscreen Quad where Stencil is 1
+			objData.color = drawColor;
+			m_device.UpdateBuffer(m_cbPerObject, objData);
 
-		// PASS 2: Draw Fullscreen Quad where Stencil is 1
-		objData.color = drawColor;
-		m_device.UpdateBuffer(m_cbPerObject, objData);
+			context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF); // Restore Color
+			context->OMSetDepthStencilState(dsApplyMask.Get(), 0); // Test Stencil == 1
+			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
-		context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF); // Restore Color
-		context->OMSetDepthStencilState(dsApplyMask.Get(), 0); // Test Stencil == 1
-		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-
-		context->IASetVertexBuffers(0, 1, s_fullscreenQuad.GetAddressOf(), &stride, &offset);
-		context->Draw(4, 0);
+			context->IASetVertexBuffers(0, 1, s_fullscreenQuad.GetAddressOf(), &stride, &offset);
+			context->Draw(4, 0);
 		};
 
 
@@ -2765,6 +2845,45 @@ void CadApplication::DrawIntersectionList(std::shared_ptr<Intersection> intersec
 {
 	ImGui::Separator();
 	ImGui::Text("Intersection Actions");
+
+	auto getSrvPtr = [](std::weak_ptr<SceneObject> objWeak) -> Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>*{
+		if (auto obj = objWeak.lock())
+		{
+			if (auto surf = obj->As<Surface>()) return std::addressof(surf->m_trimTextureSRV);
+			if (obj->type == ObjectType::Torus) return std::addressof(static_cast<Torus*>(obj.get())->m_trimTextureSRV);
+		}
+		return nullptr;
+		};
+
+	auto srv1Ptr = getSrvPtr(intersection->m_surface1);
+	bool isTrimS1 = srv1Ptr && srv1Ptr->Get() == intersection->m_trimTexture1.srv.Get();
+	if (ImGui::Button(isTrimS1 ? "Disable Trim S1" : "Enable Trim S1", ImVec2(-1, 0)))
+	{
+		if (srv1Ptr)
+		{
+			if (isTrimS1) 
+				srv1Ptr->Reset(); // Unbind texture
+			else
+				*srv1Ptr = intersection->m_trimTexture1.srv; // Bind texture
+		}
+	}
+
+	auto srv2Ptr = getSrvPtr(intersection->m_surface2);
+	bool isTrimS2 = srv2Ptr && srv2Ptr->Get() == intersection->m_trimTexture2.srv.Get();
+
+	if (ImGui::Button(isTrimS2 ? "Disable Trim S2" : "Enable Trim S2", ImVec2(-1, 0)))
+	{
+		if (srv2Ptr)
+		{
+			if (isTrimS2) 
+				srv2Ptr->Reset(); // Unbind texture
+			else 
+				*srv2Ptr = intersection->m_trimTexture2.srv; // Bind texture
+		}
+	}
+
+
+
 	bool changed = false;
 	if (ImGui::Button("Reverse S1 Trim", ImVec2(-1, 0)))
 	{
@@ -2815,24 +2934,33 @@ void CadApplication::DrawIntersectionList(std::shared_ptr<Intersection> intersec
 
 void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
 {
+	context->IASetInputLayout(m_layoutUV.Get());
+	context->VSSetShader(m_torusVertexShader.Get(), nullptr, 0);
 	for (auto& obj : m_sceneObjects)
 	{
 		if (auto torus = obj->As<Torus>())
 		{
 			torus->UpdateMesh(m_device);
 
+			ID3D11ShaderResourceView* srvToBind = torus->m_trimTextureSRV ? torus->m_trimTextureSRV.Get() : m_dummyTrimTextureSRV.Get();
+			context->PSSetShaderResources(0, 1, &srvToBind);
+
 			PerObjectBuffer objData;
 			objData.model = torus->m_modelMatrix;
 			objData.color = torus->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
 			m_device.UpdateBuffer(m_cbPerObject, objData);
 
-			UINT stride = sizeof(VertexPosition);
+			UINT stride = sizeof(VertexPositionUV);
 			UINT offset = 0;
 			context->IASetVertexBuffers(0, 1, torus->GetVertexBuffer().GetAddressOf(), &stride, &offset);
 			context->IASetIndexBuffer(torus->GetIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
 			context->DrawIndexed(static_cast<UINT>(torus->indices.size()), 0, 0);
 		}
 	}
+
+	context->PSSetShaderResources(0, 1, m_dummyTrimTextureSRV.GetAddressOf());
+	context->IASetInputLayout(m_layout.Get());
+	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
 }
 
 void CadApplication::DrawCursors(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
