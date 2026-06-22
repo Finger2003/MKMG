@@ -144,6 +144,7 @@
     <ClInclude Include="Mat4f.h" />
     <ClInclude Include="MathLib.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="Vec2f.h" />
     <ClInclude Include="Vec3d.h" />
     <ClInclude Include="Vec3f.h" />
     <ClInclude Include="Vec4d.h" />
@@ -159,6 +160,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Vec2f.cpp" />
     <ClCompile Include="Vec3d.cpp" />
     <ClCompile Include="Vec3f.cpp" />
     <ClCompile Include="Vec4d.cpp" />
