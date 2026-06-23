@@ -251,7 +251,8 @@ private:
 	void DrawSurfacesPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawGregoryPatches(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 	void DrawGregoryPatchesTangents(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawIntersections(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void DrawLinearIntersections(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void DrawBezierIntersections(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
 #pragma endregion
 
 #pragma region stereoscopy

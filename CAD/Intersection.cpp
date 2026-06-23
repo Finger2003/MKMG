@@ -2,27 +2,29 @@
 #include "Intersection.h"
 #include "../MathLib/Vec2f.h"
 
+using namespace MathLib;
 
-Intersection::Intersection(std::vector<MathLib::Vec4f>&& params, std::weak_ptr<SceneObject> surface1, std::weak_ptr<SceneObject> surface2, MathLib::Vec4f&& maxDomains, TrimFillMode trimModeS1, TrimFillMode trimModeS2)
-	: SceneObject("Intersection" + std::to_string(s_nextId++), ObjectType::Intersection),
-	m_params(std::move(params)), m_surface1(std::move(surface1)), m_surface2(std::move(surface2)), 
-	m_maxDomains(std::move(maxDomains)), m_trimModeS1(trimModeS1), m_trimModeS2(trimModeS2)
-{
-}
 
-void Intersection::InitGeometry(const std::vector<MathLib::Vec3f>& points, const DxDevice& device)
+Intersection::Intersection(std::string&& name, std::vector<MathLib::Vec3f>&& basePoints, std::vector<MathLib::Vec4f>&& params, std::weak_ptr<SceneObject> surface1, std::weak_ptr<SceneObject> surface2, MathLib::Vec4f&& maxDomains, TrimFillMode trimModeS1, TrimFillMode trimModeS2, bool isClosedLoop, ObjectType type)
+	: SceneObject(std::move(name), type),
+	m_basePoints(std::move(basePoints)), m_params(std::move(params)), m_surface1(std::move(surface1)), m_surface2(std::move(surface2)),
+	m_maxDomains(std::move(maxDomains)), m_trimModeS1(trimModeS1), m_trimModeS2(trimModeS2), m_isClosedLoop(isClosedLoop)
+{}
+
+void Intersection::InitGeometry(const DxDevice& device)
 {
-	if (points.empty())
+	if (m_basePoints.empty())
 		return;
 
-	m_vertexCount = static_cast<UINT>(points.size());
-	std::vector<VertexPosition> vertices;
-	vertices.reserve(points.size());
-	std::transform(points.begin(), points.end(), std::back_inserter(vertices), [](const MathLib::Vec3f& p) {
-		return ToVertexPosition(p);
-		});
 
-	m_vertexBuffer = device.CreateVertexBuffer(vertices);
+	//m_vertexCount = static_cast<UINT>(m_basePoints.size());
+	//std::vector<VertexPosition> vertices;
+	//vertices.reserve(points.size());
+	//std::transform(points.begin(), points.end(), std::back_inserter(vertices), [](const MathLib::Vec3f& p) {
+	//	return ToVertexPosition(p);
+	//	});
+
+	//m_vertexBuffer = device.CreateVertexBuffer(vertices);
 
 	std::vector<VertexPosition> lines1 = GenerateLinesInUVSpace(true);
 	if (!lines1.empty())
@@ -78,15 +80,15 @@ std::vector<VertexPosition> Intersection::GenerateLinesInUVSpace(bool isSurface1
 		float v2 = isSurface1 ? m_params[i + 1].y : m_params[i + 1].w;
 
 		float offsetU = 0.0f;
-		if (u2 - u1 > thresholdU) 
+		if (u2 - u1 > thresholdU)
 			offsetU = -maxU;
-		else if (u1 - u2 > thresholdU) 
+		else if (u1 - u2 > thresholdU)
 			offsetU = maxU;
 
 		float offsetV = 0.0f;
-		if (v2 - v1 > thresholdV) 
+		if (v2 - v1 > thresholdV)
 			offsetV = -maxV;
-		else if (v1 - v2 > thresholdV) 
+		else if (v1 - v2 > thresholdV)
 			offsetV = maxV;
 
 		if (offsetU != 0.0f || offsetV != 0.0f)
@@ -150,7 +152,7 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 			return minD <= edgeEps ? edge : -1;
 		};
 
-	auto snapToEdge = [maxU, maxV](MathLib::Vec2f p, int edge)
+	auto snapToEdge = [maxU, maxV](Vec2f p, int edge)
 		{
 			switch (edge)
 			{
@@ -164,7 +166,7 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 			return p;
 		};
 
-	std::vector<MathLib::Vec2f> contour;
+	std::vector<Vec2f> contour;
 	contour.reserve(m_params.size());
 
 	for (const auto& p : m_params)
@@ -175,7 +177,7 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 			});
 	}
 
-	auto closeThroughBoundary = [&](std::vector<MathLib::Vec2f>& c) -> bool
+	auto closeThroughBoundary = [&](std::vector<Vec2f>& c) -> bool
 		{
 			if (c.size() < 2)
 				return false;
@@ -189,7 +191,7 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 			c.front() = snapToEdge(c.front(), startEdge);
 			c.back() = snapToEdge(c.back(), endEdge);
 
-			MathLib::Vec2f corners[4] =
+			Vec2f corners[4] =
 			{
 				{ 0.0f, 0.0f },
 				{ maxU, 0.0f },
@@ -209,7 +211,7 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 			return true;
 		};
 
-	auto convertWrappedToOpenCut = [&](std::vector<MathLib::Vec2f>& pts, bool wrapU) -> bool
+	auto convertWrappedToOpenCut = [&](std::vector<Vec2f>& pts, bool wrapU) -> bool
 		{
 			if (pts.size() < 3)
 				return false;
@@ -222,12 +224,12 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 			if ((pts.front() - pts.back()).length_sqr() < closeEps * closeEps)
 				pts.pop_back();
 
-			auto getA = [wrapU](const MathLib::Vec2f& p)
+			auto getA = [wrapU](const Vec2f& p)
 				{
 					return wrapU ? p.x : p.y;
 				};
 
-			auto getB = [wrapU](const MathLib::Vec2f& p)
+			auto getB = [wrapU](const Vec2f& p)
 				{
 					return wrapU ? p.y : p.x;
 				};
@@ -235,8 +237,8 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 			auto makePoint = [wrapU](float a, float b)
 				{
 					return wrapU
-						? MathLib::Vec2f(a, b)
-						: MathLib::Vec2f(b, a);
+						? Vec2f(a, b)
+						: Vec2f(b, a);
 				};
 
 			const float thresholdA = maxA * 0.5f;
@@ -265,8 +267,8 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 			const float aB = getB(a);
 			const float bB = getB(b);
 
-			std::vector<MathLib::Vec2f> opened;
-			
+			std::vector<Vec2f> opened;
+
 			if (aA > bA)
 			{
 				// Crossing maxA -> 0.
@@ -338,13 +340,13 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 		}
 		else
 		{
-			std::vector<MathLib::Vec2f> unwrapped;
+			std::vector<Vec2f> unwrapped;
 			unwrapped.push_back(contour[0]);
 
 			for (size_t i = 1; i < contour.size(); i++)
 			{
-				MathLib::Vec2f p = contour[i];
-				MathLib::Vec2f prev = unwrapped.back();
+				Vec2f p = contour[i];
+				Vec2f prev = unwrapped.back();
 
 				if (p.x - prev.x > thresholdU) p.x -= maxU;
 				else if (prev.x - p.x > thresholdU) p.x += maxU;
@@ -357,103 +359,12 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 			contour = unwrapped;
 			contour.push_back(contour.front()); // Close the loop
 		}
-
-		//bool wrappedThroughSeam = convertWrappedToOpenCut(contour, true); // U seam
-
-		//if (!wrappedThroughSeam)
-		//	wrappedThroughSeam = convertWrappedToOpenCut(contour, false);
-
-		//if (wrappedThroughSeam)
-		//{
-		//	if (!closeThroughBoundary(contour))
-		//		return triangles;
-		//}
-		//else
-		//{
-		//	contour.push_back(contour.front());
-		//}
 	}
 	else if (mode == TrimFillMode::BoundaryToBoundary)
 	{
 		if (!closeThroughBoundary(contour))
 			return triangles;
 	}
-
-	auto distPointSegmentSqr = [](MathLib::Vec2f p, MathLib::Vec2f a, MathLib::Vec2f b)
-		{
-			MathLib::Vec2f ab = b - a;
-			float len2 = ab.length_sqr();
-
-			if (len2 < 1e-12f)
-				return (p - a).length_sqr();
-
-			float t = MathLib::Vec2f::dot(p - a, ab) / len2;
-			t = std::clamp(t, 0.0f, 1.0f);
-
-			MathLib::Vec2f q = a + ab * t;
-			return (p - q).length_sqr();
-		};
-
-	auto pickSafeAnchor = [&]()
-		{
-			std::vector<MathLib::Vec2f> candidates =
-			{
-				{ maxU * 0.5f,  maxV * 0.5f  },
-				{ maxU * 0.5f,  maxV * 0.25f },
-				{ maxU * 0.5f,  maxV * 0.75f },
-				{ maxU * 0.25f, maxV * 0.5f  },
-				{ maxU * 0.75f, maxV * 0.5f  },
-				{ maxU * 0.25f, maxV * 0.25f },
-				{ maxU * 0.75f, maxV * 0.75f },
-				{ maxU * 0.25f, maxV * 0.75f },
-				{ maxU * 0.75f, maxV * 0.25f }
-			};
-
-			float eps = std::max(maxU, maxV) * 1e-3f;
-			float eps2 = eps * eps;
-
-			for (const auto& candidate : candidates)
-			{
-				bool ok = true;
-
-				for (size_t i = 0; i + 1 < contour.size(); i++)
-				{
-					if (distPointSegmentSqr(candidate, contour[i], contour[i + 1]) < eps2)
-					{
-						ok = false;
-						break;
-					}
-				}
-
-				if (ok)
-					return candidate;
-			}
-
-			return MathLib::Vec2f(maxU * 0.37f, maxV * 0.61f);
-		};
-
-	//MathLib::Vec2f anchor = pickSafeAnchor();
-
-	//for (size_t i = 0; i < contour.size() - 1; i++)
-	//{
-	//	triangles.push_back({
-	//		toNDCU(anchor.x, maxU),
-	//		toNDCV(anchor.y, maxV),
-	//		0.0f
-	//		});
-
-	//	triangles.push_back({
-	//		toNDCU(contour[i].x, maxU),
-	//		toNDCV(contour[i].y, maxV),
-	//		0.0f
-	//		});
-
-	//	triangles.push_back({
-	//		toNDCU(contour[i + 1].x, maxU),
-	//		toNDCV(contour[i + 1].y, maxV),
-	//		0.0f
-	//		});
-	//}
 
 	float minUnwrappedU = contour[0].x;
 	float maxUnwrappedU = contour[0].x;
@@ -467,7 +378,7 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 		maxUnwrappedV = std::max(maxUnwrappedV, p.y);
 	}
 
-	MathLib::Vec2f anchor = contour[0];
+	Vec2f anchor = contour[0];
 	std::vector<VertexPosition> baseTriangles;
 
 	for (size_t i = 0; i < contour.size() - 1; i++)
@@ -499,4 +410,177 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 	}
 
 	return triangles;
+}
+
+LinearIntersection::LinearIntersection(std::vector<MathLib::Vec3f>&& basePoints, std::vector<MathLib::Vec4f>&& params, std::weak_ptr<SceneObject> surface1, std::weak_ptr<SceneObject> surface2, MathLib::Vec4f maxDomains, TrimFillMode trimModeS1, TrimFillMode trimModeS2, bool isClosedLoop)
+	: Intersection("LinearIntersection" + std::to_string(s_nextId++), std::move(basePoints), std::move(params), std::move(surface1), std::move(surface2), std::move(maxDomains), trimModeS1, trimModeS2, isClosedLoop, ObjectType::LinearIntersection)
+{}
+
+void LinearIntersection::InitGeometry(const DxDevice& device)
+{
+	Intersection::InitGeometry(device);
+
+	if (m_basePoints.empty())
+		return;
+
+	m_vertexCount = static_cast<UINT>(m_basePoints.size());
+	std::vector<VertexPosition> vertices;
+	vertices.reserve(m_basePoints.size());
+	std::transform(m_basePoints.begin(), m_basePoints.end(), std::back_inserter(vertices), [](const MathLib::Vec3f& p) {
+		return ToVertexPosition(p);
+		});
+
+	m_vertexBuffer = device.CreateVertexBuffer(vertices);
+}
+
+
+BezierIntersection::BezierIntersection(LinearIntersection&& linear)
+	: Intersection(std::move("BezierIntersection" + std::to_string(s_nextId++)), std::move(linear.m_basePoints), std::move(linear.m_params), linear.m_surface1, linear.m_surface2, std::move(linear.m_maxDomains), linear.m_trimModeS1, linear.m_trimModeS2, linear.m_isClosedLoop, ObjectType::BezierIntersection)
+{
+	m_uvLinesBuffer1 = linear.m_uvLinesBuffer1;
+	m_uvLinesBuffer2 = linear.m_uvLinesBuffer2;
+	m_uvLineCount1 = linear.m_uvLineCount1;
+	m_uvLineCount2 = linear.m_uvLineCount2;
+
+	m_trimPolygonBuffer1 = linear.m_trimPolygonBuffer1;
+	m_trimPolygonBuffer2 = linear.m_trimPolygonBuffer2;
+	m_trimPolygonCount1 = linear.m_trimPolygonCount1;
+	m_trimPolygonCount2 = linear.m_trimPolygonCount2;
+
+	m_trimTexture1 = linear.m_trimTexture1;
+	m_trimTexture2 = linear.m_trimTexture2;
+
+	m_reverseTrimS1 = linear.m_reverseTrimS1;
+	m_reverseTrimS2 = linear.m_reverseTrimS2;
+}
+
+void BezierIntersection::InitGeometry(const DxDevice& device)
+{
+	Intersection::InitGeometry(device);
+	InitBezierGeometry(device);
+}
+
+void BezierIntersection::InitBezierGeometry(const DxDevice& device)
+{
+	if (m_basePoints.size() < 2)
+		return;
+
+	size_t n = m_basePoints.size();
+	std::vector<Vec3f> P = m_basePoints;
+	std::vector<Vec3f> D(n);
+
+	if (m_isClosedLoop && n > 2)
+	{
+		int unique_n = static_cast<int>(n) - 1;
+		int pad = std::min(10, unique_n - 1);
+
+		std::vector<Vec3f> P_pad;
+		P_pad.reserve(n + 2 * pad);
+
+		// Prefix padding
+		for (int i = unique_n - pad; i < unique_n; i++)
+			P_pad.push_back(P[i]);
+		// Core body
+		for (int i = 0; i < static_cast<int>(n); i++)
+			P_pad.push_back(P[i]);
+		// Suffix padding
+		for (int i = 1; i <= pad; i++)
+			P_pad.push_back(P[i]);
+
+		size_t n_pad = P_pad.size();
+		std::vector<float> h(n_pad - 1);
+		for (size_t i = 0; i < n_pad - 1; i++)
+			h[i] = (P_pad[i + 1] - P_pad[i]).length();
+
+		std::vector<float> a(n_pad), b(n_pad), c(n_pad);
+		std::vector<Vec3f> d(n_pad);
+
+		b[0] = 2.0f; c[0] = 1.0f; d[0] = (P_pad[1] - P_pad[0]) * (3.0f / h[0]);
+		for (size_t i = 1; i < n_pad - 1; i++)
+		{
+			a[i] = h[i]; b[i] = 2.0f * (h[i - 1] + h[i]); c[i] = h[i - 1];
+			d[i] = (P_pad[i] - P_pad[i - 1]) * (3.0f * h[i] / h[i - 1]) + (P_pad[i + 1] - P_pad[i]) * (3.0f * h[i - 1] / h[i]);
+		}
+		a[n_pad - 1] = 1.0f;
+		b[n_pad - 1] = 2.0f;
+		d[n_pad - 1] = (P_pad[n_pad - 1] - P_pad[n_pad - 2]) * (3.0f / h[n_pad - 2]);
+
+		std::vector<float> c_prime(n_pad);
+		std::vector<MathLib::Vec3f> d_prime(n_pad);
+		c_prime[0] = c[0] / b[0]; d_prime[0] = d[0] * (1.0f / b[0]);
+
+		for (size_t i = 1; i < n_pad; i++)
+		{
+			float m = 1.0f / (b[i] - a[i] * c_prime[i - 1]);
+			c_prime[i] = c[i] * m;
+			d_prime[i] = (d[i] - d_prime[i - 1] * a[i]) * m;
+		}
+
+		std::vector<MathLib::Vec3f> D_pad(n_pad);
+		D_pad[n_pad - 1] = d_prime[n_pad - 1];
+		for (int i = static_cast<int>(n_pad - 2); i >= 0; i--)
+			D_pad[i] = d_prime[i] - D_pad[i + 1] * c_prime[i];
+
+		for (int i = 0; i < static_cast<int>(n); i++)
+			D[i] = D_pad[i + pad];
+		D[n - 1] = D[0];
+	}
+	else
+	{
+		std::vector<float> h(n - 1);
+		for (size_t i = 0; i < n - 1; i++)
+			h[i] = (P[i + 1] - P[i]).length();
+
+		std::vector<float> a(n), b(n), c(n);
+		std::vector<MathLib::Vec3f> d(n);
+
+		b[0] = 2.0f;
+		c[0] = 1.0f;
+		d[0] = (P[1] - P[0]) * (3.0f / h[0]);
+
+		for (size_t i = 1; i < n - 1; i++)
+		{
+			a[i] = h[i]; b[i] = 2.0f * (h[i - 1] + h[i]); c[i] = h[i - 1];
+			d[i] = (P[i] - P[i - 1]) * (3.0f * h[i] / h[i - 1]) + (P[i + 1] - P[i]) * (3.0f * h[i - 1] / h[i]);
+		}
+
+		a[n - 1] = 1.0f;
+		b[n - 1] = 2.0f;
+		d[n - 1] = (P[n - 1] - P[n - 2]) * (3.0f / h[n - 2]);
+
+		std::vector<float> c_prime(n);
+		std::vector<Vec3f> d_prime(n);
+		c_prime[0] = c[0] / b[0];
+		d_prime[0] = d[0] * (1.0f / b[0]);
+
+		for (size_t i = 1; i < n; i++)
+		{
+			float m = 1.0f / (b[i] - a[i] * c_prime[i - 1]);
+			c_prime[i] = c[i] * m;
+			d_prime[i] = (d[i] - d_prime[i - 1] * a[i]) * m;
+		}
+
+		D[n - 1] = d_prime[n - 1];
+		for (int i = static_cast<int>(n - 2); i >= 0; i--)
+			D[i] = d_prime[i] - D[i + 1] * c_prime[i];
+	}
+
+	std::vector<VertexPosition> bezierVertices;
+	bezierVertices.reserve((n - 1) * 4);
+	for (size_t i = 0; i < n - 1; i++)
+	{
+		float hi = (P[i + 1] - P[i]).length();
+		Vec3f b0 = P[i];
+		Vec3f b1 = P[i] + D[i] * (hi / 3.0f);
+		Vec3f b2 = P[i + 1] - D[i + 1] * (hi / 3.0f);
+		Vec3f b3 = P[i + 1];
+
+		bezierVertices.push_back({ b0.x, b0.y, b0.z });
+		bezierVertices.push_back({ b1.x, b1.y, b1.z });
+		bezierVertices.push_back({ b2.x, b2.y, b2.z });
+		bezierVertices.push_back({ b3.x, b3.y, b3.z });
+	}
+
+	m_bezierVertexCount = static_cast<UINT>(bezierVertices.size());
+	m_bezierVertexBuffer = device.CreateVertexBuffer(bezierVertices);
 }

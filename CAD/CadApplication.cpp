@@ -1858,15 +1858,15 @@ void CadApplication::DrawGregoryPatchesTangents(const Microsoft::WRL::ComPtr<ID3
 	}
 }
 
-void CadApplication::DrawIntersections(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+void CadApplication::DrawLinearIntersections(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
 {
 	PerObjectBuffer objData;
 	objData.model = Mat4f::Identity();
 	for (const auto& obj : m_sceneObjects)
 	{
-		if (obj->type == ObjectType::Intersection)
+		if (obj->type == ObjectType::LinearIntersection)
 		{
-			auto intersection = static_cast<Intersection*>(obj.get());
+			auto intersection = static_cast<LinearIntersection*>(obj.get());
 
 			if (intersection->m_vertexCount > 0)
 			{
@@ -1877,6 +1877,28 @@ void CadApplication::DrawIntersections(const Microsoft::WRL::ComPtr<ID3D11Device
 				UINT offset = 0;
 				context->IASetVertexBuffers(0, 1, intersection->m_vertexBuffer.GetAddressOf(), &stride, &offset);
 				context->Draw(intersection->m_vertexCount, 0);
+			}
+		}
+	}
+}
+
+void CadApplication::DrawBezierIntersections(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
+{
+	PerObjectBuffer objData;
+	objData.model = Mat4f::Identity();
+	for (const auto& obj : m_sceneObjects)
+	{
+		if (obj->type == ObjectType::BezierIntersection)
+		{
+			auto intersection = static_cast<BezierIntersection*>(obj.get());
+			if (intersection->m_bezierVertexCount > 0)
+			{
+				objData.color = intersection->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+				m_device.UpdateBuffer(m_cbPerObject, objData);
+				UINT stride = sizeof(VertexPosition);
+				UINT offset = 0;
+				context->IASetVertexBuffers(0, 1, intersection->m_bezierVertexBuffer.GetAddressOf(), &stride, &offset);
+				context->Draw(intersection->m_bezierVertexCount, 0);
 			}
 		}
 	}
@@ -1943,7 +1965,7 @@ void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
 	DrawPolylines(context);
-	DrawIntersections(context);
+	DrawLinearIntersections(context);
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 	DrawSurfacesPolylines(context);
 	DrawGregoryPatchesTangents(context);
@@ -1952,6 +1974,7 @@ void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>
 	context->VSSetShader(m_bezierVertexShader.Get(), nullptr, 0);
 	context->GSSetShader(m_bezierGeometryShader.Get(), nullptr, 0);
 	DrawBezierCurves(context);
+	DrawBezierIntersections(context);
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
@@ -2885,8 +2908,8 @@ void CadApplication::ActionFindIntersection()
 	}
 
 
-	auto intersection = std::make_shared<Intersection>(std::move(intersectionParams), obj1W, obj2W, std::move(maxDomains), trimModeS1, trimModeS2);
-	intersection->InitGeometry(intersectionPoints, m_device);
+	auto intersection = std::make_shared<LinearIntersection>(std::move(intersectionPoints), std::move(intersectionParams), obj1W, obj2W, std::move(maxDomains), trimModeS1, trimModeS2, isClosedLoop);
+	intersection->InitGeometry(m_device);
 	RenderTrimTextures(intersection.get(), m_device.getContext());
 
 	auto bindTrimTex = [&](SceneObject* obj, const Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& srv) {
@@ -3228,7 +3251,22 @@ void CadApplication::DrawIntersectionList(std::shared_ptr<Intersection> intersec
 			m_previewSurfaceIndex = 2;
 		}
 	}
-	ImGui::Button("To Interpolation Bezier", ImVec2(-1, 0));
+	if (intersection->type == ObjectType::LinearIntersection)
+	{
+		if (ImGui::Button("To Interpolation Bezier", ImVec2(-1, 0)))
+		{
+			auto bezInt = std::make_shared<BezierIntersection>(std::move(*std::static_pointer_cast<LinearIntersection>(intersection)));
+			bezInt->InitBezierGeometry(m_device);
+
+			auto it = std::find(m_sceneObjects.begin(), m_sceneObjects.end(), intersection);
+			if (it != m_sceneObjects.end()) 
+				*it = bezInt;
+			
+			bezInt->selected = true;
+			if (m_previewIntersection.lock() == intersection)
+				m_previewIntersection = bezInt;
+		}
+	}
 }
 
 void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
@@ -3308,22 +3346,21 @@ void CadApplication::DrawMenu()
 			selectedCount++;
 			if (obj->type == ObjectType::Point)
 				selectedPoints++;
-			else if (obj->IsA(ObjectType::Curve))
+			else if (auto sharedCurve = obj->AsShared<Curve>())
 			{
 				selectedCurves++;
-				auto sharedCurve = std::static_pointer_cast<Curve>(obj);
 				selectedCurve = sharedCurve;
 				sharedCurve->CleanExpiredPoints();
 			}
-			else if (obj->IsA(ObjectType::Surface))
+			else if (auto sharedSurface = obj->AsShared<Surface>())
 			{
 				selectedSurfaces++;
-				selectedSurface = std::static_pointer_cast<Surface>(obj);
+				selectedSurface = sharedSurface;
 			}
-			else if (obj->type == ObjectType::Intersection)
+			else if (auto sharedIntersection = obj->AsShared<Intersection>())
 			{
 				selectedIntersections++;
-				selectedIntersection = std::static_pointer_cast<Intersection>(obj);
+				selectedIntersection = sharedIntersection;
 			}
 		}
 	}

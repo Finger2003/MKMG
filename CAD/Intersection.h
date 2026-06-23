@@ -10,12 +10,9 @@ enum class TrimFillMode
 	BoundaryToBoundary
 };
 
-struct Intersection : public SceneObject, public NamedObjectCounter<Intersection>
+struct Intersection : public SceneObject
 {
 	DEFINE_TYPE(SceneObject, ObjectType::Intersection);
-
-	Microsoft::WRL::ComPtr<ID3D11Buffer> m_vertexBuffer;
-	UINT m_vertexCount = 0;
 
 	std::vector<MathLib::Vec4f> m_params; // x = u1, y = v1, z = u2, w = v2
 	std::weak_ptr<SceneObject> m_surface1;
@@ -42,13 +39,47 @@ struct Intersection : public SceneObject, public NamedObjectCounter<Intersection
 	bool m_reverseTrimS1 = false;
 	bool m_reverseTrimS2 = false;
 
-	Intersection(std::vector<MathLib::Vec4f>&& params, 
-		std::weak_ptr<SceneObject> surface1, std::weak_ptr<SceneObject> surface2, 
-		MathLib::Vec4f&& maxDomains, TrimFillMode trimModeS1, TrimFillMode trimModeS2);
+	bool m_isClosedLoop = false;
+	std::vector<MathLib::Vec3f> m_basePoints;
 
-	void InitGeometry(const std::vector<MathLib::Vec3f>& points, const DxDevice& device);
+	Intersection(std::string&& name, std::vector<MathLib::Vec3f>&& basePoints, std::vector<MathLib::Vec4f>&& params,
+		std::weak_ptr<SceneObject> surface1, std::weak_ptr<SceneObject> surface2,
+		MathLib::Vec4f&& maxDomains, TrimFillMode trimModeS1, TrimFillMode trimModeS2, bool isClosedLoop, ObjectType type);
+
+	virtual ~Intersection() = default;
+
+	virtual void InitGeometry(const DxDevice& device);
 
 	std::vector<VertexPosition> GenerateLinesInUVSpace(bool isSurface1);
 	std::vector<VertexPosition> GenerateTrimPolygon(bool isSurface1);
 };
 
+struct LinearIntersection : public Intersection, public NamedObjectCounter<LinearIntersection>
+{
+	DEFINE_TYPE(Intersection, ObjectType::LinearIntersection);
+
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_vertexBuffer;
+	UINT m_vertexCount = 0;
+
+	LinearIntersection(std::vector<MathLib::Vec3f>&& basePoints, std::vector<MathLib::Vec4f>&& params,
+		std::weak_ptr<SceneObject> surface1, std::weak_ptr<SceneObject> surface2,
+		MathLib::Vec4f maxDomains, TrimFillMode trimModeS1, TrimFillMode trimModeS2, bool isClosedLoop);
+
+	void InitGeometry(const DxDevice& device) override;
+};
+
+struct BezierIntersection : public Intersection, public NamedObjectCounter<BezierIntersection>
+{
+	DEFINE_TYPE(Intersection, ObjectType::BezierIntersection);
+
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_bezierVertexBuffer;
+	UINT m_bezierVertexCount = 0;
+
+	//BezierIntersection(std::vector<MathLib::Vec4f> params,
+	//	std::weak_ptr<SceneObject> surface1, std::weak_ptr<SceneObject> surface2,
+	//	MathLib::Vec4f maxDomains, TrimFillMode trimModeS1, TrimFillMode trimModeS2, bool isClosedLoop);
+
+	BezierIntersection(LinearIntersection&& linear);
+	void InitGeometry(const DxDevice& device) override;
+	void InitBezierGeometry(const DxDevice& device);
+};

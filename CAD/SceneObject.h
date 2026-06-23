@@ -14,7 +14,9 @@
 	X(BezierSurface)		 \
 	X(BSplineSurface)		 \
 	X(GregoryPatch)			 \
-	X(Intersection)
+	X(Intersection)			 \
+	X(LinearIntersection)	 \
+	X(BezierIntersection)	 \
 
 
 enum class ObjectType
