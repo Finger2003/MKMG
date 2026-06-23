@@ -404,6 +404,160 @@ namespace
 		return std::nullopt;
 	}
 
+
+
+	struct AABB
+	{
+		MathLib::Vec3f min_pt = { FLT_MAX, FLT_MAX, FLT_MAX };
+		MathLib::Vec3f max_pt = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+
+		void Expand(const MathLib::Vec3f& p)
+		{
+			min_pt.x = std::min(min_pt.x, p.x); min_pt.y = std::min(min_pt.y, p.y); min_pt.z = std::min(min_pt.z, p.z);
+			max_pt.x = std::max(max_pt.x, p.x); max_pt.y = std::max(max_pt.y, p.y); max_pt.z = std::max(max_pt.z, p.z);
+		}
+
+		bool Overlaps(const AABB& other, float tolerance = 1e-4f) const
+		{
+			if (max_pt.x < other.min_pt.x - tolerance || min_pt.x > other.max_pt.x + tolerance) return false;
+			if (max_pt.y < other.min_pt.y - tolerance || min_pt.y > other.max_pt.y + tolerance) return false;
+			if (max_pt.z < other.min_pt.z - tolerance || min_pt.z > other.max_pt.z + tolerance) return false;
+			return true;
+		}
+	};
+
+	struct SurfacePatch
+	{
+		float u_min, u_max, v_min, v_max;
+		AABB aabb;
+	};
+
+	AABB ComputePatchAABB(SceneObject* obj, float u_min, float u_max, float v_min, float v_max)
+	{
+		AABB box;
+
+		float max_du_len = 0.0f;
+		float max_dv_len = 0.0f;
+
+		// Sample a 3x3 grid within this patch
+		//for (int i = 0; i <= 2; i++)
+		//{
+		//	float u = std::lerp(u_min, u_max, i / 2.0f);
+		//	for (int j = 0; j <= 2; j++)
+		//	{
+		//		float v = std::lerp(v_min, v_max, j / 2.0f);
+		//		box.Expand(EvaluateParametric(obj, u, v).p);
+		//	}
+		//}
+		for (int i = 0; i <= 2; i++)
+		{
+			float u = std::lerp(u_min, u_max, i / 2.0f);
+			for (int j = 0; j <= 2; j++)
+			{
+				float v = std::lerp(v_min, v_max, j / 2.0f);
+
+				auto eval = EvaluateParametric(obj, u, v);
+				box.Expand(eval.p);
+
+				if (obj->IsA(ObjectType::Surface))
+				{
+					max_du_len = std::max(max_du_len, eval.du.length());
+					max_dv_len = std::max(max_dv_len, eval.dv.length());
+				}
+			}
+		}
+
+		float padding = 0.0f;
+		if (obj->type == ObjectType::Torus)
+		{
+			auto torus = static_cast<Torus*>(obj);
+
+			float stepU = (u_max - u_min) / 2.0f;
+			float stepV = (v_max - v_min) / 2.0f;
+
+			float thetaU = stepU * 2.0f * std::numbers::pi_v<float>;
+			float thetaV = stepV * 2.0f * std::numbers::pi_v<float>;
+
+			float maxRadiusU = torus->GetMajorRadius() + torus->GetMinorRadius();
+			float sagittaU = maxRadiusU * (1.0f - std::cos(thetaU / 2.0f));
+
+			float maxRadiusV = torus->GetMinorRadius();
+			float sagittaV = maxRadiusV * (1.0f - std::cos(thetaV / 2.0f));
+
+			padding = sagittaU + sagittaV;
+		}
+		else if (obj->IsA(ObjectType::Surface))
+		{
+			float stepU = (u_max - u_min) / 2.0f;
+			float stepV = (v_max - v_min) / 2.0f;
+
+			padding = (max_du_len * stepU + max_dv_len * stepV) * 1.2f;
+		}		
+
+		box.min_pt = box.min_pt - MathLib::Vec3f(padding + 1e-5f, padding + 1e-5f, padding + 1e-5f);
+		box.max_pt = box.max_pt + MathLib::Vec3f(padding + 1e-5f, padding + 1e-5f, padding + 1e-5f);
+
+		return box;
+	}
+
+	void IntersectPatches(
+		SceneObject* obj1, SurfacePatch p1,
+		SceneObject* obj2, SurfacePatch p2,
+		std::vector<MathLib::Vec4f>& candidateParams,
+		int depth = 0)
+	{
+		// Bounding boxes don't overlap, cut off this branch
+		if (!p1.aabb.Overlaps(p2.aabb))
+			return;
+
+		// Max depth reached, add the center of the patches as a candidate
+		if (depth >= 8)
+		{
+			float u1 = (p1.u_min + p1.u_max) * 0.5f;
+			float v1 = (p1.v_min + p1.v_max) * 0.5f;
+			float u2 = (p2.u_min + p2.u_max) * 0.5f;
+			float v2 = (p2.v_min + p2.v_max) * 0.5f;
+			candidateParams.push_back({ u1, v1, u2, v2 });
+			return;
+		}
+
+		// Subdivide the larger patch into 4 quadrants
+		float diag1 = (p1.aabb.max_pt - p1.aabb.min_pt).length_sqr();
+		float diag2 = (p2.aabb.max_pt - p2.aabb.min_pt).length_sqr();
+		//float area1 = (p1.u_max - p1.u_min) * (p1.v_max - p1.v_min);
+		//float area2 = (p2.u_max - p2.u_min) * (p2.v_max - p2.v_min);
+
+		if (diag1 > diag2)
+		{
+			float midU = (p1.u_min + p1.u_max) * 0.5f;
+			float midV = (p1.v_min + p1.v_max) * 0.5f;
+
+			SurfacePatch sub[4] = {
+				{ p1.u_min, midU, p1.v_min, midV, ComputePatchAABB(obj1, p1.u_min, midU, p1.v_min, midV) },
+				{ midU, p1.u_max, p1.v_min, midV, ComputePatchAABB(obj1, midU, p1.u_max, p1.v_min, midV) },
+				{ p1.u_min, midU, midV, p1.v_max, ComputePatchAABB(obj1, p1.u_min, midU, midV, p1.v_max) },
+				{ midU, p1.u_max, midV, p1.v_max, ComputePatchAABB(obj1, midU, p1.u_max, midV, p1.v_max) }
+			};
+
+			for (int i = 0; i < 4; i++)
+				IntersectPatches(obj1, sub[i], obj2, p2, candidateParams, depth + 1);
+		}
+		else
+		{
+			float midU = (p2.u_min + p2.u_max) * 0.5f;
+			float midV = (p2.v_min + p2.v_max) * 0.5f;
+
+			SurfacePatch sub[4] = {
+				{ p2.u_min, midU, p2.v_min, midV, ComputePatchAABB(obj2, p2.u_min, midU, p2.v_min, midV) },
+				{ midU, p2.u_max, p2.v_min, midV, ComputePatchAABB(obj2, midU, p2.u_max, p2.v_min, midV) },
+				{ p2.u_min, midU, midV, p2.v_max, ComputePatchAABB(obj2, p2.u_min, midU, midV, p2.v_max) },
+				{ midU, p2.u_max, midV, p2.v_max, ComputePatchAABB(obj2, midU, p2.u_max, midV, p2.v_max) }
+			};
+
+			for (int i = 0; i < 4; i++)
+				IntersectPatches(obj1, p1, obj2, sub[i], candidateParams, depth + 1);
+		}
+	}
 }
 
 CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight, std::wstring wndTitle)
@@ -2180,149 +2334,184 @@ void CadApplication::ActionFindIntersection()
 	}
 
 	// =============================================================
-	// STAGE 1: GRID SEARCH (find closest points on coarse grid)
+	// STAGE 1: FIND STARTING PARAMETERS
 	// =============================================================
-	constexpr int sampleCount = 20;
-	struct SamplePoint { MathLib::Vec3f p; float u, v; };
-	std::vector<SamplePoint> samples1, samples2;
-	samples1.reserve((sampleCount + 1) * (sampleCount + 1));
-	samples2.reserve((sampleCount + 1) * (sampleCount + 1));
-
-	// Sample Surface 1
-	for (int i = 0; i <= sampleCount; i++)
+	struct Candidate
 	{
-		float u = (i / static_cast<float>(sampleCount)) * maxU1;
-		for (int j = 0; j <= sampleCount; j++)
-		{
-			float v = (j / static_cast<float>(sampleCount)) * maxV1;
-			auto res = EvaluateParametric(obj1, u, v);
-			samples1.push_back({ res.p, u, v });
-		}
-	}
-
-	// Sample Surface 2
-	for (int i = 0; i <= sampleCount; i++)
-	{
-		float u = (i / static_cast<float>(sampleCount)) * maxU2;
-		for (int j = 0; j <= sampleCount; j++)
-		{
-			float v = (j / static_cast<float>(sampleCount)) * maxV2;
-			auto res = EvaluateParametric(obj2, u, v);
-			samples2.push_back({ res.p, u, v });
-		}
-	}
-
-	Vec4f currentParams{ 0.0f, 0.0f, 0.0f, 0.0f };
+		MathLib::Vec4f params;
+		float dist;
+	};
+	std::vector<Candidate> sortedCandidates;
 
 	if (m_useCursorAsHint)
 	{
-		float minVal1 = std::numeric_limits<float>::max();
-		float minVal2 = std::numeric_limits<float>::max();
+		constexpr int cursorSamples = 50;
 		Vec3f cursorPos(m_cursorPosition.x, m_cursorPosition.y, m_cursorPosition.z);
 
-		for (const auto& s1 : samples1)
-		{
-			float dist = (s1.p - cursorPos).length_sqr();
-			if (dist < minVal1)
-			{
-				minVal1 = dist;
-				currentParams.x = s1.u;
-				currentParams.y = s1.v;
-			}
-		}
+		float minVal1 = std::numeric_limits<float>::max();
+		float minVal2 = std::numeric_limits<float>::max();
+		Vec4f currentParams{ 0.0f, 0.0f, 0.0f, 0.0f };
 
-		for (const auto& s2 : samples2)
+		for (int i = 0; i <= cursorSamples; i++)
 		{
-			float dist = (s2.p - cursorPos).length_sqr();
-			if (dist < minVal2)
-			{
-				minVal2 = dist;
-				currentParams.z = s2.u;
-				currentParams.w = s2.v;
-			}
-		}
-	}
-	else
-	{
-		float minVal = std::numeric_limits<float>::max();
+			float u1 = (i / static_cast<float>(cursorSamples)) * maxU1;
+			float u2 = (i / static_cast<float>(cursorSamples)) * maxU2;
 
-		for (const auto& s1 : samples1)
-		{
-			for (const auto& s2 : samples2)
+			for (int j = 0; j <= cursorSamples; j++)
 			{
-				float dist = (s1.p - s2.p).length_sqr();
-				if (dist < minVal)
+				float v1 = (j / static_cast<float>(cursorSamples)) * maxV1;
+				float v2 = (j / static_cast<float>(cursorSamples)) * maxV2;
+
+				float dist1 = (EvaluateParametric(obj1, u1, v1).p - cursorPos).length_sqr();
+				if (dist1 < minVal1)
 				{
-					minVal = dist;
-					currentParams = Vec4f(s1.u, s1.v, s2.u, s2.v);
+					minVal1 = dist1;
+					currentParams.x = u1;
+					currentParams.y = v1;
+				}
+
+				float dist2 = (EvaluateParametric(obj2, u2, v2).p - cursorPos).length_sqr();
+				if (dist2 < minVal2)
+				{
+					minVal2 = dist2;
+					currentParams.z = u2;
+					currentParams.w = v2;
 				}
 			}
 		}
+
+		auto p1 = EvaluateParametric(obj1, currentParams.x, currentParams.y).p;
+		auto p2 = EvaluateParametric(obj2, currentParams.z, currentParams.w).p;
+		sortedCandidates.push_back({ currentParams, (p1 - p2).length_sqr() });
 	}
+	else
+	{
+		std::vector<MathLib::Vec4f> candidateParams;
+
+		SurfacePatch root1 = { 0.0f, maxU1, 0.0f, maxV1, ComputePatchAABB(obj1, 0.0f, maxU1, 0.0f, maxV1) };
+		SurfacePatch root2 = { 0.0f, maxU2, 0.0f, maxV2, ComputePatchAABB(obj2, 0.0f, maxU2, 0.0f, maxV2) };
+
+		IntersectPatches(obj1, root1, obj2, root2, candidateParams);
+
+		if (candidateParams.empty())
+			return;
+
+		sortedCandidates.reserve(candidateParams.size());
+		for (const auto& params : candidateParams)
+		{
+			auto p1 = EvaluateParametric(obj1, params.x, params.y).p;
+			auto p2 = EvaluateParametric(obj2, params.z, params.w).p;
+			sortedCandidates.push_back({ params, (p1 - p2).length_sqr() });
+		}
+
+		std::sort(sortedCandidates.begin(), sortedCandidates.end(), [](const Candidate& a, const Candidate& b) {
+			return a.dist < b.dist;
+			});
+
+		//float minVal = std::numeric_limits<float>::max();
+		//Vec4f currentParams;
+
+		//for (const auto& params : candidateParams)
+		//{
+		//	auto p1 = EvaluateParametric(obj1, params.x, params.y).p;
+		//	auto p2 = EvaluateParametric(obj2, params.z, params.w).p;
+		//	float dist = (p1 - p2).length_sqr();
+
+		//	if (dist < minVal)
+		//	{
+		//		minVal = dist;
+		//		currentParams = params;
+		//	}
+		//}
+	}
+
 	// =============================================================
 	// STAGE 2: GRADIENT DESCENT
 	// =============================================================
-	float alpha = 0.01f;
-	constexpr float alphaIncrease = 1.2f;
-	constexpr float alphaReduction = 0.5f;
-	constexpr float tolerance = 1e-6f;
-	constexpr int maxIterations = 100;
-	auto eval1 = EvaluateParametric(obj1, currentParams.x, currentParams.y);
-	auto eval2 = EvaluateParametric(obj2, currentParams.z, currentParams.w);
+	bool foundStartPoint = false;
+	Vec4f currentParams;
+	SurfaceEvalResult eval1, eval2;
+	int attempts = std::min(50, static_cast<int>(sortedCandidates.size()));
 
-	for (int iter = 0; iter < maxIterations; iter++)
+
+	for (int i = 0; i < attempts; i++)
 	{
-		Vec3f D = eval1.p - eval2.p;
-		float distSqr = D.length_sqr();
-		if (distSqr < tolerance)
-			break;
+		currentParams = sortedCandidates[i].params;
+		float alpha = 0.01f;
+		constexpr float alphaIncrease = 1.2f;
+		constexpr float alphaReduction = 0.5f;
+		constexpr float tolerance = 1e-6f;
+		constexpr int maxIterations = 100;
 
-		float gu = Vec3f::dot(D, eval1.du);
-		float gv = Vec3f::dot(D, eval1.dv);
-		float gs = Vec3f::dot(-D, eval2.du);
-		float gt = Vec3f::dot(-D, eval2.dv);
+		eval1 = EvaluateParametric(obj1, currentParams.x, currentParams.y);
+		eval2 = EvaluateParametric(obj2, currentParams.z, currentParams.w);
 
-		Vec4f nextParams = currentParams - alpha * Vec4f(gu, gv, gs, gt);
+		for (int iter = 0; iter < maxIterations; iter++)
+		{
+			Vec3f D = eval1.p - eval2.p;
+			float distSqr = D.length_sqr();
+			if (distSqr < tolerance)
+				break;
 
-		auto applyBounds = [](float& val, float maxVal, SceneObject* obj) {
-			if (obj->type == ObjectType::Torus)
+			float gu = Vec3f::dot(D, eval1.du);
+			float gv = Vec3f::dot(D, eval1.dv);
+			float gs = Vec3f::dot(-D, eval2.du);
+			float gt = Vec3f::dot(-D, eval2.dv);
+
+			Vec4f nextParams = currentParams - alpha * Vec4f(gu, gv, gs, gt);
+
+			auto applyBounds = [](float& val, float maxVal, SceneObject* obj) {
+				if (obj->type == ObjectType::Torus)
+				{
+					val = std::fmod(val, maxVal);
+					if (val < 0.0f) val += maxVal;
+				}
+				else
+				{
+					val = std::clamp(val, 0.0f, maxVal);
+				}
+				};
+
+			applyBounds(nextParams.x, maxU1, obj1);
+			applyBounds(nextParams.y, maxV1, obj1);
+			applyBounds(nextParams.z, maxU2, obj2);
+			applyBounds(nextParams.w, maxV2, obj2);
+
+			auto nextEval1 = EvaluateParametric(obj1, nextParams.x, nextParams.y);
+			auto nextEval2 = EvaluateParametric(obj2, nextParams.z, nextParams.w);
+
+			if ((nextEval1.p - nextEval2.p).length_sqr() < distSqr)
 			{
-				val = std::fmod(val, maxVal);
-				if (val < 0.0f) val += maxVal;
+				currentParams = nextParams;
+				eval1 = nextEval1;
+				eval2 = nextEval2;
+				alpha *= alphaIncrease;
 			}
 			else
 			{
-				val = std::clamp(val, 0.0f, maxVal);
+				alpha *= alphaReduction;
 			}
-			};
-
-		applyBounds(nextParams.x, maxU1, obj1);
-		applyBounds(nextParams.y, maxV1, obj1);
-		applyBounds(nextParams.z, maxU2, obj2);
-		applyBounds(nextParams.w, maxV2, obj2);
-
-		auto nextEval1 = EvaluateParametric(obj1, nextParams.x, nextParams.y);
-		auto nextEval2 = EvaluateParametric(obj2, nextParams.z, nextParams.w);
-
-		if ((nextEval1.p - nextEval2.p).length_sqr() < distSqr)
-		{
-			currentParams = nextParams;
-			eval1 = nextEval1;
-			eval2 = nextEval2;
-			alpha *= alphaIncrease;
 		}
-		else
+
+		if ((eval1.p - eval2.p).length_sqr() <= 1e-5f)
 		{
-			alpha *= alphaReduction;
+			foundStartPoint = true;
+			break;
 		}
+
+		//m_intersectionStartParams = currentParams;
+		//eval1 = EvaluateParametric(obj1, currentParams.x, currentParams.y);
+		//eval2 = EvaluateParametric(obj2, currentParams.z, currentParams.w);
+		//float d = m_intersectionStep;
+		//if ((eval1.p - eval2.p).length_sqr() > 1e-5)
+		//	return;
 	}
 
-	m_intersectionStartParams = currentParams;
-	eval1 = EvaluateParametric(obj1, currentParams.x, currentParams.y);
-	eval2 = EvaluateParametric(obj2, currentParams.z, currentParams.w);
-	float d = m_intersectionStep;
-	if ((eval1.p - eval2.p).length_sqr() > 1e-5)
+	if (!foundStartPoint)
 		return;
+
+	m_intersectionStartParams = currentParams;
+	float d = m_intersectionStep;
 
 	// =============================================================
 	// STAGE 3: TRACE THE INTERSECTION CURVE
