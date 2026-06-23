@@ -495,15 +495,19 @@ void BezierIntersection::InitBezierGeometry(const DxDevice& device)
 		std::vector<float> a(n_pad), b(n_pad), c(n_pad);
 		std::vector<Vec3f> d(n_pad);
 
-		b[0] = 2.0f; c[0] = 1.0f; d[0] = (P_pad[1] - P_pad[0]) * (3.0f / h[0]);
+		b[0] = 1.0f; 
+		c[0] = 1.0f; 
+		d[0] = (P_pad[1] - P_pad[0]) * (2.0f / h[0]);
 		for (size_t i = 1; i < n_pad - 1; i++)
 		{
-			a[i] = h[i]; b[i] = 2.0f * (h[i - 1] + h[i]); c[i] = h[i - 1];
+			a[i] = h[i]; 
+			b[i] = 2.0f * (h[i - 1] + h[i]); 
+			c[i] = h[i - 1];
 			d[i] = (P_pad[i] - P_pad[i - 1]) * (3.0f * h[i] / h[i - 1]) + (P_pad[i + 1] - P_pad[i]) * (3.0f * h[i - 1] / h[i]);
 		}
 		a[n_pad - 1] = 1.0f;
-		b[n_pad - 1] = 2.0f;
-		d[n_pad - 1] = (P_pad[n_pad - 1] - P_pad[n_pad - 2]) * (3.0f / h[n_pad - 2]);
+		b[n_pad - 1] = 1.0f;
+		d[n_pad - 1] = (P_pad[n_pad - 1] - P_pad[n_pad - 2]) * (2.0f / h[n_pad - 2]);
 
 		std::vector<float> c_prime(n_pad);
 		std::vector<MathLib::Vec3f> d_prime(n_pad);
@@ -534,19 +538,21 @@ void BezierIntersection::InitBezierGeometry(const DxDevice& device)
 		std::vector<float> a(n), b(n), c(n);
 		std::vector<MathLib::Vec3f> d(n);
 
-		b[0] = 2.0f;
+		b[0] = 1.0f;
 		c[0] = 1.0f;
-		d[0] = (P[1] - P[0]) * (3.0f / h[0]);
+		d[0] = (P[1] - P[0]) * (2.0f / h[0]);
 
 		for (size_t i = 1; i < n - 1; i++)
 		{
-			a[i] = h[i]; b[i] = 2.0f * (h[i - 1] + h[i]); c[i] = h[i - 1];
+			a[i] = h[i]; 
+			b[i] = 2.0f * (h[i - 1] + h[i]); 
+			c[i] = h[i - 1];
 			d[i] = (P[i] - P[i - 1]) * (3.0f * h[i] / h[i - 1]) + (P[i + 1] - P[i]) * (3.0f * h[i - 1] / h[i]);
 		}
 
 		a[n - 1] = 1.0f;
-		b[n - 1] = 2.0f;
-		d[n - 1] = (P[n - 1] - P[n - 2]) * (3.0f / h[n - 2]);
+		b[n - 1] = 1.0f;
+		d[n - 1] = (P[n - 1] - P[n - 2]) * (2.0f / h[n - 2]);
 
 		std::vector<float> c_prime(n);
 		std::vector<Vec3f> d_prime(n);
