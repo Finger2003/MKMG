@@ -511,7 +511,7 @@ namespace
 			return;
 
 		// Max depth reached, add the center of the patches as a candidate
-		if (depth >= 8)
+		if (depth >= 6)
 		{
 			float u1 = (p1.u_min + p1.u_max) * 0.5f;
 			float v1 = (p1.v_min + p1.v_max) * 0.5f;
@@ -2431,7 +2431,8 @@ void CadApplication::ActionFindIntersection()
 	bool foundStartPoint = false;
 	Vec4f currentParams;
 	SurfaceEvalResult eval1, eval2;
-	int attempts = std::min(50, static_cast<int>(sortedCandidates.size()));
+	//int attempts = std::min(50, static_cast<int>(sortedCandidates.size()));
+	int attempts = static_cast<int>(sortedCandidates.size());
 
 
 	for (int i = 0; i < attempts; i++)
@@ -2491,12 +2492,22 @@ void CadApplication::ActionFindIntersection()
 			{
 				alpha *= alphaReduction;
 			}
+
+			if (alpha < 1e-7f)
+				break;
 		}
 
 		if ((eval1.p - eval2.p).length_sqr() <= 1e-5f)
 		{
-			foundStartPoint = true;
-			break;
+			Vec3f np = Vec3f::cross(eval1.du, eval1.dv).normalize();
+			Vec3f nq = Vec3f::cross(eval2.du, eval2.dv).normalize();
+			float intersectionStrength = Vec3f::cross(np, nq).length_sqr();
+
+			if (intersectionStrength >= 0.0025f)
+			{
+				foundStartPoint = true;
+				break;
+			}
 		}
 
 		//m_intersectionStartParams = currentParams;
@@ -2533,7 +2544,7 @@ void CadApplication::ActionFindIntersection()
 	int forwardHitDim = -1;
 	int backwardHitDim = -1;
 
-	for (float direction : {1.0f, -1.0f })
+	for (float direction : { 1.0f, -1.0f })
 	{
 		if (isClosedLoop)
 			break;
@@ -2550,22 +2561,46 @@ void CadApplication::ActionFindIntersection()
 			Vec3f nq = Vec3f::cross(du2, dv2).normalize();
 			Vec3f t = Vec3f::cross(np, nq);
 
-			if (t.length_sqr() < 1e-8f)
-				break;
+			float tLen = t.length();
 
-			t = t.normalize();
-
-			if (stepCount == 0)
+			if (tLen < 0.05f)
 			{
-				t *= direction;
-				if (direction == 1.0f)
-					startTangent = t;
+				if (stepCount == 0)
+					break;
+				t = prevTangent;
 			}
 			else
 			{
-				if (Vec3f::dot(t, prevTangent) < 0.0f)
-					t = -t;
+				t /= tLen;
+				if (stepCount == 0)
+				{
+					t *= direction;
+					if (direction == 1.0f)
+						startTangent = t;
+				}
+				else
+				{
+					if (Vec3f::dot(t, prevTangent) < 0.0f)
+						t = -t;
+				}
 			}
+
+			//if (t.length_sqr() < 1e-8f)
+			//	break;
+
+			//t = t.normalize();
+
+			//if (stepCount == 0)
+			//{
+			//	t *= direction;
+			//	if (direction == 1.0f)
+			//		startTangent = t;
+			//}
+			//else
+			//{
+			//	if (Vec3f::dot(t, prevTangent) < 0.0f)
+			//		t = -t;
+			//}
 			prevTangent = t;
 
 			auto nextParamsOpt = FindIntersectionNextPoint(obj1, obj2, marchingParams, p1, t, d);
