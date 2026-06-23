@@ -492,7 +492,7 @@ namespace
 			float stepV = (v_max - v_min) / 2.0f;
 
 			padding = (max_du_len * stepU + max_dv_len * stepV) * 1.2f;
-		}		
+		}
 
 		box.min_pt = box.min_pt - MathLib::Vec3f(padding + 1e-5f, padding + 1e-5f, padding + 1e-5f);
 		box.max_pt = box.max_pt + MathLib::Vec3f(padding + 1e-5f, padding + 1e-5f, padding + 1e-5f);
@@ -504,6 +504,7 @@ namespace
 		SceneObject* obj1, SurfacePatch p1,
 		SceneObject* obj2, SurfacePatch p2,
 		std::vector<MathLib::Vec4f>& candidateParams,
+		bool isSelfIntersection,
 		int depth = 0)
 	{
 		// Bounding boxes don't overlap, cut off this branch
@@ -511,8 +512,18 @@ namespace
 			return;
 
 		// Max depth reached, add the center of the patches as a candidate
-		if (depth >= 6)
+		constexpr int maxDepth = 6;
+		if (depth >= maxDepth)
 		{
+			if (isSelfIntersection)
+			{
+				constexpr float eps = 1e-4f;
+				bool separatedU = (p1.u_max < p2.u_min - eps) || (p2.u_max < p1.u_min - eps);
+				bool separatedV = (p1.v_max < p2.v_min - eps) || (p2.v_max < p1.v_min - eps);
+				if (!separatedU && !separatedV)
+					return;
+			}
+
 			float u1 = (p1.u_min + p1.u_max) * 0.5f;
 			float v1 = (p1.v_min + p1.v_max) * 0.5f;
 			float u2 = (p2.u_min + p2.u_max) * 0.5f;
@@ -540,7 +551,7 @@ namespace
 			};
 
 			for (int i = 0; i < 4; i++)
-				IntersectPatches(obj1, sub[i], obj2, p2, candidateParams, depth + 1);
+				IntersectPatches(obj1, sub[i], obj2, p2, candidateParams, isSelfIntersection, depth + 1);
 		}
 		else
 		{
@@ -555,7 +566,7 @@ namespace
 			};
 
 			for (int i = 0; i < 4; i++)
-				IntersectPatches(obj1, p1, obj2, sub[i], candidateParams, depth + 1);
+				IntersectPatches(obj1, p1, obj2, sub[i], candidateParams, isSelfIntersection, depth + 1);
 		}
 	}
 }
@@ -2308,14 +2319,19 @@ void CadApplication::ActionFindIntersection()
 			selectedObjects.push_back(obj);
 	}
 
-	if (selectedObjects.size() != 2)
+	if (selectedObjects.size() != 1 && selectedObjects.size() != 2)
 		return;
 
+	bool isSelfIntersection = (selectedObjects.size() == 1);
+
 	auto& obj1W = selectedObjects[0];
-	auto& obj2W = selectedObjects[1];
+	auto& obj2W = isSelfIntersection ? selectedObjects[0] : selectedObjects[1];
 
 	auto obj1 = obj1W.lock().get();
 	auto obj2 = obj2W.lock().get();
+
+	if (isSelfIntersection && !obj1->IsA(ObjectType::Surface))
+		return;
 
 	float maxU1 = 1.0f;
 	float maxV1 = 1.0f;
@@ -2352,30 +2368,73 @@ void CadApplication::ActionFindIntersection()
 		float minVal2 = std::numeric_limits<float>::max();
 		Vec4f currentParams{ 0.0f, 0.0f, 0.0f, 0.0f };
 
-		for (int i = 0; i <= cursorSamples; i++)
+		if (isSelfIntersection)
 		{
-			float u1 = (i / static_cast<float>(cursorSamples)) * maxU1;
-			float u2 = (i / static_cast<float>(cursorSamples)) * maxU2;
-
-			for (int j = 0; j <= cursorSamples; j++)
+			for (int i = 0; i <= cursorSamples; i++)
 			{
-				float v1 = (j / static_cast<float>(cursorSamples)) * maxV1;
-				float v2 = (j / static_cast<float>(cursorSamples)) * maxV2;
-
-				float dist1 = (EvaluateParametric(obj1, u1, v1).p - cursorPos).length_sqr();
-				if (dist1 < minVal1)
+				float u = (i / static_cast<float>(cursorSamples)) * maxU1;
+				for (int j = 0; j <= cursorSamples; j++)
 				{
-					minVal1 = dist1;
-					currentParams.x = u1;
-					currentParams.y = v1;
+					float v = (j / static_cast<float>(cursorSamples)) * maxV1;
+					float dist = (EvaluateParametric(obj1, u, v).p - cursorPos).length_sqr();
+
+					if (dist < minVal1)
+					{
+						float pDist = (u - currentParams.x) * (u - currentParams.x) + (v - currentParams.y) * (v - currentParams.y);
+						float domainDiagonalSqr = (maxU1 * maxU1) + (maxV1 * maxV1);
+						float dynamicThreshold = domainDiagonalSqr * 0.05f;
+						if (pDist > dynamicThreshold)
+						{
+							minVal2 = minVal1;
+							currentParams.z = currentParams.x;
+							currentParams.w = currentParams.y;
+						}
+						minVal1 = dist;
+						currentParams.x = u;
+						currentParams.y = v;
+					}
+					else if (dist < minVal2)
+					{
+						float pDist = (u - currentParams.x) * (u - currentParams.x) + (v - currentParams.y) * (v - currentParams.y);
+						float domainDiagonalSqr = (maxU1 * maxU1) + (maxV1 * maxV1);
+						float dynamicThreshold = domainDiagonalSqr * 0.05f;
+						if (pDist > dynamicThreshold)
+						{
+							minVal2 = dist;
+							currentParams.z = u;
+							currentParams.w = v;
+						}
+					}
 				}
+			}
+		}
+		else
+		{
+			for (int i = 0; i <= cursorSamples; i++)
+			{
+				float u1 = (i / static_cast<float>(cursorSamples)) * maxU1;
+				float u2 = (i / static_cast<float>(cursorSamples)) * maxU2;
 
-				float dist2 = (EvaluateParametric(obj2, u2, v2).p - cursorPos).length_sqr();
-				if (dist2 < minVal2)
+				for (int j = 0; j <= cursorSamples; j++)
 				{
-					minVal2 = dist2;
-					currentParams.z = u2;
-					currentParams.w = v2;
+					float v1 = (j / static_cast<float>(cursorSamples)) * maxV1;
+					float v2 = (j / static_cast<float>(cursorSamples)) * maxV2;
+
+					float dist1 = (EvaluateParametric(obj1, u1, v1).p - cursorPos).length_sqr();
+					if (dist1 < minVal1)
+					{
+						minVal1 = dist1;
+						currentParams.x = u1;
+						currentParams.y = v1;
+					}
+
+					float dist2 = (EvaluateParametric(obj2, u2, v2).p - cursorPos).length_sqr();
+					if (dist2 < minVal2)
+					{
+						minVal2 = dist2;
+						currentParams.z = u2;
+						currentParams.w = v2;
+					}
 				}
 			}
 		}
@@ -2391,7 +2450,7 @@ void CadApplication::ActionFindIntersection()
 		SurfacePatch root1 = { 0.0f, maxU1, 0.0f, maxV1, ComputePatchAABB(obj1, 0.0f, maxU1, 0.0f, maxV1) };
 		SurfacePatch root2 = { 0.0f, maxU2, 0.0f, maxV2, ComputePatchAABB(obj2, 0.0f, maxU2, 0.0f, maxV2) };
 
-		IntersectPatches(obj1, root1, obj2, root2, candidateParams);
+		IntersectPatches(obj1, root1, obj2, root2, candidateParams, isSelfIntersection);
 
 		if (candidateParams.empty())
 			return;
@@ -2499,6 +2558,14 @@ void CadApplication::ActionFindIntersection()
 
 		if ((eval1.p - eval2.p).length_sqr() <= 1e-5f)
 		{
+			if (isSelfIntersection)
+			{
+				float pDist = (currentParams.x - currentParams.z) * (currentParams.x - currentParams.z) +
+					(currentParams.y - currentParams.w) * (currentParams.y - currentParams.w);
+				if (pDist < 1e-4f)
+					continue; // converged to the same point on the surface
+			}
+
 			Vec3f np = Vec3f::cross(eval1.du, eval1.dv).normalize();
 			Vec3f nq = Vec3f::cross(eval2.du, eval2.dv).normalize();
 			float intersectionStrength = Vec3f::cross(np, nq).length_sqr();
@@ -2612,6 +2679,14 @@ void CadApplication::ActionFindIntersection()
 			auto [v_p2, v_du2, v_dv2] = EvaluateParametric(obj2, nextParamsOpt->z, nextParamsOpt->w);
 			if ((v_p1 - v_p2).length_sqr() > 1e-5f)
 				break;
+
+			if (isSelfIntersection)
+			{
+				float pDist = (nextParamsOpt->x - nextParamsOpt->z) * (nextParamsOpt->x - nextParamsOpt->z) +
+					(nextParamsOpt->y - nextParamsOpt->w) * (nextParamsOpt->y - nextParamsOpt->w);
+				if (pDist < 1e-4f)
+					break; // converged to the same point on the surface
+			}
 
 			if (isOutOfBounds(*nextParamsOpt))
 			{
@@ -3085,7 +3160,7 @@ void CadApplication::DrawIntersectionList(std::shared_ptr<Intersection> intersec
 	{
 		if (srv1Ptr)
 		{
-			if (isTrimS1) 
+			if (isTrimS1)
 				srv1Ptr->Reset(); // Unbind texture
 			else
 				*srv1Ptr = intersection->m_trimTexture1.srv; // Bind texture
@@ -3099,9 +3174,9 @@ void CadApplication::DrawIntersectionList(std::shared_ptr<Intersection> intersec
 	{
 		if (srv2Ptr)
 		{
-			if (isTrimS2) 
+			if (isTrimS2)
 				srv2Ptr->Reset(); // Unbind texture
-			else 
+			else
 				*srv2Ptr = intersection->m_trimTexture2.srv; // Bind texture
 		}
 	}
