@@ -469,64 +469,132 @@ void BezierIntersection::InitBezierGeometry(const DxDevice& device)
 	std::vector<Vec3f> P = m_basePoints;
 	std::vector<Vec3f> D(n);
 
+	//if (m_isClosedLoop && n > 2)
+	//{
+	//	int unique_n = static_cast<int>(n) - 1;
+	//	int pad = std::min(10, unique_n - 1);
+
+	//	std::vector<Vec3f> P_pad;
+	//	P_pad.reserve(n + 2 * pad);
+
+	//	// Prefix padding
+	//	for (int i = unique_n - pad; i < unique_n; i++)
+	//		P_pad.push_back(P[i]);
+	//	// Core body
+	//	for (int i = 0; i < static_cast<int>(n); i++)
+	//		P_pad.push_back(P[i]);
+	//	// Suffix padding
+	//	for (int i = 1; i <= pad; i++)
+	//		P_pad.push_back(P[i]);
+
+	//	size_t n_pad = P_pad.size();
+	//	std::vector<float> h(n_pad - 1);
+	//	for (size_t i = 0; i < n_pad - 1; i++)
+	//		h[i] = (P_pad[i + 1] - P_pad[i]).length();
+
+	//	std::vector<float> a(n_pad), b(n_pad), c(n_pad);
+	//	std::vector<Vec3f> d(n_pad);
+
+	//	b[0] = 1.0f; 
+	//	c[0] = 1.0f; 
+	//	d[0] = (P_pad[1] - P_pad[0]) * (2.0f / h[0]);
+	//	for (size_t i = 1; i < n_pad - 1; i++)
+	//	{
+	//		a[i] = h[i]; 
+	//		b[i] = 2.0f * (h[i - 1] + h[i]); 
+	//		c[i] = h[i - 1];
+	//		d[i] = (P_pad[i] - P_pad[i - 1]) * (3.0f * h[i] / h[i - 1]) + (P_pad[i + 1] - P_pad[i]) * (3.0f * h[i - 1] / h[i]);
+	//	}
+	//	a[n_pad - 1] = 1.0f;
+	//	b[n_pad - 1] = 1.0f;
+	//	d[n_pad - 1] = (P_pad[n_pad - 1] - P_pad[n_pad - 2]) * (2.0f / h[n_pad - 2]);
+
+	//	std::vector<float> c_prime(n_pad);
+	//	std::vector<MathLib::Vec3f> d_prime(n_pad);
+	//	c_prime[0] = c[0] / b[0]; d_prime[0] = d[0] * (1.0f / b[0]);
+
+	//	for (size_t i = 1; i < n_pad; i++)
+	//	{
+	//		float m = 1.0f / (b[i] - a[i] * c_prime[i - 1]);
+	//		c_prime[i] = c[i] * m;
+	//		d_prime[i] = (d[i] - d_prime[i - 1] * a[i]) * m;
+	//	}
+
+	//	std::vector<MathLib::Vec3f> D_pad(n_pad);
+	//	D_pad[n_pad - 1] = d_prime[n_pad - 1];
+	//	for (int i = static_cast<int>(n_pad - 2); i >= 0; i--)
+	//		D_pad[i] = d_prime[i] - D_pad[i + 1] * c_prime[i];
+
+	//	for (int i = 0; i < static_cast<int>(n); i++)
+	//		D[i] = D_pad[i + pad];
+	//	D[n - 1] = D[0];
+	//}
 	if (m_isClosedLoop && n > 2)
 	{
 		int unique_n = static_cast<int>(n) - 1;
-		int pad = std::min(10, unique_n - 1);
 
-		std::vector<Vec3f> P_pad;
-		P_pad.reserve(n + 2 * pad);
+		std::vector<float> h(unique_n);
+		for (int i = 0; i < unique_n; i++)
+			h[i] = (P[(i + 1) % unique_n] - P[i]).length();
 
-		// Prefix padding
-		for (int i = unique_n - pad; i < unique_n; i++)
-			P_pad.push_back(P[i]);
-		// Core body
-		for (int i = 0; i < static_cast<int>(n); i++)
-			P_pad.push_back(P[i]);
-		// Suffix padding
-		for (int i = 1; i <= pad; i++)
-			P_pad.push_back(P[i]);
+		std::vector<float> a(unique_n), b(unique_n), c(unique_n);
+		std::vector<Vec3f> d(unique_n);
 
-		size_t n_pad = P_pad.size();
-		std::vector<float> h(n_pad - 1);
-		for (size_t i = 0; i < n_pad - 1; i++)
-			h[i] = (P_pad[i + 1] - P_pad[i]).length();
-
-		std::vector<float> a(n_pad), b(n_pad), c(n_pad);
-		std::vector<Vec3f> d(n_pad);
-
-		b[0] = 1.0f; 
-		c[0] = 1.0f; 
-		d[0] = (P_pad[1] - P_pad[0]) * (2.0f / h[0]);
-		for (size_t i = 1; i < n_pad - 1; i++)
+		for (int i = 0; i < unique_n; i++)
 		{
-			a[i] = h[i]; 
-			b[i] = 2.0f * (h[i - 1] + h[i]); 
-			c[i] = h[i - 1];
-			d[i] = (P_pad[i] - P_pad[i - 1]) * (3.0f * h[i] / h[i - 1]) + (P_pad[i + 1] - P_pad[i]) * (3.0f * h[i - 1] / h[i]);
-		}
-		a[n_pad - 1] = 1.0f;
-		b[n_pad - 1] = 1.0f;
-		d[n_pad - 1] = (P_pad[n_pad - 1] - P_pad[n_pad - 2]) * (2.0f / h[n_pad - 2]);
-
-		std::vector<float> c_prime(n_pad);
-		std::vector<MathLib::Vec3f> d_prime(n_pad);
-		c_prime[0] = c[0] / b[0]; d_prime[0] = d[0] * (1.0f / b[0]);
-
-		for (size_t i = 1; i < n_pad; i++)
-		{
-			float m = 1.0f / (b[i] - a[i] * c_prime[i - 1]);
-			c_prime[i] = c[i] * m;
-			d_prime[i] = (d[i] - d_prime[i - 1] * a[i]) * m;
+			int prev = (i + unique_n - 1) % unique_n;
+			a[i] = h[i];
+			b[i] = 2.0f * (h[prev] + h[i]);
+			c[i] = h[prev];
+			d[i] = (P[i] - P[prev]) * (3.0f * h[i] / h[prev]) + (P[(i + 1) % unique_n] - P[i]) * (3.0f * h[prev] / h[i]);
 		}
 
-		std::vector<MathLib::Vec3f> D_pad(n_pad);
-		D_pad[n_pad - 1] = d_prime[n_pad - 1];
-		for (int i = static_cast<int>(n_pad - 2); i >= 0; i--)
-			D_pad[i] = d_prime[i] - D_pad[i + 1] * c_prime[i];
+		float gamma = -b[0];
 
-		for (int i = 0; i < static_cast<int>(n); i++)
-			D[i] = D_pad[i + pad];
+		std::vector<float> a_prime = a, b_prime = b, c_prime = c;
+		b_prime[0] -= gamma;
+		b_prime[unique_n - 1] -= a[0] * c[unique_n - 1] / gamma;
+
+		std::vector<float> u(unique_n, 0.0f);
+		u[0] = gamma;
+		u[unique_n - 1] = c[unique_n - 1];
+
+		std::vector<float> v(unique_n, 0.0f);
+		v[0] = 1.0f;
+		v[unique_n - 1] = a[0] / gamma;
+
+		auto SolveThomas = [&](const auto& d_input, auto& out) {
+			std::vector<float> c_star(unique_n);
+			out.resize(unique_n);
+
+			c_star[0] = c_prime[0] / b_prime[0];
+			out[0] = d_input[0] * (1.0f / b_prime[0]);
+
+			for (int i = 1; i < unique_n; i++)
+			{
+				float m = 1.0f / (b_prime[i] - a_prime[i] * c_star[i - 1]);
+				c_star[i] = c_prime[i] * m;
+				out[i] = (d_input[i] - out[i - 1] * a_prime[i]) * m;
+			}
+			for (int i = unique_n - 2; i >= 0; i--)
+			{
+				out[i] = out[i] - out[i + 1] * c_star[i];
+			}
+			};
+
+		std::vector<Vec3f> Y;
+		SolveThomas(d, Y);
+
+		std::vector<float> Q;
+		SolveThomas(u, Q);
+
+		Vec3f v_dot_y = Y[0] + Y[unique_n - 1] * v[unique_n - 1];
+		float v_dot_q = Q[0] + Q[unique_n - 1] * v[unique_n - 1];
+		float scalar_ratio = 1.0f / (1.0f + v_dot_q);
+
+		for (int i = 0; i < unique_n; i++)
+			D[i] = Y[i] - v_dot_y * (Q[i] * scalar_ratio);
+
 		D[n - 1] = D[0];
 	}
 	else
@@ -536,7 +604,7 @@ void BezierIntersection::InitBezierGeometry(const DxDevice& device)
 			h[i] = (P[i + 1] - P[i]).length();
 
 		std::vector<float> a(n), b(n), c(n);
-		std::vector<MathLib::Vec3f> d(n);
+		std::vector<Vec3f> d(n);
 
 		b[0] = 1.0f;
 		c[0] = 1.0f;
