@@ -465,8 +465,66 @@ void BezierIntersection::InitBezierGeometry(const DxDevice& device)
 	if (m_basePoints.size() < 2)
 		return;
 
-	size_t n = m_basePoints.size();
-	std::vector<Vec3f> P = m_basePoints;
+
+	auto perpendicularDistance = [](const MathLib::Vec3f& pt, const MathLib::Vec3f& lineStart, const MathLib::Vec3f& lineEnd) {
+		MathLib::Vec3f line = lineEnd - lineStart;
+		float lineLenSqr = line.length_sqr();
+
+		if (lineLenSqr < 1e-8f)
+			return (pt - lineStart).length();
+
+		float t = MathLib::Vec3f::dot(pt - lineStart, line) / lineLenSqr;
+		t = std::clamp(t, 0.0f, 1.0f);
+		MathLib::Vec3f projected = lineStart + line * t;
+		return (pt - projected).length();
+		};
+
+	int totalPoints = static_cast<int>(m_basePoints.size());
+	std::vector<bool> keepPoint(totalPoints, false);
+	keepPoint.front() = true;
+	keepPoint.back() = true;
+
+	float tolerance = 0.005f;
+
+	std::vector<std::pair<int, int>> stack;
+	stack.reserve(totalPoints);
+	stack.push_back({ 0, totalPoints - 1 });
+
+	while (!stack.empty())
+	{
+		auto [start, end] = stack.back();
+		stack.pop_back();
+
+		float maxDist = 0.0f;
+		int maxIndex = start;
+
+		for (int i = start + 1; i < end; i++)
+		{
+			float dist = perpendicularDistance(m_basePoints[i], m_basePoints[start], m_basePoints[end]);
+			if (dist > maxDist)
+			{
+				maxDist = dist;
+				maxIndex = i;
+			}
+		}
+		if (maxDist > tolerance)
+		{
+			keepPoint[maxIndex] = true;
+			stack.push_back({ maxIndex, end });
+			stack.push_back({ start, maxIndex });
+		}
+	}
+
+	std::vector<MathLib::Vec3f> P;
+	P.reserve(totalPoints);
+	for (int i = 0; i < totalPoints; i++)
+	{
+		if (keepPoint[i])
+			P.push_back(m_basePoints[i]);
+	}
+
+
+	size_t n = P.size();
 	std::vector<Vec3f> D(n);
 
 	//if (m_isClosedLoop && n > 2)
@@ -529,7 +587,16 @@ void BezierIntersection::InitBezierGeometry(const DxDevice& device)
 	//		D[i] = D_pad[i + pad];
 	//	D[n - 1] = D[0];
 	//}
-	if (m_isClosedLoop && n > 2)
+	if (n == 2)
+	{
+		float h0 = (P[1] - P[0]).length();
+		if (h0 > 1e-8f)
+		{
+			D[0] = (P[1] - P[0]) * (1.0f / h0);
+			D[1] = (P[1] - P[0]) * (1.0f / h0);
+		}
+	}
+	else if (m_isClosedLoop && n > 3)
 	{
 		int unique_n = static_cast<int>(n) - 1;
 
