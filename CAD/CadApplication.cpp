@@ -408,8 +408,8 @@ namespace
 
 	struct AABB
 	{
-		MathLib::Vec3f min_pt = { FLT_MAX, FLT_MAX, FLT_MAX };
-		MathLib::Vec3f max_pt = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+		MathLib::Vec3f min_pt = { std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max() };
+		MathLib::Vec3f max_pt = { -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max() };
 
 		void Expand(const MathLib::Vec3f& p)
 		{
