@@ -591,6 +591,7 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	const auto surfaceVsByteCode = DxDevice::LoadByteCode(L"SurfaceVS.cso");
 	const auto surfaceHsByteCode = DxDevice::LoadByteCode(L"SurfaceHS.cso");
 	const auto surfaceDsByteCode = DxDevice::LoadByteCode(L"SurfaceDS.cso");
+	const auto gregoryVsByteCode = DxDevice::LoadByteCode(L"GregoryVS.cso");
 	const auto gregoryHsByteCode = DxDevice::LoadByteCode(L"GregoryHS.cso");
 	const auto gregoryDsByteCode = DxDevice::LoadByteCode(L"GregoryDS.cso");
 	const auto torusVSByteCode = DxDevice::LoadByteCode(L"TorusVS.cso");
@@ -606,6 +607,7 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	m_surfaceVertexShader = m_device.CreateVertexShader(surfaceVsByteCode);
 	m_surfaceDomainShader = m_device.CreateDomainShader(surfaceDsByteCode);
 	m_surfaceHullShader = m_device.CreateHullShader(surfaceHsByteCode);
+	m_gregoryVertexShader = m_device.CreateVertexShader(gregoryVsByteCode);
 	m_gregoryDomainShader = m_device.CreateDomainShader(gregoryDsByteCode);
 	m_gregoryHullShader = m_device.CreateHullShader(gregoryHsByteCode);
 	m_torusVertexShader = m_device.CreateVertexShader(torusVSByteCode);
