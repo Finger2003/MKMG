@@ -6,6 +6,7 @@
 #include "../ImGuiLib/imgui_impl_dx11.h"
 #include "HoleDetection.h"
 #include "GeometryMath.h"
+#include "SceneSerializer.h"
 
 
 using namespace MathLib;
@@ -254,6 +255,12 @@ void CadApplication::ClearSelection()
 {
 	for (auto& o : m_sceneObjects)
 		o->selected = false;
+
+	ResetSelectionState();
+}
+
+void CadApplication::ResetSelectionState()
+{
 	m_lastClickedIndex = std::nullopt;
 	m_lastCurveClickedIndex = std::nullopt;
 	m_selectionCenterCache = std::nullopt;
@@ -1506,27 +1513,13 @@ void CadApplication::ActionSaveAs()
 
 void CadApplication::SaveScene(const std::wstring& filePath)
 {
-	using namespace nlohmann;
-	json rootObject = json::object();
-	json pointsArray = json::array();
-	json geometryArray = json::array();
-
-	for (const auto& obj : m_sceneObjects)
+	try
 	{
-		if (obj->type == ObjectType::Point)
-			pointsArray.push_back(obj->Serialize());
-		else
-			geometryArray.push_back(obj->Serialize());
+		SceneSerializer::Save(filePath, m_sceneObjects);
 	}
-
-	rootObject["points"] = std::move(pointsArray);
-	rootObject["geometry"] = std::move(geometryArray);
-
-	std::ofstream file(filePath);
-	if (file.is_open())
+	catch (const std::exception& e)
 	{
-		file << rootObject.dump(4);
-		file.close();
+		MessageBoxA(m_window.getHandle(), e.what(), "Save Error", MB_OK | MB_ICONERROR);
 	}
 }
 
@@ -1539,134 +1532,16 @@ void CadApplication::ActionLoad()
 
 void CadApplication::LoadScene(const std::wstring& filePath)
 {
-	std::ifstream file(filePath);
-	if (!file.is_open())
-		return;
-
-	nlohmann::json rootObject;
 	try
 	{
-		file >> rootObject;
+		auto loadedObjects = SceneSerializer::Load(filePath, m_device);
+		ResetSelectionState();
+		m_sceneObjects = std::move(loadedObjects);
+		m_currentFilePath = filePath;
 	}
 	catch (const std::exception& e)
 	{
-		MessageBoxA(nullptr, e.what(), "JSON Parse Error", MB_OK | MB_ICONERROR);
-		return;
-	}
-
-	ClearSelection();
-	m_sceneObjects.clear();
-	m_currentFilePath = filePath;
-
-	std::unordered_map<unsigned int, std::shared_ptr<Point>> pointMap;
-
-	auto parseNameData = [](const nlohmann::json& jsonNode) -> std::optional<ParsedNameData> {
-		if (jsonNode.contains("name"))
-		{
-			std::string n = jsonNode["name"];
-			if (!n.empty())
-			{
-				unsigned int idx = ExtractIndexFromName(n);
-				return ParsedNameData{ std::move(n), idx };
-			}
-		}
-		return std::nullopt;
-		};
-
-	if (rootObject.contains("points"))
-	{
-		for (const auto& ptJson : rootObject["points"])
-		{
-			unsigned int id = ptJson["id"];
-			float3 pos = ptJson["position"];
-			std::optional<ParsedNameData> nameData = parseNameData(ptJson);
-
-			auto pt = std::make_shared<Point>(id, pos, std::move(nameData));
-			pointMap[id] = pt;
-			m_sceneObjects.push_back(pt);
-		}
-	}
-
-	if (rootObject.contains("geometry"))
-	{
-		for (const auto& geomJson : rootObject["geometry"])
-		{
-			unsigned int id = geomJson["id"];
-			std::string type = geomJson["objectType"];
-			std::optional<ParsedNameData> nameData = parseNameData(geomJson);
-
-			std::vector<std::weak_ptr<Point>> controlPoints;
-			if (geomJson.contains("controlPoints"))
-			{
-				for (const auto& cpRef : geomJson["controlPoints"])
-				{
-					unsigned int cpId = cpRef["id"];
-					if (pointMap.count(cpId))
-						controlPoints.push_back(pointMap[cpId]);
-				}
-			}
-
-			std::shared_ptr<SceneObject> newObject = nullptr;
-			auto assignCurve = [&]<typename CurveType>()
-			{
-				auto newCurve = std::make_shared<CurveType>(id, std::move(controlPoints), std::move(nameData));
-				for (const auto& cpWeak : newCurve->m_controlPoints)
-				{
-					if (auto cp = cpWeak.lock())
-						cp->AddDependent(newCurve);
-				}
-				newObject = std::move(newCurve);
-			};
-
-			if (type == BezierSurface::SchemaName || type == BSplineSurface::SchemaName)
-			{
-				uint2 size = geomJson["size"];
-				uint2 samples = geomJson["samples"];
-
-				std::shared_ptr<Surface> newSurface;
-				auto assignSurface = [&]<typename SurfaceType>()
-				{
-					newSurface = std::make_shared<SurfaceType>(id, size, samples, std::move(controlPoints), std::move(nameData));
-				};
-				if (type == BezierSurface::SchemaName)
-					assignSurface.operator() < BezierSurface > ();
-				else
-					assignSurface.operator() < BSplineSurface > ();
-
-
-				for (const auto& cpWeak : newSurface->m_controlPoints)
-				{
-					if (auto cpShared = cpWeak.lock())
-					{
-						cpShared->AddDependent(newSurface);
-						cpShared->m_surfaceLockCount++;
-					}
-				}
-
-				newSurface->InitGeometry(m_device);
-				newObject = std::move(newSurface);
-			}
-			else if (type == Torus::SchemaName)
-			{
-				float3 pos = geomJson["position"];
-				float3 scale = geomJson["scale"];
-				uint2 samples = geomJson["samples"];
-				float largeRadius = geomJson["largeRadius"];
-				float smallRadius = geomJson["smallRadius"];
-				Quaternion rotation = geomJson["rotation"];
-				Mat4f rotMatrix = Mat4f::FromQuaternion(rotation);
-				newObject = std::make_shared<Torus>(id, pos, scale, rotMatrix, largeRadius, smallRadius, samples, std::move(nameData));
-			}
-			else if (type == BezierCurve::SchemaName)
-				assignCurve.operator() < BezierCurve > ();
-			else if (type == BSplineCurve::SchemaName)
-				assignCurve.operator() < BSplineCurve > ();
-			else if (type == InterpolatingCurve::SchemaName)
-				assignCurve.operator() < InterpolatingCurve > ();
-
-			if (newObject)
-				m_sceneObjects.push_back(newObject);
-		}
+		MessageBoxA(m_window.getHandle(), e.what(), "Error", MB_OK | MB_ICONERROR);
 	}
 }
 

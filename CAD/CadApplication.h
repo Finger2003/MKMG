@@ -231,6 +231,7 @@ private:
 #pragma endregion
 
 	void ClearSelection();
+	void ResetSelectionState();
 	void HandleObjectSelection(size_t index, bool ctrlHeld, bool shiftHeld);
 	void HandleCurveListSelection(Curve* curve, size_t index, bool ctrlHeld, bool shiftHeld);
 	std::optional<size_t> PickClosestPoint(int mouseX, int mouseY, float toleranceSq = 100.0f);

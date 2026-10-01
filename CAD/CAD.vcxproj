@@ -177,6 +177,7 @@
     </ClCompile>
     <ClCompile Include="Point.cpp" />
     <ClCompile Include="SceneObject.cpp" />
+    <ClCompile Include="SceneSerializer.cpp" />
     <ClCompile Include="Surface.cpp" />
     <ClCompile Include="SurfaceBuilder.cpp" />
     <ClCompile Include="Torus.cpp" />
@@ -206,6 +207,7 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="Point.h" />
     <ClInclude Include="SceneObject.h" />
+    <ClInclude Include="SceneSerializer.h" />
     <ClInclude Include="SplineMath.h" />
     <ClInclude Include="structs.h" />
     <ClInclude Include="Surface.h" />
