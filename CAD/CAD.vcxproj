@@ -163,6 +163,7 @@
     <ClCompile Include="DxDevice.cpp" />
     <ClCompile Include="DxStructures.cpp" />
     <ClCompile Include="exceptions.cpp" />
+    <ClCompile Include="GeometryMath.cpp" />
     <ClCompile Include="GregoryPatch.cpp" />
     <ClCompile Include="HoleDetection.cpp" />
     <ClCompile Include="InterpolatingCurve.cpp" />
@@ -197,6 +198,7 @@
     <ClInclude Include="DxStructures.h" />
     <ClInclude Include="exceptions.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="GeometryMath.h" />
     <ClInclude Include="GregoryPatch.h" />
     <ClInclude Include="HoleDetection.h" />
     <ClInclude Include="InterpolatingCurve.h" />
