@@ -15,10 +15,13 @@ public:
 	~CadGuiManager() = default;
 
 	void DrawMenu();
+
+#pragma region Getters And Setters
 	bool UseCursorAsHint() const { return m_useCursorAsHint; }
 	bool IsSurfacePreviewActive() const { return m_showSurfacePopup; }
 	void ShowIntersectionPopup() { m_showIntersectionPopup = true; }
 	float GetIntersectionStep() const { return m_intersectionStep; }
+#pragma endregion
 
 private:
 	CadApplication& m_app;
@@ -34,7 +37,6 @@ private:
 	bool m_showSurfacePopup = false;
 #pragma endregion
 
-
 #pragma region Intersections
 	bool m_showIntersectionPopup = false;
 	bool m_useCursorAsHint = false;
@@ -46,6 +48,20 @@ private:
 	char m_renameBuffer[128] = {};
 	char m_filterBuffer[128] = {};
 	std::optional<size_t> m_nameEditingIndex = std::nullopt;
+
+#pragma region Menu
+	void DrawSidebarPanel();
+	void DrawBoxSelectionOverlay();
+	void DrawIntersectionDialog();
+	void DrawTrimTextureOverlay();
+#pragma endregion
+
+#pragma region ListMenu
+	void DrawObjectCreationSection(int selectedPoints, std::shared_ptr<Curve> activeCurve);
+	void DrawSurfaceCreationDialog();
+	void DrawObjectListSection();
+	void DrawBatchActionSection(int selectedCount);
+#pragma endregion
 
 	void DrawActionCombo();
 	void DrawListMenu(int selectedCount, int selectedPoints, std::shared_ptr<Curve> activeCurve);

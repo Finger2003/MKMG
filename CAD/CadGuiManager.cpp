@@ -25,6 +25,16 @@ void CadGuiManager::DrawMenu()
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
+	DrawSidebarPanel();
+	DrawBoxSelectionOverlay();
+	DrawIntersectionDialog();
+	DrawTrimTextureOverlay();
+
+	ImGui::Render();
+}
+
+void CadGuiManager::DrawSidebarPanel()
+{
 	ImGui::SetNextWindowPos(ImVec2(m_app.m_renderSize.cx, 0.0f));
 	ImGui::SetNextWindowSize(ImVec2(m_app.cMenuWidth, m_app.m_renderSize.cy));
 
@@ -106,126 +116,118 @@ void CadGuiManager::DrawMenu()
 	else if (m_app.m_menuState == MenuState::EditGroup)
 		DrawEditGroupMenu(selectedCount);
 
-
 	DrawCameraSettingsMenu();
 	DrawCursorSettingsMenu();
 
 	ImGui::End();
-
-	if (m_app.m_isBoxSelecting)
-	{
-		ImDrawList* drawList = ImGui::GetForegroundDrawList();
-		auto [minX, maxX] = std::minmax(m_app.m_boxSelectStart.x, m_app.m_boxSelectCurrent.x);
-		auto [minY, maxY] = std::minmax(m_app.m_boxSelectStart.y, m_app.m_boxSelectCurrent.y);
-		ImVec2 p_min(static_cast<float>(minX), static_cast<float>(minY));
-		ImVec2 p_max(static_cast<float>(maxX), static_cast<float>(maxY));
-		bool ctrlHeld = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
-		bool shiftHeld = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
-
-		ImU32 fillCol = IM_COL32(0, 130, 255, 40);   // Default Blue
-		ImU32 borderCol = IM_COL32(0, 130, 255, 220);
-
-		if (ctrlHeld)
-		{
-			fillCol = IM_COL32(255, 50, 50, 40);   // Subtract Red
-			borderCol = IM_COL32(255, 50, 50, 220);
-		}
-		else if (shiftHeld)
-		{
-			fillCol = IM_COL32(50, 220, 50, 40);   // Append Green
-			borderCol = IM_COL32(50, 220, 50, 220);
-		}
-
-		drawList->AddRectFilled(p_min, p_max, fillCol);
-		drawList->AddRect(p_min, p_max, borderCol);
-	}
-
-	if (m_showIntersectionPopup)
-	{
-		ImGui::Begin("Intersection Parameters", &m_showIntersectionPopup, ImGuiWindowFlags_AlwaysAutoResize);
-
-		ImGui::Checkbox("Use cursor as hint", &m_useCursorAsHint);
-		ImGui::InputFloat("d", &m_intersectionStep);
-		ImGui::Spacing();
-		if (ImGui::Button("OK", ImVec2(120, 0)))
-		{
-			m_showIntersectionPopup = false;
-			m_app.ActionFindIntersection();
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Cancel", ImVec2(120, 0)))
-			m_showIntersectionPopup = false;
-		ImGui::End();
-
-	}
-
-	if (auto previewInt = m_previewIntersection.lock())
-	{
-		void* texToDraw = nullptr;
-		float aspect = 1.0f;
-
-		if (m_previewSurfaceIndex == 1 && previewInt->m_trimTexture1.texture)
-		{
-			texToDraw = (void*)previewInt->m_trimTexture1.srv.Get();
-			aspect = previewInt->m_maxDomains.x / previewInt->m_maxDomains.y;
-		}
-		else if (m_previewSurfaceIndex == 2 && previewInt->m_trimTexture2.texture)
-		{
-			texToDraw = (void*)previewInt->m_trimTexture2.srv.Get();
-			aspect = previewInt->m_maxDomains.z / previewInt->m_maxDomains.w;
-		}
-
-		if (texToDraw)
-		{
-			ImDrawList* bgDrawList = ImGui::GetBackgroundDrawList();
-
-			float padding = 40.0f;
-			float availableW = m_app.m_renderSize.cx - padding * 2.0f;
-			float availableH = m_app.m_renderSize.cy - padding * 2.0f;
-
-			float drawW = availableW;
-			float drawH = availableW / aspect;
-
-			if (drawH > availableH)
-			{
-				drawH = availableH;
-				drawW = availableH * aspect;
-			}
-
-			float offsetX = (m_app.m_renderSize.cx - drawW) * 0.5f;
-			float offsetY = (m_app.m_renderSize.cy - drawH) * 0.5f;
-
-			ImVec2 pMin(offsetX, offsetY);
-			ImVec2 pMax(offsetX + drawW, offsetY + drawH);
-
-			bgDrawList->AddRectFilled(pMin, pMax, IM_COL32(255, 255, 255, 255));
-			bgDrawList->AddImage(texToDraw, pMin, pMax);
-
-			bgDrawList->AddRect(pMin, pMax, IM_COL32(100, 100, 100, 255), 0.0f, 0, 2.0f);
-		}
-	}
-
-	ImGui::Render();
 }
 
-void CadGuiManager::DrawActionCombo()
+void CadGuiManager::DrawBoxSelectionOverlay()
 {
-	ImGui::Text("Interactive Action");
-	const char* actions[] = {
-		"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",
-		"Free Arcball", "Rotate X", "Rotate Y", "Rotate Z", "Scale", "Scale X", "Scale Y", "Scale Z"
-	};
-	int actionIndex = static_cast<int>(m_app.m_currentEditAction);
+	if (!m_app.m_isBoxSelecting)
+		return;
 
-	if (ImGui::Combo("##ObjectAction", &actionIndex, actions, IM_ARRAYSIZE(actions)))
+	ImDrawList* drawList = ImGui::GetForegroundDrawList();
+	auto [minX, maxX] = std::minmax(m_app.m_boxSelectStart.x, m_app.m_boxSelectCurrent.x);
+	auto [minY, maxY] = std::minmax(m_app.m_boxSelectStart.y, m_app.m_boxSelectCurrent.y);
+	ImVec2 p_min(static_cast<float>(minX), static_cast<float>(minY));
+	ImVec2 p_max(static_cast<float>(maxX), static_cast<float>(maxY));
+	bool ctrlHeld = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+	bool shiftHeld = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+
+	ImU32 fillCol = IM_COL32(0, 130, 255, 40);   // Default Blue
+	ImU32 borderCol = IM_COL32(0, 130, 255, 220);
+
+	if (ctrlHeld)
 	{
-		m_app.m_currentEditAction = static_cast<EditAction>(actionIndex);
+		fillCol = IM_COL32(255, 50, 50, 40);   // Subtract Red
+		borderCol = IM_COL32(255, 50, 50, 220);
+	}
+	else if (shiftHeld)
+	{
+		fillCol = IM_COL32(50, 220, 50, 40);   // Append Green
+		borderCol = IM_COL32(50, 220, 50, 220);
+	}
+
+	drawList->AddRectFilled(p_min, p_max, fillCol);
+	drawList->AddRect(p_min, p_max, borderCol);
+}
+
+void CadGuiManager::DrawIntersectionDialog()
+{
+	if (!m_showIntersectionPopup)
+		return;
+
+	ImGui::Begin("Intersection Parameters", &m_showIntersectionPopup, ImGuiWindowFlags_AlwaysAutoResize);
+
+	ImGui::Checkbox("Use cursor as hint", &m_useCursorAsHint);
+	ImGui::InputFloat("d", &m_intersectionStep);
+	ImGui::Spacing();
+
+	if (ImGui::Button("OK", ImVec2(120, 0)))
+	{
+		m_showIntersectionPopup = false;
+		m_app.ActionFindIntersection();
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Cancel", ImVec2(120, 0)))
+		m_showIntersectionPopup = false;
+
+	ImGui::End();
+}
+
+void CadGuiManager::DrawTrimTextureOverlay()
+{
+	auto previewInt = m_previewIntersection.lock();
+	if (!previewInt)
+		return;
+
+	void* texToDraw = nullptr;
+	float aspect = 1.0f;
+
+	if (m_previewSurfaceIndex == 1 && previewInt->m_trimTexture1.texture)
+	{
+		texToDraw = (void*)previewInt->m_trimTexture1.srv.Get();
+		aspect = previewInt->m_maxDomains.x / previewInt->m_maxDomains.y;
+	}
+	else if (m_previewSurfaceIndex == 2 && previewInt->m_trimTexture2.texture)
+	{
+		texToDraw = (void*)previewInt->m_trimTexture2.srv.Get();
+		aspect = previewInt->m_maxDomains.z / previewInt->m_maxDomains.w;
+	}
+
+	if (texToDraw)
+	{
+		ImDrawList* bgDrawList = ImGui::GetBackgroundDrawList();
+
+		float padding = 40.0f;
+		float availableW = m_app.m_renderSize.cx - padding * 2.0f;
+		float availableH = m_app.m_renderSize.cy - padding * 2.0f;
+
+		float drawW = availableW;
+		float drawH = availableW / aspect;
+
+		if (drawH > availableH)
+		{
+			drawH = availableH;
+			drawW = availableH * aspect;
+		}
+
+		float offsetX = (m_app.m_renderSize.cx - drawW) * 0.5f;
+		float offsetY = (m_app.m_renderSize.cy - drawH) * 0.5f;
+
+		ImVec2 pMin(offsetX, offsetY);
+		ImVec2 pMax(offsetX + drawW, offsetY + drawH);
+
+		bgDrawList->AddRectFilled(pMin, pMax, IM_COL32(255, 255, 255, 255));
+		bgDrawList->AddImage(texToDraw, pMin, pMax);
+
+		bgDrawList->AddRect(pMin, pMax, IM_COL32(100, 100, 100, 255), 0.0f, 0, 2.0f);
 	}
 }
 
-void CadGuiManager::DrawListMenu(int selectedCount, int selectedPoints, std::shared_ptr<Curve> activeCurve)
+void CadGuiManager::DrawObjectCreationSection(int selectedPoints, std::shared_ptr<Curve> activeCurve)
 {
-
 	if (ImGui::Button("Add Torus"))
 	{
 		m_app.m_sceneObjects.push_back(std::make_shared<Torus>(m_app.m_cursorPosition));
@@ -310,6 +312,11 @@ void CadGuiManager::DrawListMenu(int selectedCount, int selectedPoints, std::sha
 	}
 	ImGui::EndDisabled();
 
+
+}
+
+void CadGuiManager::DrawSurfaceCreationDialog()
+{
 	bool changed = false;
 	if (ImGui::Button("Create C0 Surface"))
 	{
@@ -324,72 +331,72 @@ void CadGuiManager::DrawListMenu(int selectedCount, int selectedPoints, std::sha
 		m_showSurfacePopup = true;
 	}
 
-	if (m_showSurfacePopup)
+	if (!m_showSurfacePopup)
+		return;
+
+	const char* popupTitle = (m_previewType == 0) ? "C0 Surface Parameters" : "C2 Surface Parameters";
+	ImGui::Begin(popupTitle, &m_showSurfacePopup);
+
+	changed |= ImGui::RadioButton("Flat", &m_previewShape, 0);
+	ImGui::SameLine();
+	changed |= ImGui::RadioButton("Cylinder", &m_previewShape, 1);
+
+	constexpr int MAX_SEGMENTS = 50;
+	int minSegU = (m_previewShape == 1) ? 3 : 1;
+
+	int oldU = m_previewSegU;
+	int oldV = m_previewSegV;
+
+	changed |= ImGui::SliderInt("Segments U", &m_previewSegU, minSegU, 10);
+	changed |= ImGui::SliderInt("Segments V", &m_previewSegV, 1, 10);
+
+	m_previewSegU = std::clamp(m_previewSegU, minSegU, MAX_SEGMENTS);
+	m_previewSegV = std::clamp(m_previewSegV, 1, MAX_SEGMENTS);
+	changed |= (m_previewSegU != oldU || m_previewSegV != oldV);
+
+	if (m_previewShape == 0)
 	{
-		const char* popupTitle = (m_previewType == 0) ? "C0 Surface Parameters" : "C2 Surface Parameters";
-		ImGui::Begin(popupTitle, &m_showSurfacePopup);
-
-
-		changed |= ImGui::RadioButton("Flat", &m_previewShape, 0);
-		ImGui::SameLine();
-		changed |= ImGui::RadioButton("Cylinder", &m_previewShape, 1);
-
-		constexpr int MAX_SEGMENTS = 50;
-		int minSegU = (m_previewShape == 1) ? 3 : 1;
-
-		int oldU = m_previewSegU;
-		int oldV = m_previewSegV;
-
-		changed |= ImGui::SliderInt("Segments U", &m_previewSegU, minSegU, 10);
-		changed |= ImGui::SliderInt("Segments V", &m_previewSegV, 1, 10);
-
-		m_previewSegU = std::clamp(m_previewSegU, minSegU, MAX_SEGMENTS);
-		m_previewSegV = std::clamp(m_previewSegV, 1, MAX_SEGMENTS);
-		changed |= (m_previewSegU != oldU || m_previewSegV != oldV);
-
-		if (m_previewShape == 0)
-		{
-			changed |= ImGui::DragFloat("Width", &m_previewWidth, 0.1f, 0.1f, 100.0f);
-			changed |= ImGui::DragFloat("Length", &m_previewDim2, 0.1f, 0.1f, 100.0f);
-		}
-		else
-		{
-			changed |= ImGui::DragFloat("Radius", &m_previewRadius, 0.1f, 0.1f, 100.0f);
-			changed |= ImGui::DragFloat("Height", &m_previewDim2, 0.1f, 0.1f, 100.0f);
-		}
-
-		if (changed)
-		{
-			m_app.m_surfaceBuilder.UpdateGeometry(
-				m_app.m_device,
-				(m_previewType == 0) ? SurfaceType::C0 : SurfaceType::C2,
-				static_cast<SurfaceShape>(m_previewShape),
-				m_previewSegU,
-				m_previewSegV,
-				(m_previewShape == 0) ? m_previewWidth : m_previewRadius,
-				m_previewDim2,
-				m_app.m_cursorPosition
-			);
-		}
-
-		if (ImGui::Button("Add to Scene"))
-		{
-			auto result = m_app.m_surfaceBuilder.Build(m_app.m_device);
-			std::shared_ptr<Surface> sharedSurface = std::move(result.surface);
-			for (auto& pt : result.points)
-			{
-				pt->AddDependent(sharedSurface);
-				m_app.m_sceneObjects.push_back(pt);
-			}
-
-			m_app.m_sceneObjects.push_back(sharedSurface);
-			m_showSurfacePopup = false;
-		}
-		ImGui::End();
+		changed |= ImGui::DragFloat("Width", &m_previewWidth, 0.1f, 0.1f, 100.0f);
+		changed |= ImGui::DragFloat("Length", &m_previewDim2, 0.1f, 0.1f, 100.0f);
+	}
+	else
+	{
+		changed |= ImGui::DragFloat("Radius", &m_previewRadius, 0.1f, 0.1f, 100.0f);
+		changed |= ImGui::DragFloat("Height", &m_previewDim2, 0.1f, 0.1f, 100.0f);
 	}
 
-	ImGui::Separator();
+	if (changed)
+	{
+		m_app.m_surfaceBuilder.UpdateGeometry(
+			m_app.m_device,
+			(m_previewType == 0) ? SurfaceType::C0 : SurfaceType::C2,
+			static_cast<SurfaceShape>(m_previewShape),
+			m_previewSegU,
+			m_previewSegV,
+			(m_previewShape == 0) ? m_previewWidth : m_previewRadius,
+			m_previewDim2,
+			m_app.m_cursorPosition
+		);
+	}
 
+	if (ImGui::Button("Add to Scene"))
+	{
+		auto result = m_app.m_surfaceBuilder.Build(m_app.m_device);
+		std::shared_ptr<Surface> sharedSurface = std::move(result.surface);
+		for (auto& pt : result.points)
+		{
+			pt->AddDependent(sharedSurface);
+			m_app.m_sceneObjects.push_back(pt);
+		}
+
+		m_app.m_sceneObjects.push_back(sharedSurface);
+		m_showSurfacePopup = false;
+	}
+	ImGui::End();
+}
+
+void CadGuiManager::DrawObjectListSection()
+{
 	ImGui::InputText("##Search", m_filterBuffer, IM_ARRAYSIZE(m_filterBuffer));
 	ImGui::SameLine();
 	if (ImGui::Button("Clear"))
@@ -438,9 +445,10 @@ void CadGuiManager::DrawListMenu(int selectedCount, int selectedPoints, std::sha
 		ImGui::PopID();
 	}
 	ImGui::EndChild();
+}
 
-	ImGui::Separator();
-
+void CadGuiManager::DrawBatchActionSection(int selectedCount)
+{
 	ImGui::BeginDisabled(selectedCount == 0);
 	if (selectedCount == 1)
 	{
@@ -490,6 +498,32 @@ void CadGuiManager::DrawListMenu(int selectedCount, int selectedPoints, std::sha
 		m_app.m_isEditing = false;
 	}
 	ImGui::EndDisabled();
+}
+
+void CadGuiManager::DrawActionCombo()
+{
+	ImGui::Text("Interactive Action");
+	const char* actions[] = {
+		"None", "Free Translation", "Translate X", "Translate Y", "Translate Z",
+		"Free Arcball", "Rotate X", "Rotate Y", "Rotate Z", "Scale", "Scale X", "Scale Y", "Scale Z"
+	};
+	int actionIndex = static_cast<int>(m_app.m_currentEditAction);
+
+	if (ImGui::Combo("##ObjectAction", &actionIndex, actions, IM_ARRAYSIZE(actions)))
+	{
+		m_app.m_currentEditAction = static_cast<EditAction>(actionIndex);
+	}
+}
+
+void CadGuiManager::DrawListMenu(int selectedCount, int selectedPoints, std::shared_ptr<Curve> activeCurve)
+{
+	DrawObjectCreationSection(selectedPoints, activeCurve);
+
+	ImGui::Separator();
+	DrawObjectListSection();
+
+	ImGui::Separator();
+	DrawBatchActionSection(selectedCount);
 }
 
 void CadGuiManager::DrawCurveList(Curve* curve, int selectedCount)
