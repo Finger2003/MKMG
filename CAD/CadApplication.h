@@ -177,7 +177,6 @@ private:
 
 	std::optional<size_t> m_lastClickedIndex = std::nullopt;
 	std::optional<size_t> m_lastCurveClickedIndex = std::nullopt;
-	std::optional<size_t> m_nameEditingIndex = std::nullopt;
 
 	MenuState m_menuState = MenuState::List;
 	EditAction m_currentEditAction = EditAction::None;
@@ -258,19 +257,9 @@ private:
 
 
 #pragma region SurfaceCreation
-	bool m_showSurfacePopup = false;
-	int m_previewSegU = 1;
-	int m_previewSegV = 1;
-	float m_previewWidth = 1.0f; // Width
-	float m_previewDim2 = 1.0f; // Length or Height
-	float m_previewRadius = m_previewWidth / (2.0f * std::numbers::pi_v<float>);
-	int m_previewType = 0; // 0 = C0, 1 = C2
-	int m_previewShape = 0;     // 0 = Flat, 1 = Cylinder
 
 	SurfaceBuilder m_surfaceBuilder;
 #pragma endregion
-
-	//static bool ContainsCaseInsensitive(const std::string& str, const std::string& substr);
 
 #pragma region Serialization
 	std::wstring m_currentFilePath;
@@ -297,18 +286,9 @@ private:
 
 
 #pragma region Intersections
-	std::weak_ptr<Intersection> m_previewIntersection;
 	MathLib::Vec4f m_intersectionStartParams{ 0.0f, 0.0f, 0.0f, 0.0f };
-	float m_intersectionStep = 0.01f;
-	int m_previewSurfaceIndex = 0;
-	bool m_showIntersectionPopup = false;
-	bool m_useCursorAsHint = false;
-
 	void ActionFindIntersection();
 	void RenderTrimTextures(Intersection* intersection, const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	//void DrawIntersectionList(std::shared_ptr<Intersection> intersection);
-	
-
 #pragma endregion
 };
 

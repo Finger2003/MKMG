@@ -612,7 +612,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		}
 		else if (msg.wParam == 'I')
 		{
-			m_showIntersectionPopup = true;
+			m_guiManager.ShowIntersectionPopup();
 			return true;
 		}
 		break;
@@ -1080,7 +1080,7 @@ void CadApplication::DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext
 		}
 	}
 
-	if (m_showSurfacePopup)
+	if (m_guiManager.IsSurfacePreviewActive())
 	{
 		for (auto& point : m_surfaceBuilder.rawPoints)
 		{
@@ -1184,7 +1184,7 @@ void CadApplication::DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3
 void CadApplication::DrawSurfaces(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
 {
 	context->IASetInputLayout(m_layoutUV.Get());
-	if (m_showSurfacePopup && m_surfaceBuilder.m_patchIndexCount > 0)// && m_previewSurface)
+	if (m_guiManager.IsSurfacePreviewActive() && m_surfaceBuilder.m_patchIndexCount > 0)// && m_previewSurface)
 	{
 		UINT stride = sizeof(VertexPositionUV);
 		UINT offset = 0;
@@ -1714,7 +1714,8 @@ void CadApplication::ActionFindIntersection()
 	};
 	std::vector<Candidate> sortedCandidates;
 
-	if (m_useCursorAsHint)
+	//if (m_useCursorAsHint)
+	if (m_guiManager.UseCursorAsHint())
 	{
 		constexpr int cursorSamples = 50;
 		Vec3f cursorPos(m_cursorPosition.x, m_cursorPosition.y, m_cursorPosition.z);
@@ -1944,7 +1945,7 @@ void CadApplication::ActionFindIntersection()
 		return;
 
 	m_intersectionStartParams = currentParams;
-	float d = m_intersectionStep;
+	float d = m_guiManager.GetIntersectionStep();
 
 	// =============================================================
 	// STAGE 3: TRACE THE INTERSECTION CURVE

@@ -96,10 +96,10 @@ void CadGuiManager::DrawMenu()
 			if (intersection->selected && selectedIntersections == 1)
 				DrawIntersectionList(intersection);
 			else
-				m_app.m_previewIntersection.reset();
+				m_previewIntersection.reset();
 		}
 		else
-			m_app.m_previewIntersection.reset();
+			m_previewIntersection.reset();
 	}
 	else if (m_app.m_menuState == MenuState::Edit)
 		DrawEditMenu();
@@ -140,36 +140,36 @@ void CadGuiManager::DrawMenu()
 		drawList->AddRect(p_min, p_max, borderCol);
 	}
 
-	if (m_app.m_showIntersectionPopup)
+	if (m_showIntersectionPopup)
 	{
-		ImGui::Begin("Intersection Parameters", &m_app.m_showIntersectionPopup, ImGuiWindowFlags_AlwaysAutoResize);
+		ImGui::Begin("Intersection Parameters", &m_showIntersectionPopup, ImGuiWindowFlags_AlwaysAutoResize);
 
-		ImGui::Checkbox("Use cursor as hint", &m_app.m_useCursorAsHint);
-		ImGui::InputFloat("d", &m_app.m_intersectionStep);
+		ImGui::Checkbox("Use cursor as hint", &m_useCursorAsHint);
+		ImGui::InputFloat("d", &m_intersectionStep);
 		ImGui::Spacing();
 		if (ImGui::Button("OK", ImVec2(120, 0)))
 		{
-			m_app.m_showIntersectionPopup = false;
+			m_showIntersectionPopup = false;
 			m_app.ActionFindIntersection();
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Cancel", ImVec2(120, 0)))
-			m_app.m_showIntersectionPopup = false;
+			m_showIntersectionPopup = false;
 		ImGui::End();
 
 	}
 
-	if (auto previewInt = m_app.m_previewIntersection.lock())
+	if (auto previewInt = m_previewIntersection.lock())
 	{
 		void* texToDraw = nullptr;
 		float aspect = 1.0f;
 
-		if (m_app.m_previewSurfaceIndex == 1 && previewInt->m_trimTexture1.texture)
+		if (m_previewSurfaceIndex == 1 && previewInt->m_trimTexture1.texture)
 		{
 			texToDraw = (void*)previewInt->m_trimTexture1.srv.Get();
 			aspect = previewInt->m_maxDomains.x / previewInt->m_maxDomains.y;
 		}
-		else if (m_app.m_previewSurfaceIndex == 2 && previewInt->m_trimTexture2.texture)
+		else if (m_previewSurfaceIndex == 2 && previewInt->m_trimTexture2.texture)
 		{
 			texToDraw = (void*)previewInt->m_trimTexture2.srv.Get();
 			aspect = previewInt->m_maxDomains.z / previewInt->m_maxDomains.w;
@@ -313,61 +313,61 @@ void CadGuiManager::DrawListMenu(int selectedCount, int selectedPoints, std::sha
 	bool changed = false;
 	if (ImGui::Button("Create C0 Surface"))
 	{
-		m_app.m_previewType = 0;
+		m_previewType = 0;
 		changed = true;
-		m_app.m_showSurfacePopup = true;
+		m_showSurfacePopup = true;
 	}
 	if (ImGui::Button("Create C2 Surface"))
 	{
-		m_app.m_previewType = 1;
+		m_previewType = 1;
 		changed = true;
-		m_app.m_showSurfacePopup = true;
+		m_showSurfacePopup = true;
 	}
 
-	if (m_app.m_showSurfacePopup)
+	if (m_showSurfacePopup)
 	{
-		const char* popupTitle = (m_app.m_previewType == 0) ? "C0 Surface Parameters" : "C2 Surface Parameters";
-		ImGui::Begin(popupTitle, &m_app.m_showSurfacePopup);
+		const char* popupTitle = (m_previewType == 0) ? "C0 Surface Parameters" : "C2 Surface Parameters";
+		ImGui::Begin(popupTitle, &m_showSurfacePopup);
 
 
-		changed |= ImGui::RadioButton("Flat", &m_app.m_previewShape, 0);
+		changed |= ImGui::RadioButton("Flat", &m_previewShape, 0);
 		ImGui::SameLine();
-		changed |= ImGui::RadioButton("Cylinder", &m_app.m_previewShape, 1);
+		changed |= ImGui::RadioButton("Cylinder", &m_previewShape, 1);
 
 		constexpr int MAX_SEGMENTS = 50;
-		int minSegU = (m_app.m_previewShape == 1) ? 3 : 1;
+		int minSegU = (m_previewShape == 1) ? 3 : 1;
 
-		int oldU = m_app.m_previewSegU;
-		int oldV = m_app.m_previewSegV;
+		int oldU = m_previewSegU;
+		int oldV = m_previewSegV;
 
-		changed |= ImGui::SliderInt("Segments U", &m_app.m_previewSegU, minSegU, 10);
-		changed |= ImGui::SliderInt("Segments V", &m_app.m_previewSegV, 1, 10);
+		changed |= ImGui::SliderInt("Segments U", &m_previewSegU, minSegU, 10);
+		changed |= ImGui::SliderInt("Segments V", &m_previewSegV, 1, 10);
 
-		m_app.m_previewSegU = std::clamp(m_app.m_previewSegU, minSegU, MAX_SEGMENTS);
-		m_app.m_previewSegV = std::clamp(m_app.m_previewSegV, 1, MAX_SEGMENTS);
-		changed |= (m_app.m_previewSegU != oldU || m_app.m_previewSegV != oldV);
+		m_previewSegU = std::clamp(m_previewSegU, minSegU, MAX_SEGMENTS);
+		m_previewSegV = std::clamp(m_previewSegV, 1, MAX_SEGMENTS);
+		changed |= (m_previewSegU != oldU || m_previewSegV != oldV);
 
-		if (m_app.m_previewShape == 0)
+		if (m_previewShape == 0)
 		{
-			changed |= ImGui::DragFloat("Width", &m_app.m_previewWidth, 0.1f, 0.1f, 100.0f);
-			changed |= ImGui::DragFloat("Length", &m_app.m_previewDim2, 0.1f, 0.1f, 100.0f);
+			changed |= ImGui::DragFloat("Width", &m_previewWidth, 0.1f, 0.1f, 100.0f);
+			changed |= ImGui::DragFloat("Length", &m_previewDim2, 0.1f, 0.1f, 100.0f);
 		}
 		else
 		{
-			changed |= ImGui::DragFloat("Radius", &m_app.m_previewRadius, 0.1f, 0.1f, 100.0f);
-			changed |= ImGui::DragFloat("Height", &m_app.m_previewDim2, 0.1f, 0.1f, 100.0f);
+			changed |= ImGui::DragFloat("Radius", &m_previewRadius, 0.1f, 0.1f, 100.0f);
+			changed |= ImGui::DragFloat("Height", &m_previewDim2, 0.1f, 0.1f, 100.0f);
 		}
 
 		if (changed)
 		{
 			m_app.m_surfaceBuilder.UpdateGeometry(
 				m_app.m_device,
-				(m_app.m_previewType == 0) ? SurfaceType::C0 : SurfaceType::C2,
-				static_cast<SurfaceShape>(m_app.m_previewShape),
-				m_app.m_previewSegU,
-				m_app.m_previewSegV,
-				(m_app.m_previewShape == 0) ? m_app.m_previewWidth : m_app.m_previewRadius,
-				m_app.m_previewDim2,
+				(m_previewType == 0) ? SurfaceType::C0 : SurfaceType::C2,
+				static_cast<SurfaceShape>(m_previewShape),
+				m_previewSegU,
+				m_previewSegV,
+				(m_previewShape == 0) ? m_previewWidth : m_previewRadius,
+				m_previewDim2,
 				m_app.m_cursorPosition
 			);
 		}
@@ -383,7 +383,7 @@ void CadGuiManager::DrawListMenu(int selectedCount, int selectedPoints, std::sha
 			}
 
 			m_app.m_sceneObjects.push_back(sharedSurface);
-			m_app.m_showSurfacePopup = false;
+			m_showSurfacePopup = false;
 		}
 		ImGui::End();
 	}
@@ -405,7 +405,7 @@ void CadGuiManager::DrawListMenu(int selectedCount, int selectedPoints, std::sha
 			continue;
 		ImGui::PushID(i);
 
-		if (m_app.m_nameEditingIndex == i)
+		if (m_nameEditingIndex == i)
 		{
 			ImGui::SetKeyboardFocusHere();
 			if (ImGui::InputText("##rename", m_renameBuffer, IM_ARRAYSIZE(m_renameBuffer),
@@ -413,12 +413,12 @@ void CadGuiManager::DrawListMenu(int selectedCount, int selectedPoints, std::sha
 			{
 
 				obj->name = std::string(m_renameBuffer);
-				m_app.m_nameEditingIndex = std::nullopt;
+				m_nameEditingIndex = std::nullopt;
 			}
 
 			if (!ImGui::IsItemActive() && ImGui::IsMouseClicked(0))
 			{
-				m_app.m_nameEditingIndex = std::nullopt;
+				m_nameEditingIndex = std::nullopt;
 			}
 		}
 		else
@@ -430,7 +430,7 @@ void CadGuiManager::DrawListMenu(int selectedCount, int selectedPoints, std::sha
 
 			if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
 			{
-				m_app.m_nameEditingIndex = i;
+				m_nameEditingIndex = i;
 				strncpy_s(m_renameBuffer, obj->name.c_str(), sizeof(m_renameBuffer) - 1);
 			}
 		}
@@ -948,20 +948,20 @@ void CadGuiManager::DrawIntersectionList(std::shared_ptr<Intersection> intersect
 	if (changed)
 		m_app.RenderTrimTextures(intersection.get(), m_app.m_device.getContext());
 
-	bool isPreviewS1 = (m_app.m_previewIntersection.lock() == intersection && m_app.m_previewSurfaceIndex == 1);
-	bool isPreviewS2 = (m_app.m_previewIntersection.lock() == intersection && m_app.m_previewSurfaceIndex == 2);
+	bool isPreviewS1 = (m_previewIntersection.lock() == intersection && m_previewSurfaceIndex == 1);
+	bool isPreviewS2 = (m_previewIntersection.lock() == intersection && m_previewSurfaceIndex == 2);
 
 	if (ImGui::Button(isPreviewS1 ? "Close S1 Parametrization" : "S1 Parametrization", ImVec2(-1, 0)))
 	{
 		if (isPreviewS1)
 		{
-			m_app.m_previewIntersection.reset();
-			m_app.m_previewSurfaceIndex = 0;
+			m_previewIntersection.reset();
+			m_previewSurfaceIndex = 0;
 		}
 		else
 		{
-			m_app.m_previewIntersection = intersection;
-			m_app.m_previewSurfaceIndex = 1;
+			m_previewIntersection = intersection;
+			m_previewSurfaceIndex = 1;
 		}
 	}
 
@@ -969,13 +969,13 @@ void CadGuiManager::DrawIntersectionList(std::shared_ptr<Intersection> intersect
 	{
 		if (isPreviewS2)
 		{
-			m_app.m_previewIntersection.reset();
-			m_app.m_previewSurfaceIndex = 0;
+			m_previewIntersection.reset();
+			m_previewSurfaceIndex = 0;
 		}
 		else
 		{
-			m_app.m_previewIntersection = intersection;
-			m_app.m_previewSurfaceIndex = 2;
+			m_previewIntersection = intersection;
+			m_previewSurfaceIndex = 2;
 		}
 	}
 	if (intersection->type == ObjectType::LinearIntersection)
@@ -990,8 +990,8 @@ void CadGuiManager::DrawIntersectionList(std::shared_ptr<Intersection> intersect
 				*it = bezInt;
 
 			bezInt->selected = true;
-			if (m_app.m_previewIntersection.lock() == intersection)
-				m_app.m_previewIntersection = bezInt;
+			if (m_previewIntersection.lock() == intersection)
+				m_previewIntersection = bezInt;
 		}
 	}
 }
