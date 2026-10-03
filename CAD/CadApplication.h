@@ -205,6 +205,14 @@ private:
 	void InitImGui();
 	void HandleSurfaceListSelection(Surface* surface, size_t index, bool ctrlHeld, bool shiftHeld);
 	void DrawCursor(float3 position, float scale);
+	void AddTorusAtCursor();
+	void AddPointAtCursor(std::shared_ptr<Curve> targetCurve = nullptr);
+	std::shared_ptr<Curve> GetSingleSelectedCurve() const;
+
+	template<CurveType T>
+	void CreateCurveFromSelectedPoints();
+	void AddSurface();
+
 	void DeleteSelectedObjects();
 #pragma endregion
 
@@ -294,6 +302,25 @@ private:
 
 
 
+template<CurveType T>
+inline void CadApplication::CreateCurveFromSelectedPoints()
+{
+	std::vector<std::weak_ptr<Point>> pts;
+	for (const auto& obj : m_sceneObjects)
+	{
+		if (obj->selected && obj->type == ObjectType::Point)
+			pts.push_back(std::static_pointer_cast<Point>(obj));
+	}
+
+	auto newCurve = std::make_shared<T>(std::move(pts));
+	for (const auto& cpWeak : newCurve->m_controlPoints)
+	{
+		if (auto cp = cpWeak.lock())
+			cp->AddDependent(newCurve);
+	}
+	m_sceneObjects.push_back(newCurve);
+}
+
 template<IsFileDialog DialogType>
 inline std::wstring CadApplication::ShowFileDialog()
 {
@@ -303,7 +330,7 @@ inline std::wstring CadApplication::ShowFileDialog()
 	if (FAILED(CoCreateInstance(DialogTraits<DialogType>::Clsid, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pDialog))))
 		return L"";
 
-	COMDLG_FILTERSPEC rgSpec[] = { { L"JSON Scene Files", L"*.json" }, { L"All Files", L"*.*" } };
+	COMDLG_FILTERSPEC rgSpec[] = { { L"JSON Scene Files", L"*.json" },{ L"All Files", L"*.*" } };
 	pDialog->SetFileTypes(ARRAYSIZE(rgSpec), rgSpec);
 	pDialog->SetDefaultExtension(L"json");
 
@@ -324,7 +351,7 @@ inline std::wstring CadApplication::ShowFileDialog()
 			pItem->Release();
 		}
 		pDialog->Release();
-	}	
+	}
 
 	return resultPath;
 }

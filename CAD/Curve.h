@@ -28,3 +28,7 @@ protected:
 	virtual ~Curve() = default;
 	void UpdateBuffer(const DxDevice& device, Microsoft::WRL::ComPtr<ID3D11Buffer>& buffer, UINT& capacity, const std::vector<VertexPosition>& data, UINT& vertexCount, UINT minCount);
 };
+
+template<typename T>
+concept CurveType = std::derived_from<T, Curve>;
+

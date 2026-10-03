@@ -443,6 +443,51 @@ void CadApplication::DrawCursor(float3 position, float scale)
 	context->Draw(Cursor3D::VertexCount, 0);
 }
 
+void CadApplication::AddTorusAtCursor()
+{
+	m_sceneObjects.push_back(std::make_shared<Torus>(m_cursorPosition));
+}
+
+void CadApplication::AddPointAtCursor(std::shared_ptr<Curve> targetCurve)
+{
+	auto newPoint = std::make_shared<Point>(m_cursorPosition);
+	m_sceneObjects.push_back(newPoint);
+	if (targetCurve)
+	{
+		targetCurve->m_controlPoints.push_back(newPoint);
+		newPoint->AddDependent(targetCurve);
+		targetCurve->MarkDirty();
+	}
+}
+
+std::shared_ptr<Curve> CadApplication::GetSingleSelectedCurve() const
+{
+	std::shared_ptr<Curve> activeCurve;
+	int selectedCurves = 0;
+	for (const auto& obj : m_sceneObjects)
+	{
+		if (obj->selected && obj->IsA(ObjectType::Curve))
+		{
+			selectedCurves++;
+			activeCurve = std::static_pointer_cast<Curve>(obj);
+		}
+	}
+	return selectedCurves == 1 ? activeCurve : nullptr;
+}
+
+void CadApplication::AddSurface()
+{
+	auto result = m_surfaceBuilder.Build(m_device);
+	std::shared_ptr<Surface> sharedSurface = std::move(result.surface);
+	for (auto& pt : result.points)
+	{
+		pt->AddDependent(sharedSurface);
+		m_sceneObjects.push_back(pt);
+	}
+
+	m_sceneObjects.push_back(sharedSurface);
+}
+
 void CadApplication::DeleteSelectedObjects()
 {
 	auto unbindTexture = [](std::weak_ptr<SceneObject> objWeak, ID3D11ShaderResourceView* texToMatch) {
@@ -666,27 +711,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 				static_cast<float>(m_renderSize.cx), static_cast<float>(m_renderSize.cy));
 			m_cursorPosition = m_camera.GetPositionOnFocalPlane(normX, normY);
 
-			auto newPoint = std::make_shared<Point>(m_cursorPosition);
-			m_sceneObjects.push_back(newPoint);
-
-			std::shared_ptr<Curve> activeCurve;
-			int selectedCurves = 0;
-			for (const auto& obj : m_sceneObjects)
-			{
-				if (obj->selected && obj->IsA(ObjectType::Curve))
-				{
-					selectedCurves++;
-					activeCurve = std::static_pointer_cast<Curve>(obj);
-				}
-			}
-
-			if (selectedCurves == 1 && activeCurve)
-			{
-				activeCurve->m_controlPoints.push_back(newPoint);
-				newPoint->AddDependent(activeCurve);
-				activeCurve->MarkDirty();
-			}
-
+			AddPointAtCursor(GetSingleSelectedCurve());
 			return true;
 		}
 

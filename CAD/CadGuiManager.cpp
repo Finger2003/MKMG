@@ -230,50 +230,21 @@ void CadGuiManager::DrawObjectCreationSection(int selectedPoints, std::shared_pt
 {
 	if (ImGui::Button("Add Torus"))
 	{
-		m_app.m_sceneObjects.push_back(std::make_shared<Torus>(m_app.m_cursorPosition));
+		m_app.AddTorusAtCursor();
 	}
 
 	if (ImGui::Button("Add Point"))
 	{
-		auto newPoint = std::make_shared<Point>(m_app.m_cursorPosition);
-		m_app.m_sceneObjects.push_back(newPoint);
-		if (activeCurve)
-		{
-			activeCurve->m_controlPoints.push_back(newPoint);
-			newPoint->AddDependent(activeCurve);
-			activeCurve->MarkDirty();
-		}
+		m_app.AddPointAtCursor(activeCurve);
 	}
-
-	auto getSelectedPoints = [&]() {
-		std::vector<std::weak_ptr<Point>> pts;
-		for (const auto& obj : m_app.m_sceneObjects)
-		{
-			if (obj->selected && obj->type == ObjectType::Point)
-				pts.push_back(std::static_pointer_cast<Point>(obj));
-		}
-		return pts;
-		};
-
-	auto createAndRegisterCurve = [&]<typename CurveType>()
-	{
-		auto pts = getSelectedPoints();
-		auto newCurve = std::make_shared<CurveType>(std::move(pts));
-		for (const auto& cpWeak : newCurve->m_controlPoints)
-		{
-			if (auto cp = cpWeak.lock())
-				cp->AddDependent(newCurve);
-		}
-		m_app.m_sceneObjects.push_back(newCurve);
-	};
 
 	ImGui::BeginDisabled(selectedPoints == 0);
 	if (ImGui::Button("Add Bezier Curve"))
-		createAndRegisterCurve.operator() < BezierCurve > ();
+		m_app.CreateCurveFromSelectedPoints<BezierCurve>();
 	if (ImGui::Button("Add B-Spline (C2) Curve"))
-		createAndRegisterCurve.operator() < BSplineCurve > ();
+		m_app.CreateCurveFromSelectedPoints<BSplineCurve>();
 	if (ImGui::Button("Add Interpolating Spline (C2)"))
-		createAndRegisterCurve.operator() < InterpolatingCurve > ();
+		m_app.CreateCurveFromSelectedPoints<InterpolatingCurve>();
 	ImGui::EndDisabled();
 
 	std::vector<std::shared_ptr<Point>> pointsToAdd;
@@ -311,8 +282,6 @@ void CadGuiManager::DrawObjectCreationSection(int selectedPoints, std::shared_pt
 		activeCurve->MarkDirty();
 	}
 	ImGui::EndDisabled();
-
-
 }
 
 void CadGuiManager::DrawSurfaceCreationDialog()
@@ -381,15 +350,7 @@ void CadGuiManager::DrawSurfaceCreationDialog()
 
 	if (ImGui::Button("Add to Scene"))
 	{
-		auto result = m_app.m_surfaceBuilder.Build(m_app.m_device);
-		std::shared_ptr<Surface> sharedSurface = std::move(result.surface);
-		for (auto& pt : result.points)
-		{
-			pt->AddDependent(sharedSurface);
-			m_app.m_sceneObjects.push_back(pt);
-		}
-
-		m_app.m_sceneObjects.push_back(sharedSurface);
+		m_app.AddSurface();
 		m_showSurfacePopup = false;
 	}
 	ImGui::End();
@@ -518,6 +479,7 @@ void CadGuiManager::DrawActionCombo()
 void CadGuiManager::DrawListMenu(int selectedCount, int selectedPoints, std::shared_ptr<Curve> activeCurve)
 {
 	DrawObjectCreationSection(selectedPoints, activeCurve);
+	DrawSurfaceCreationDialog();
 
 	ImGui::Separator();
 	DrawObjectListSection();
