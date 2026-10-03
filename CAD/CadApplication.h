@@ -15,6 +15,7 @@
 #include "SurfaceBuilder.h"
 #include "GregoryPatch.h"
 #include "Intersection.h"
+#include "CadGuiManager.h"
 
 struct PerPointBuffer
 {
@@ -162,8 +163,6 @@ private:
 	static constexpr int cMinWidth = 500;
 	static constexpr int cMinHeight = 500;
 #pragma endregion
-	char m_renameBuffer[128] = {};
-	char m_filterBuffer[128] = {};
 	Camera m_camera;
 
 	MathLib::Vec3f m_startArcballVector{};
@@ -202,21 +201,10 @@ private:
 	void BeginVirtualEditAction(int mouseX, int mouseY, const VirtualPointMapping& mapping);
 	void ApplyVirtualEditTransform(int mouseX, int mouseY);
 #pragma region Menu Methods
+	friend class CadGuiManager;
+	CadGuiManager m_guiManager;
 	void InitImGui();
-	void DrawMenu();
-	void DrawListMenu(int selectedCount, int selectedPoints, std::shared_ptr<Curve> activeCurve);
-	void DrawCurveList(Curve* curve, int selectedCount);
-	void DrawSurfaceList(Surface* surface, int selectedCount);
 	void HandleSurfaceListSelection(Surface* surface, size_t index, bool ctrlHeld, bool shiftHeld);
-	void DrawEditMenu();
-	void DrawTorusMenu(Torus& torus);
-	void DrawPointMenu(Point& selectedObj);
-	void DrawSurfaceMenu(Surface& surface);
-	void DrawPatchMenu(GregoryPatch& patch);
-	void DrawActionCombo();
-	void DrawEditGroupMenu(int selectedCount);
-	void DrawCameraSettingsMenu();
-	void DrawCursorSettingsMenu();
 	void DrawCursor(float3 position, float scale);
 	void DeleteSelectedObjects();
 #pragma endregion
@@ -282,7 +270,7 @@ private:
 	SurfaceBuilder m_surfaceBuilder;
 #pragma endregion
 
-	static bool ContainsCaseInsensitive(const std::string& str, const std::string& substr);
+	//static bool ContainsCaseInsensitive(const std::string& str, const std::string& substr);
 
 #pragma region Serialization
 	std::wstring m_currentFilePath;
@@ -318,7 +306,7 @@ private:
 
 	void ActionFindIntersection();
 	void RenderTrimTextures(Intersection* intersection, const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawIntersectionList(std::shared_ptr<Intersection> intersection);
+	//void DrawIntersectionList(std::shared_ptr<Intersection> intersection);
 	
 
 #pragma endregion

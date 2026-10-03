@@ -156,6 +156,7 @@
     <ClCompile Include="BSplineCurve.cpp" />
     <ClCompile Include="BSplineSurface.cpp" />
     <ClCompile Include="CadApplication.cpp" />
+    <ClCompile Include="CadGuiManager.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Cursor3D.cpp" />
     <ClCompile Include="Curve.cpp" />
@@ -191,6 +192,7 @@
     <ClInclude Include="BSplineCurve.h" />
     <ClInclude Include="BSplineSurface.h" />
     <ClInclude Include="CadApplication.h" />
+    <ClInclude Include="CadGuiManager.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Cursor3D.h" />
     <ClInclude Include="Curve.h" />
