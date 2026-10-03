@@ -13,6 +13,7 @@ struct Cursor3D
 	static constexpr int VertexCount = 10; // 5 line segments, 2 vertices each
 
 	const Microsoft::WRL::ComPtr<ID3D11Buffer>& GetVertexBuffer() const { return s_vertexBuffer; }
+	const static Microsoft::WRL::ComPtr<ID3D11Buffer>& GetStaticVertexBuffer() { return s_vertexBuffer; }
 
 	//MathLib::Mat4f GetTranslationMatrix() const;
 

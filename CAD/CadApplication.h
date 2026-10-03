@@ -16,28 +16,29 @@
 #include "GregoryPatch.h"
 #include "Intersection.h"
 #include "CadGuiManager.h"
+#include "SceneRenderer.h"
 
-struct PerPointBuffer
-{
-	MathLib::Vec4f color;
-};
-
-
-struct PerObjectBuffer
-{
-	MathLib::Mat4f model;
-	MathLib::Vec4f color;
-	MathLib::Vec4f surfaceParams;
-};
-
-struct PerPassBuffer
-{
-	MathLib::Mat4f viewProj;
-	float aspectRatio;
-	float renderSize[2];
-	float padding;
-	MathLib::Vec4f stereoTint;
-};
+//struct PerPointBuffer
+//{
+//	MathLib::Vec4f color;
+//};
+//
+//
+//struct PerObjectBuffer
+//{
+//	MathLib::Mat4f model;
+//	MathLib::Vec4f color;
+//	MathLib::Vec4f surfaceParams;
+//};
+//
+//struct PerPassBuffer
+//{
+//	MathLib::Mat4f viewProj;
+//	float aspectRatio;
+//	float renderSize[2];
+//	float padding;
+//	MathLib::Vec4f stereoTint;
+//};
 
 enum class InteractionMode
 {
@@ -125,38 +126,8 @@ protected:
 
 
 	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_depthBuffer;
-	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_vertexShader;
-	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_torusVertexShader;
-	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_pixelShader;
-	Microsoft::WRL::ComPtr<ID3D11InputLayout> m_layout;
-	Microsoft::WRL::ComPtr<ID3D11InputLayout> m_layoutUV;
+	SceneRenderer m_sceneRenderer;
 
-	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_pointVertexShader;
-	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_pointPixelShader;
-	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_trimPixelShader;
-	Microsoft::WRL::ComPtr<ID3D11GeometryShader> m_pointGeometryShader;
-	//Microsoft::WRL::ComPtr<ID3D11InputLayout> m_pointLayout;
-
-	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_bezierVertexShader;
-	Microsoft::WRL::ComPtr<ID3D11GeometryShader> m_bezierGeometryShader;
-
-	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_surfaceVertexShader;
-	Microsoft::WRL::ComPtr<ID3D11DomainShader> m_surfaceDomainShader;
-	Microsoft::WRL::ComPtr<ID3D11HullShader> m_surfaceHullShader;
-
-	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_gregoryVertexShader;
-	Microsoft::WRL::ComPtr<ID3D11DomainShader> m_gregoryDomainShader;
-	Microsoft::WRL::ComPtr<ID3D11HullShader> m_gregoryHullShader;
-
-
-	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerObject;
-	Microsoft::WRL::ComPtr<ID3D11Buffer> m_cbPerPass;
-
-	Microsoft::WRL::ComPtr<ID3D11BlendState> m_blendStateAnaglyph;
-	Microsoft::WRL::ComPtr<ID3D11BlendState> m_blendStateDefault;
-
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_dummyTrimTextureSRV;
-	Microsoft::WRL::ComPtr<ID3D11SamplerState> m_trimSampler;
 private:
 #pragma region Constants
 	static constexpr float cMenuWidth = 400.0f;
@@ -204,7 +175,6 @@ private:
 	CadGuiManager m_guiManager;
 	void InitImGui();
 	void HandleSurfaceListSelection(Surface* surface, size_t index, bool ctrlHeld, bool shiftHeld);
-	void DrawCursor(float3 position, float scale);
 	void AddTorusAtCursor();
 	void AddPointAtCursor(std::shared_ptr<Curve> targetCurve = nullptr);
 	std::shared_ptr<Curve> GetSingleSelectedCurve() const;
@@ -233,23 +203,6 @@ private:
 
 	void BeginEditAction(int xPos, int yPos, bool shiftHeld);
 	void ApplyEditTransform(int mouseX, int mouseY);
-
-
-#pragma region Rendering Methods
-	void DrawCursors(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawSurfaces(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context, Surface* surface, MathLib::Vec4f color);
-	void DrawSurfacesPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawGregoryPatches(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawGregoryPatchesTangents(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawLinearIntersections(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-	void DrawBezierIntersections(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-#pragma endregion
 
 #pragma region stereoscopy
 	bool m_enableStereo = false;
@@ -296,7 +249,7 @@ private:
 #pragma region Intersections
 	MathLib::Vec4f m_intersectionStartParams{ 0.0f, 0.0f, 0.0f, 0.0f };
 	void ActionFindIntersection();
-	void RenderTrimTextures(Intersection* intersection, const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
+	void RenderTrimTextures(Intersection* intersection) { m_sceneRenderer.RenderTrimTextures(intersection); }
 #pragma endregion
 };
 

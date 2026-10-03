@@ -39,7 +39,7 @@ namespace
 }
 
 CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight, std::wstring wndTitle)
-	:DxApplication(hInstance, wndWidth, wndHeight, wndTitle), m_guiManager(*this)
+	:DxApplication(hInstance, wndWidth, wndHeight, wndTitle), m_guiManager(*this), m_sceneRenderer(m_device)
 {
 	SIZE wndSize = m_window.getClientSize();
 	m_depthBuffer = m_device.CreateDepthStencilView(wndSize);
@@ -48,82 +48,82 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	Viewport viewport{ wndSize };
 	m_device.getContext()->RSSetViewports(1, &viewport);
 
-	const auto vsByteCode = DxDevice::LoadByteCode(L"VertexShader.cso");
-	const auto psByteCode = DxDevice::LoadByteCode(L"PixelShader.cso");
-	const auto pointVsByteCode = DxDevice::LoadByteCode(L"PointVS.cso");
-	const auto pointPsByteCode = DxDevice::LoadByteCode(L"PointPS.cso");
-	const auto pointGsByteCode = DxDevice::LoadByteCode(L"PointGS.cso");
-	const auto bezierVsByteCode = DxDevice::LoadByteCode(L"BezierVS.cso");
-	const auto bezierGsByteCode = DxDevice::LoadByteCode(L"BezierGS.cso");
-	const auto surfaceVsByteCode = DxDevice::LoadByteCode(L"SurfaceVS.cso");
-	const auto surfaceHsByteCode = DxDevice::LoadByteCode(L"SurfaceHS.cso");
-	const auto surfaceDsByteCode = DxDevice::LoadByteCode(L"SurfaceDS.cso");
-	const auto gregoryVsByteCode = DxDevice::LoadByteCode(L"GregoryVS.cso");
-	const auto gregoryHsByteCode = DxDevice::LoadByteCode(L"GregoryHS.cso");
-	const auto gregoryDsByteCode = DxDevice::LoadByteCode(L"GregoryDS.cso");
-	const auto torusVSByteCode = DxDevice::LoadByteCode(L"TorusVS.cso");
-	const auto trimPSByteCode = DxDevice::LoadByteCode(L"TrimPS.cso");
+	//const auto vsByteCode = DxDevice::LoadByteCode(L"VertexShader.cso");
+	//const auto psByteCode = DxDevice::LoadByteCode(L"PixelShader.cso");
+	//const auto pointVsByteCode = DxDevice::LoadByteCode(L"PointVS.cso");
+	//const auto pointPsByteCode = DxDevice::LoadByteCode(L"PointPS.cso");
+	//const auto pointGsByteCode = DxDevice::LoadByteCode(L"PointGS.cso");
+	//const auto bezierVsByteCode = DxDevice::LoadByteCode(L"BezierVS.cso");
+	//const auto bezierGsByteCode = DxDevice::LoadByteCode(L"BezierGS.cso");
+	//const auto surfaceVsByteCode = DxDevice::LoadByteCode(L"SurfaceVS.cso");
+	//const auto surfaceHsByteCode = DxDevice::LoadByteCode(L"SurfaceHS.cso");
+	//const auto surfaceDsByteCode = DxDevice::LoadByteCode(L"SurfaceDS.cso");
+	//const auto gregoryVsByteCode = DxDevice::LoadByteCode(L"GregoryVS.cso");
+	//const auto gregoryHsByteCode = DxDevice::LoadByteCode(L"GregoryHS.cso");
+	//const auto gregoryDsByteCode = DxDevice::LoadByteCode(L"GregoryDS.cso");
+	//const auto torusVSByteCode = DxDevice::LoadByteCode(L"TorusVS.cso");
+	//const auto trimPSByteCode = DxDevice::LoadByteCode(L"TrimPS.cso");
 
-	m_vertexShader = m_device.CreateVertexShader(vsByteCode);
-	m_pixelShader = m_device.CreatePixelShader(psByteCode);
-	m_pointVertexShader = m_device.CreateVertexShader(pointVsByteCode);
-	m_pointPixelShader = m_device.CreatePixelShader(pointPsByteCode);
-	m_pointGeometryShader = m_device.CreateGeometryShader(pointGsByteCode);
-	m_bezierVertexShader = m_device.CreateVertexShader(bezierVsByteCode);
-	m_bezierGeometryShader = m_device.CreateGeometryShader(bezierGsByteCode);
-	m_surfaceVertexShader = m_device.CreateVertexShader(surfaceVsByteCode);
-	m_surfaceDomainShader = m_device.CreateDomainShader(surfaceDsByteCode);
-	m_surfaceHullShader = m_device.CreateHullShader(surfaceHsByteCode);
-	m_gregoryVertexShader = m_device.CreateVertexShader(gregoryVsByteCode);
-	m_gregoryDomainShader = m_device.CreateDomainShader(gregoryDsByteCode);
-	m_gregoryHullShader = m_device.CreateHullShader(gregoryHsByteCode);
-	m_torusVertexShader = m_device.CreateVertexShader(torusVSByteCode);
-	m_trimPixelShader = m_device.CreatePixelShader(trimPSByteCode);
+	//m_vertexShader = m_device.CreateVertexShader(vsByteCode);
+	//m_pixelShader = m_device.CreatePixelShader(psByteCode);
+	//m_pointVertexShader = m_device.CreateVertexShader(pointVsByteCode);
+	//m_pointPixelShader = m_device.CreatePixelShader(pointPsByteCode);
+	//m_pointGeometryShader = m_device.CreateGeometryShader(pointGsByteCode);
+	//m_bezierVertexShader = m_device.CreateVertexShader(bezierVsByteCode);
+	//m_bezierGeometryShader = m_device.CreateGeometryShader(bezierGsByteCode);
+	//m_surfaceVertexShader = m_device.CreateVertexShader(surfaceVsByteCode);
+	//m_surfaceDomainShader = m_device.CreateDomainShader(surfaceDsByteCode);
+	//m_surfaceHullShader = m_device.CreateHullShader(surfaceHsByteCode);
+	//m_gregoryVertexShader = m_device.CreateVertexShader(gregoryVsByteCode);
+	//m_gregoryDomainShader = m_device.CreateDomainShader(gregoryDsByteCode);
+	//m_gregoryHullShader = m_device.CreateHullShader(gregoryHsByteCode);
+	//m_torusVertexShader = m_device.CreateVertexShader(torusVSByteCode);
+	//m_trimPixelShader = m_device.CreatePixelShader(trimPSByteCode);
 
-	vector<D3D11_INPUT_ELEMENT_DESC> inputElements = {
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	};
-	m_layout = m_device.CreateInputLayout(inputElements, vsByteCode);
+	//vector<D3D11_INPUT_ELEMENT_DESC> inputElements = {
+	//	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	//};
+	//m_layout = m_device.CreateInputLayout(inputElements, vsByteCode);
 
-	std::vector<D3D11_INPUT_ELEMENT_DESC> uvInputElements = {
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	};
-	m_layoutUV = m_device.CreateInputLayout(uvInputElements, torusVSByteCode);
+	//std::vector<D3D11_INPUT_ELEMENT_DESC> uvInputElements = {
+	//	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	//	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	//};
+	//m_layoutUV = m_device.CreateInputLayout(uvInputElements, torusVSByteCode);
 
 
-	// Create the constant buffers for MVP matrices
-	m_cbPerPass = m_device.CreateConstantBuffer<PerPassBuffer>();
-	m_cbPerObject = m_device.CreateConstantBuffer<PerObjectBuffer>();
-	InitStereoBlendStates();
+	//// Create the constant buffers for MVP matrices
+	//m_cbPerPass = m_device.CreateConstantBuffer<PerPassBuffer>();
+	//m_cbPerObject = m_device.CreateConstantBuffer<PerObjectBuffer>();
+	//InitStereoBlendStates();
 	InitImGui();
 
-	D3D11_TEXTURE2D_DESC texDesc = {};
-	texDesc.Width = 1;
-	texDesc.Height = 1;
-	texDesc.MipLevels = 1;
-	texDesc.ArraySize = 1;
-	texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	texDesc.SampleDesc.Count = 1;
-	texDesc.Usage = D3D11_USAGE_IMMUTABLE;
-	texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+	//D3D11_TEXTURE2D_DESC texDesc = {};
+	//texDesc.Width = 1;
+	//texDesc.Height = 1;
+	//texDesc.MipLevels = 1;
+	//texDesc.ArraySize = 1;
+	//texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	//texDesc.SampleDesc.Count = 1;
+	//texDesc.Usage = D3D11_USAGE_IMMUTABLE;
+	//texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 
-	uint32_t whitePixel = 0xFFFFFFFF;
-	D3D11_SUBRESOURCE_DATA initData = { &whitePixel, sizeof(uint32_t), 0 };
-	Microsoft::WRL::ComPtr<ID3D11Texture2D> dummyTex;
-	m_device.get()->CreateTexture2D(&texDesc, &initData, dummyTex.GetAddressOf());
-	m_device.get()->CreateShaderResourceView(dummyTex.Get(), nullptr, m_dummyTrimTextureSRV.GetAddressOf());
+	//uint32_t whitePixel = 0xFFFFFFFF;
+	//D3D11_SUBRESOURCE_DATA initData = { &whitePixel, sizeof(uint32_t), 0 };
+	//Microsoft::WRL::ComPtr<ID3D11Texture2D> dummyTex;
+	//m_device.get()->CreateTexture2D(&texDesc, &initData, dummyTex.GetAddressOf());
+	//m_device.get()->CreateShaderResourceView(dummyTex.Get(), nullptr, m_dummyTrimTextureSRV.GetAddressOf());
 
-	D3D11_SAMPLER_DESC sampDesc = {};
-	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-	sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-	m_device.get()->CreateSamplerState(&sampDesc, m_trimSampler.GetAddressOf());
+	//D3D11_SAMPLER_DESC sampDesc = {};
+	//sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	//sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+	//sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+	//sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+	//sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	//m_device.get()->CreateSamplerState(&sampDesc, m_trimSampler.GetAddressOf());
 
 
-	Cursor3D::InitSharedGeometry(m_device);
+	//Cursor3D::InitSharedGeometry(m_device);
 }
 
 std::optional<VirtualPointMapping> CadApplication::PickVirtualPoint(int mouseX, int mouseY, float toleranceSq)
@@ -227,29 +227,31 @@ MathLib::Vec3f CadApplication::ScreenToArcballVector(int x, int y, int width, in
 
 void CadApplication::UpdateProjectionMatrix()
 {
-	if (m_camera.UpdateProjectionMatrix())
-		SyncPerPassBuffer();
+	m_camera.UpdateProjectionMatrix();
+	//if (m_camera.UpdateProjectionMatrix())
+	//	SyncPerPassBuffer();
 }
 
 void CadApplication::UpdateViewMatrix()
 {
-	if (m_camera.UpdateViewMatrices())
-		SyncPerPassBuffer();
+	m_camera.UpdateViewMatrices();
+	//if (m_camera.UpdateViewMatrices())
+	//	SyncPerPassBuffer();
 }
 
-void CadApplication::SyncPerPassBuffer()
-{
-	if (m_cbPerPass)
-	{
-		PerPassBuffer perPassData;
-		perPassData.viewProj = m_camera.GetProjViewMatrix();
-		perPassData.aspectRatio = m_camera.GetAspectRatio();
-		perPassData.renderSize[0] = static_cast<float>(m_renderSize.cx);
-		perPassData.renderSize[1] = static_cast<float>(m_renderSize.cy);
-		perPassData.stereoTint = { 1.0f, 1.0f, 1.0f, 1.0f };
-		m_device.UpdateBuffer(m_cbPerPass, perPassData);
-	}
-}
+//void CadApplication::SyncPerPassBuffer()
+//{
+//	if (m_cbPerPass)
+//	{
+//		PerPassBuffer perPassData;
+//		perPassData.viewProj = m_camera.GetProjViewMatrix();
+//		perPassData.aspectRatio = m_camera.GetAspectRatio();
+//		perPassData.renderSize[0] = static_cast<float>(m_renderSize.cx);
+//		perPassData.renderSize[1] = static_cast<float>(m_renderSize.cy);
+//		perPassData.stereoTint = { 1.0f, 1.0f, 1.0f, 1.0f };
+//		m_device.UpdateBuffer(m_cbPerPass, perPassData);
+//	}
+//}
 
 void CadApplication::ClearSelection()
 {
@@ -416,32 +418,32 @@ std::optional<size_t> CadApplication::PickClosestPoint(int mouseX, int mouseY, f
 	return closestIndex;
 }
 
-void CadApplication::DrawCursor(float3 position, float scale)
-{
-	auto& context = m_device.getContext();
-
-	PerObjectBuffer objData;
-	Mat4f translation = Mat4f::Translation(position.x, position.y, position.z);
-	Mat4f scaling = Mat4f::Scaling(scale);
-
-	// X axis - Red
-	objData.model = translation * scaling;
-	objData.color = { 1.0f, 0.0f, 0.0f, 1.0f };
-	m_device.UpdateBuffer(m_cbPerObject, objData);
-	context->Draw(Cursor3D::VertexCount, 0);
-
-	// Y axis - Green (Rotate X arrow 90 degrees around Z axis)
-	objData.model = translation * Mat4f::RotationZ(std::numbers::pi_v<float> / 2.0f) * scaling;
-	objData.color = { 0.0f, 1.0f, 0.0f, 1.0f };
-	m_device.UpdateBuffer(m_cbPerObject, objData);
-	context->Draw(Cursor3D::VertexCount, 0);
-
-	// Z axis - Blue (Rotate X arrow -90 degrees around Y axis)
-	objData.model = translation * Mat4f::RotationY(-std::numbers::pi_v<float> / 2.0f) * scaling;
-	objData.color = { 0.0f, 0.0f, 1.0f, 1.0f };
-	m_device.UpdateBuffer(m_cbPerObject, objData);
-	context->Draw(Cursor3D::VertexCount, 0);
-}
+//void CadApplication::DrawCursor(float3 position, float scale)
+//{
+//	auto& context = m_device.getContext();
+//
+//	PerObjectBuffer objData;
+//	Mat4f translation = Mat4f::Translation(position.x, position.y, position.z);
+//	Mat4f scaling = Mat4f::Scaling(scale);
+//
+//	// X axis - Red
+//	objData.model = translation * scaling;
+//	objData.color = { 1.0f, 0.0f, 0.0f, 1.0f };
+//	m_device.UpdateBuffer(m_cbPerObject, objData);
+//	context->Draw(Cursor3D::VertexCount, 0);
+//
+//	// Y axis - Green (Rotate X arrow 90 degrees around Z axis)
+//	objData.model = translation * Mat4f::RotationZ(std::numbers::pi_v<float> / 2.0f) * scaling;
+//	objData.color = { 0.0f, 1.0f, 0.0f, 1.0f };
+//	m_device.UpdateBuffer(m_cbPerObject, objData);
+//	context->Draw(Cursor3D::VertexCount, 0);
+//
+//	// Z axis - Blue (Rotate X arrow -90 degrees around Y axis)
+//	objData.model = translation * Mat4f::RotationY(-std::numbers::pi_v<float> / 2.0f) * scaling;
+//	objData.color = { 0.0f, 0.0f, 1.0f, 1.0f };
+//	m_device.UpdateBuffer(m_cbPerObject, objData);
+//	context->Draw(Cursor3D::VertexCount, 0);
+//}
 
 void CadApplication::AddTorusAtCursor()
 {
@@ -1057,455 +1059,30 @@ void CadApplication::Render()
 	m_guiManager.DrawMenu();
 
 	auto& context = m_device.getContext();
-
 	const float clear_color[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
 	context->ClearRenderTargetView(m_backBuffer.Get(), clear_color);
 	context->OMSetRenderTargets(1, m_backBuffer.GetAddressOf(), m_depthBuffer.Get());
 
-	if (!m_enableStereo)
-	{
-		context->OMSetBlendState(m_blendStateDefault.Get(), nullptr, 0xFFFFFFFF);
-		context->ClearDepthStencilView(m_depthBuffer.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
-		SyncPerPassBuffer();
-		DrawScene(context);
-	}
-	else
-	{
-		context->OMSetBlendState(m_blendStateAnaglyph.Get(), nullptr, 0xFFFFFFFF);
-
-		// Left eye
-		context->ClearDepthStencilView(m_depthBuffer.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
-		SetupStereoCamera(true, m_leftEyeColor);
-		DrawScene(context);
-
-		// Right eye
-		context->ClearDepthStencilView(m_depthBuffer.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
-		SetupStereoCamera(false, m_rightEyeColor);
-		DrawScene(context);
-		context->OMSetBlendState(m_blendStateDefault.Get(), nullptr, 0xFFFFFFFF);
-	}
+	m_sceneRenderer.DrawScene(
+		m_camera,
+		m_sceneObjects,
+		m_enableStereo,
+		m_leftEyeColor,
+		m_rightEyeColor,
+		m_eyeSeparation,
+		m_focalLength,
+		m_cursorPosition,
+		GetSelectionCenter(),
+		m_showBernsteinPoints,
+		m_renderSize,
+		m_guiManager.IsSurfacePreviewActive(),
+		m_surfaceBuilder,
+		m_depthBuffer.Get()
+	);
 
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
 
-void CadApplication::DrawPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	UINT stride = sizeof(VertexPosition);
-	UINT offset = 0;
-	context->IASetVertexBuffers(0, 1, Point::GetSharedVertexBuffer().GetAddressOf(), &stride, &offset);
-	for (auto& obj : m_sceneObjects)
-	{
-		if (auto point = obj->As<Point>())
-		{
-			PerObjectBuffer objData;
-			objData.model = point->GetModelMatrix();
-			objData.color = point->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-			m_device.UpdateBuffer(m_cbPerObject, objData);
-			context->Draw(1, 0);
-		}
-	}
-
-	if (m_guiManager.IsSurfacePreviewActive())
-	{
-		for (auto& point : m_surfaceBuilder.rawPoints)
-		{
-			PerObjectBuffer objData;
-			objData.model = Mat4f::Translation(point.x, point.y, point.z);
-			objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
-			m_device.UpdateBuffer(m_cbPerObject, objData);
-			context->Draw(1, 0);
-		}
-	}
-}
-
-void CadApplication::DrawPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	PerObjectBuffer objData;
-	objData.model = Mat4f::Identity();
-	objData.color = Vec4f(0.7f, 0.7f, 0.7f, 1.0f);
-	m_device.UpdateBuffer(m_cbPerObject, objData);
-
-	for (auto& obj : m_sceneObjects)
-	{
-		if (auto curve = obj->As<Curve>())
-		{
-			curve->UpdatePolyline(m_device);
-			if (curve->selected)
-			{
-				ID3D11Buffer** bufferToDraw = curve->m_lineVertexBuffer.GetAddressOf();
-				UINT countToDraw = curve->m_lineVertexCount;
-
-				if (m_showBernsteinPoints)
-				{
-					if (auto bsplineCurve = curve->As<BSplineCurve>())
-					{
-						bufferToDraw = bsplineCurve->m_bernsteinVertexBuffer.GetAddressOf();
-						countToDraw = bsplineCurve->m_bernsteinVertexCount;
-					}
-				}
-
-				if (countToDraw > 0)
-				{
-					UINT stride = sizeof(VertexPosition);
-					UINT offset = 0;
-					context->IASetVertexBuffers(0, 1, bufferToDraw, &stride, &offset);
-					context->Draw(countToDraw, 0);
-				}
-			}
-		}
-	}
-}
-
-void CadApplication::DrawBezierCurves(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	PerObjectBuffer objData;
-	objData.model = Mat4f::Identity();
-
-	for (auto& obj : m_sceneObjects)
-	{
-		if (auto curve = obj->As<Curve>())
-		{
-			objData.color = curve->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-			m_device.UpdateBuffer(m_cbPerObject, objData);
-
-			if (curve->m_curveVertexCount > 0)
-			{
-				UINT stride = sizeof(VertexPosition);
-				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, curve->m_curveVertexBuffer.GetAddressOf(), &stride, &offset);
-				context->Draw(curve->m_curveVertexCount, 0);
-			}
-		}
-	}
-}
-
-void CadApplication::DrawVirtualBernsteinPoints(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	if (!m_showBernsteinPoints) return;
-
-	PerObjectBuffer objData;
-	objData.model = Mat4f::Identity();
-	objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
-	m_device.UpdateBuffer(m_cbPerObject, objData);
-
-	for (auto& obj : m_sceneObjects)
-	{
-		if (!obj->selected)
-			continue;
-
-		if (auto bspline = obj->As<BSplineCurve>())
-		{
-			if (bspline->m_bernsteinVertexCount > 0)
-			{
-				UINT stride = sizeof(VertexPosition);
-				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, bspline->m_bernsteinVertexBuffer.GetAddressOf(), &stride, &offset);
-				context->Draw(bspline->m_bernsteinVertexCount, 0);
-			}
-		}
-	}
-}
-
-void CadApplication::DrawSurfaces(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	context->IASetInputLayout(m_layoutUV.Get());
-	if (m_guiManager.IsSurfacePreviewActive() && m_surfaceBuilder.m_patchIndexCount > 0)// && m_previewSurface)
-	{
-		UINT stride = sizeof(VertexPositionUV);
-		UINT offset = 0;
-		context->IASetVertexBuffers(0, 1, m_surfaceBuilder.m_patchVertexBuffer.GetAddressOf(), &stride, &offset);
-		context->IASetIndexBuffer(m_surfaceBuilder.m_patchIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-		PerObjectBuffer objData;
-		objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
-		auto updateAndDraw = [&](float xParam, float yParam) {
-			objData.surfaceParams =
-			{
-				xParam,
-				yParam,
-				25.0f,
-				0.0f
-			};
-			m_device.UpdateBuffer(m_cbPerObject, objData);
-			context->DrawIndexed(m_surfaceBuilder.m_patchIndexCount, 0, 0);
-			};
-
-		updateAndDraw(0.0f, m_surfaceBuilder.linesPerSegmentU);
-		updateAndDraw(1.0f, m_surfaceBuilder.linesPerSegmentV);
-
-		//DrawSurface(context, m_previewSurface.get(), Vec4f(0.0f, 0.5f, 1.0f, 1.0f));	
-	}
-
-	for (auto& obj : m_sceneObjects)
-	{
-		if (auto surface = obj->As<Surface>())
-			DrawSurface(context, surface, surface->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f));
-	}
-
-	context->PSSetShaderResources(0, 1, m_dummyTrimTextureSRV.GetAddressOf());
-	context->IASetInputLayout(m_layout.Get());
-}
-
-void CadApplication::DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context, Surface* surface, MathLib::Vec4f color)
-{
-	surface->UpdateVertices(m_device);
-	if (surface->m_patchIndexCount > 0)
-	{
-		UINT stride = sizeof(VertexPositionUV);
-		UINT offset = 0;
-		context->IASetVertexBuffers(0, 1, surface->m_patchVertexBuffer.GetAddressOf(), &stride, &offset);
-		context->IASetIndexBuffer(surface->m_patchIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-		ID3D11ShaderResourceView* srvToBind = surface->m_trimTextureSRV ? surface->m_trimTextureSRV.Get() : m_dummyTrimTextureSRV.Get();
-		context->PSSetShaderResources(0, 1, &srvToBind);
-		PerObjectBuffer objData;
-		objData.color = color;
-
-		auto updateAndDraw = [&](Surface* surf, float xParam, float yParam) {
-			objData.surfaceParams =
-			{
-				xParam,
-				yParam,
-				static_cast<float>(surf->m_smoothness),
-				0.0f
-			};
-
-			m_device.UpdateBuffer(m_cbPerObject, objData);
-			context->DrawIndexed(surf->m_patchIndexCount, 0, 0);
-			};
-
-		updateAndDraw(surface, 0.0f, static_cast<float>(surface->m_linesPerSegmentU));
-		updateAndDraw(surface, 1.0f, static_cast<float>(surface->m_linesPerSegmentV));
-	}
-}
-
-void CadApplication::DrawSurfacesPolylines(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	PerObjectBuffer objData;
-	objData.model = Mat4f::Identity();
-	objData.color = Vec4f(0.7f, 0.7f, 0.7f, 1.0f);
-	m_device.UpdateBuffer(m_cbPerObject, objData);
-
-	for (auto& obj : m_sceneObjects)
-	{
-		if (auto surface = obj->As<Surface>())
-		{
-			surface->UpdateVertices(m_device);
-			if (surface->selected && surface->m_polylineIndexCount > 0)
-			{
-				UINT stride = sizeof(VertexPosition);
-				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, surface->m_polylineVertexBuffer.GetAddressOf(), &stride, &offset);
-				context->IASetIndexBuffer(surface->m_polylineIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-				context->DrawIndexed(surface->m_polylineIndexCount, 0, 0);
-			}
-		}
-	}
-}
-
-void CadApplication::DrawGregoryPatches(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	for (auto& obj : m_sceneObjects)
-	{
-		if (obj->type == ObjectType::GregoryPatch)
-		{
-			auto gregoryPatch = static_cast<GregoryPatch*>(obj.get());
-			gregoryPatch->UpdateVertices(m_device);
-
-			UINT stride = sizeof(VertexPosition);
-			UINT offset = 0;
-			context->IASetVertexBuffers(0, 1, gregoryPatch->m_vertexBuffer.GetAddressOf(), &stride, &offset);
-
-			PerObjectBuffer objData;
-			objData.color = gregoryPatch->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-
-			auto updateAndDraw = [&](float xParam, float yParam) {
-				objData.surfaceParams =
-				{
-					xParam,
-					yParam,
-					static_cast<float>(gregoryPatch->m_smoothness),
-					0.0f
-				};
-				m_device.UpdateBuffer(m_cbPerObject, objData);
-				context->Draw(gregoryPatch->m_vertexCount, 0);
-				};
-			updateAndDraw(0.0f, static_cast<float>(gregoryPatch->m_linesPerSegmentU));
-			updateAndDraw(1.0f, static_cast<float>(gregoryPatch->m_linesPerSegmentV));
-		}
-	}
-}
-
-
-void CadApplication::DrawGregoryPatchesTangents(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	PerObjectBuffer objData;
-	objData.model = Mat4f::Identity();
-	objData.color = Vec4f(0.7f, 0.1f, 0.1f, 1.0f);
-	m_device.UpdateBuffer(m_cbPerObject, objData);
-
-	for (auto& obj : m_sceneObjects)
-	{
-		if (auto patch = obj->As<GregoryPatch>())
-		{
-			patch->UpdateVertices(m_device);
-			if (patch->selected)
-			{
-				UINT stride = sizeof(VertexPosition);
-				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, patch->m_continuityVertexBuffer.GetAddressOf(), &stride, &offset);
-				context->Draw(patch->m_continuityVertexCount, 0);
-			}
-		}
-	}
-}
-
-void CadApplication::DrawLinearIntersections(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	PerObjectBuffer objData;
-	objData.model = Mat4f::Identity();
-	for (const auto& obj : m_sceneObjects)
-	{
-		if (obj->type == ObjectType::LinearIntersection)
-		{
-			auto intersection = static_cast<LinearIntersection*>(obj.get());
-
-			if (intersection->m_vertexCount > 0)
-			{
-				objData.color = intersection->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-				m_device.UpdateBuffer(m_cbPerObject, objData);
-
-				UINT stride = sizeof(VertexPosition);
-				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, intersection->m_vertexBuffer.GetAddressOf(), &stride, &offset);
-				context->Draw(intersection->m_vertexCount, 0);
-			}
-		}
-	}
-}
-
-void CadApplication::DrawBezierIntersections(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	PerObjectBuffer objData;
-	objData.model = Mat4f::Identity();
-	for (const auto& obj : m_sceneObjects)
-	{
-		if (obj->type == ObjectType::BezierIntersection)
-		{
-			auto intersection = static_cast<BezierIntersection*>(obj.get());
-			if (intersection->m_bezierVertexCount > 0)
-			{
-				objData.color = intersection->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-				m_device.UpdateBuffer(m_cbPerObject, objData);
-				UINT stride = sizeof(VertexPosition);
-				UINT offset = 0;
-				context->IASetVertexBuffers(0, 1, intersection->m_bezierVertexBuffer.GetAddressOf(), &stride, &offset);
-				context->Draw(intersection->m_bezierVertexCount, 0);
-			}
-		}
-	}
-}
-
-void CadApplication::InitStereoBlendStates()
-{
-	m_blendStateDefault = m_device.CreateBlendState();
-	m_blendStateAnaglyph = m_device.CreateBlendState(BlendDescription::MaxBlendDescription());
-}
-
-void CadApplication::SetupStereoCamera(bool isLeftEye, const MathLib::Vec4f& eyeTint)
-{
-	float E = m_eyeSeparation * 0.5f;
-	float shiftMultiplier = isLeftEye ? 1.0f : -1.0f;
-	float E_shift = E * shiftMultiplier;
-
-	Mat4f stereoView = Mat4f::Translation(E_shift, 0.0f, 0.0f) * m_camera.GetViewMatrix();
-	float aspect = m_camera.GetAspectRatio();
-	float fov = m_camera.GetFovY();
-	float n = m_camera.GetNearPlane();
-	float f = m_camera.GetFarPlane();
-
-	float top = n * std::tan(fov / 2.0f);
-	float bottom = -top;
-
-	float frustumShift = E_shift * (n / m_focalLength);
-	float width = aspect * top;
-
-	float left = -width + frustumShift;
-	float right = width + frustumShift;
-
-	Mat4f stereoProj = Mat4f::Frustum(left, right, bottom, top, n, f);
-
-	PerPassBuffer perPassData;
-	perPassData.viewProj = stereoProj * stereoView;
-	perPassData.aspectRatio = aspect;
-	perPassData.renderSize[0] = static_cast<float>(m_renderSize.cx);
-	perPassData.renderSize[1] = static_cast<float>(m_renderSize.cy);
-	perPassData.stereoTint = eyeTint;
-	m_device.UpdateBuffer(m_cbPerPass, perPassData);
-}
-
-void CadApplication::DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	ID3D11Buffer* buffers[] = { m_cbPerPass.Get(), m_cbPerObject.Get() };
-	context->VSSetConstantBuffers(0, 2, buffers);
-	context->HSSetConstantBuffers(0, 2, buffers);
-	context->DSSetConstantBuffers(0, 2, buffers);
-	context->GSSetConstantBuffers(0, 2, buffers);
-	context->PSSetConstantBuffers(0, 2, buffers);
-	context->PSSetSamplers(0, 1, m_trimSampler.GetAddressOf());
-
-	context->IASetInputLayout(m_layout.Get());
-	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-	//context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
-
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
-	context->PSSetShader(m_trimPixelShader.Get(), nullptr, 0);
-	DrawToruses(context);
-	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
-
-	DrawCursors(context);
-
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
-	DrawPolylines(context);
-	DrawLinearIntersections(context);
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
-	DrawSurfacesPolylines(context);
-	DrawGregoryPatchesTangents(context);
-
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST_ADJ);
-	context->VSSetShader(m_bezierVertexShader.Get(), nullptr, 0);
-	context->GSSetShader(m_bezierGeometryShader.Get(), nullptr, 0);
-	DrawBezierCurves(context);
-	DrawBezierIntersections(context);
-
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-	context->GSSetShader(m_pointGeometryShader.Get(), nullptr, 0);
-	context->PSSetShader(m_pointPixelShader.Get(), nullptr, 0);
-
-	DrawPoints(context);
-	DrawVirtualBernsteinPoints(context);
-
-	context->GSSetShader(nullptr, nullptr, 0);
-
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_16_CONTROL_POINT_PATCHLIST);
-
-	context->VSSetShader(m_surfaceVertexShader.Get(), nullptr, 0);
-	context->HSSetShader(m_surfaceHullShader.Get(), nullptr, 0);
-	context->DSSetShader(m_surfaceDomainShader.Get(), nullptr, 0);
-	context->PSSetShader(m_trimPixelShader.Get(), nullptr, 0);
-
-	DrawSurfaces(context);
-
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_20_CONTROL_POINT_PATCHLIST);
-	context->VSSetShader(m_gregoryVertexShader.Get(), nullptr, 0);
-	context->HSSetShader(m_gregoryHullShader.Get(), nullptr, 0);
-	context->DSSetShader(m_gregoryDomainShader.Get(), nullptr, 0);
-	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
-
-	DrawGregoryPatches(context);
-
-	context->HSSetShader(nullptr, nullptr, 0);
-	context->DSSetShader(nullptr, nullptr, 0);
-}
 
 void CadApplication::ActionSave()
 {
@@ -2268,7 +1845,7 @@ void CadApplication::ActionFindIntersection()
 
 	auto intersection = std::make_shared<LinearIntersection>(std::move(intersectionPoints), std::move(intersectionParams), obj1W, obj2W, std::move(maxDomains), trimModeS1, trimModeS2, isClosedLoop);
 	intersection->InitGeometry(m_device);
-	RenderTrimTextures(intersection.get(), m_device.getContext());
+	RenderTrimTextures(intersection.get());
 
 	auto bindTrimTex = [&](SceneObject* obj, const Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& srv) {
 		if (auto surf = obj->As<Surface>())
@@ -2284,283 +1861,6 @@ void CadApplication::ActionFindIntersection()
 	bindTrimTex(obj2, intersection->m_trimTexture2.srv);
 
 	m_sceneObjects.push_back(std::move(intersection));
-}
-
-void CadApplication::RenderTrimTextures(Intersection* intersection, const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	static Microsoft::WRL::ComPtr<ID3D11DepthStencilState> dsMarkStencil, dsApplyMask;
-	static Microsoft::WRL::ComPtr<ID3D11BlendState> bsNoColor;
-	if (!dsMarkStencil)
-	{
-		D3D11_DEPTH_STENCIL_DESC desc = {};
-		desc.DepthEnable = FALSE;
-		desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-		desc.DepthFunc = D3D11_COMPARISON_ALWAYS;
-
-		desc.StencilEnable = TRUE;
-		desc.StencilReadMask = 0xFF;
-		desc.StencilWriteMask = 0xFF;
-
-		D3D11_DEPTH_STENCILOP_DESC stencilOp = {};
-		stencilOp.StencilFailOp = D3D11_STENCIL_OP_KEEP;
-		stencilOp.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
-		stencilOp.StencilPassOp = D3D11_STENCIL_OP_INVERT;
-		stencilOp.StencilFunc = D3D11_COMPARISON_ALWAYS;
-
-		desc.FrontFace = stencilOp;
-		desc.BackFace = stencilOp;
-
-		HRESULT hr = m_device.get()->CreateDepthStencilState(
-			&desc,
-			dsMarkStencil.GetAddressOf()
-		);
-		assert(SUCCEEDED(hr));
-
-		//desc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
-		//desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_INVERT; // Toggle 0 -> 1 -> 0
-		//desc.BackFace = desc.FrontFace;
-		//m_device.get()->CreateDepthStencilState(&desc, dsMarkStencil.GetAddressOf());
-
-		//desc.FrontFace.StencilFunc = D3D11_COMPARISON_NOT_EQUAL;
-		//desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
-		//desc.BackFace = desc.FrontFace;
-		//m_device.get()->CreateDepthStencilState(&desc, dsApplyMask.GetAddressOf());
-
-		D3D11_BLEND_DESC bDesc = {};
-		bDesc.RenderTarget[0].RenderTargetWriteMask = 0; // Write no color
-		hr = m_device.get()->CreateBlendState(
-			&bDesc,
-			bsNoColor.GetAddressOf()
-		);
-		assert(SUCCEEDED(hr));
-
-		stencilOp.StencilPassOp = D3D11_STENCIL_OP_KEEP;
-		stencilOp.StencilFunc = D3D11_COMPARISON_NOT_EQUAL;
-
-		desc.FrontFace = stencilOp;
-		desc.BackFace = stencilOp;
-
-		hr = m_device.get()->CreateDepthStencilState(
-			&desc,
-			dsApplyMask.GetAddressOf()
-		);
-		assert(SUCCEEDED(hr));
-	}
-
-	static Microsoft::WRL::ComPtr<ID3D11RasterizerState> rsCullNone;
-	if (!rsCullNone)
-	{
-		D3D11_RASTERIZER_DESC rDesc = {};
-		rDesc.FillMode = D3D11_FILL_SOLID;
-		rDesc.CullMode = D3D11_CULL_NONE; // Prevent arbitrary winding deletion
-		rDesc.FrontCounterClockwise = FALSE;
-		rDesc.DepthClipEnable = TRUE;
-		m_device.get()->CreateRasterizerState(&rDesc, rsCullNone.GetAddressOf());
-	}
-
-	static Microsoft::WRL::ComPtr<ID3D11Buffer> s_fullscreenQuad;
-	if (!s_fullscreenQuad)
-	{
-		std::vector<VertexPosition> quadVerts = {
-			{ -1.0f, -1.0f, 0.0f }, // Bottom-Left
-			{ -1.0f,  1.0f, 0.0f }, // Top-Left
-			{  1.0f, -1.0f, 0.0f }, // Bottom-Right
-			{  1.0f,  1.0f, 0.0f }  // Top-Right
-		};
-		s_fullscreenQuad = m_device.CreateVertexBuffer(quadVerts);
-	}
-
-	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> oldRTV;
-	Microsoft::WRL::ComPtr<ID3D11DepthStencilView> oldDSV;
-	context->OMGetRenderTargets(1, oldRTV.GetAddressOf(), oldDSV.GetAddressOf());
-
-	UINT numViewports = 1;
-	D3D11_VIEWPORT oldViewport;
-	context->RSGetViewports(&numViewports, &oldViewport);
-
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
-	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-	context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
-
-
-	context->GSSetShader(nullptr, nullptr, 0);
-	context->HSSetShader(nullptr, nullptr, 0);
-	context->DSSetShader(nullptr, nullptr, 0);
-
-	context->IASetInputLayout(m_layout.Get());
-	ID3D11Buffer* cBuffers[] = { m_cbPerPass.Get(), m_cbPerObject.Get() };
-	context->VSSetConstantBuffers(0, 2, cBuffers);
-	context->PSSetConstantBuffers(0, 2, cBuffers);
-
-	PerPassBuffer passData;
-	passData.stereoTint = Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-	passData.viewProj = Mat4f::Identity();
-	passData.aspectRatio = 1.0f;
-	passData.renderSize[0] = 512.0f;
-	passData.renderSize[1] = 512.0f;
-
-
-	//PerObjectBuffer objData;
-	//objData.model = Mat4f::Identity();
-	//objData.color = Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-
-	m_device.UpdateBuffer(m_cbPerPass, passData);
-	//m_device.UpdateBuffer(m_cbPerObject, objData);
-
-
-	//const float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-
-	//if (intersection->m_uvLineCount1 > 0)
-	//{
-	//	D3D11_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(intersection->m_trimTexture1.width), static_cast<float>(intersection->m_trimTexture1.height), 0.0f, 1.0f };
-	//	context->RSSetViewports(1, &vp);
-
-	//	context->OMSetRenderTargets(1, intersection->m_trimTexture1.rtv.GetAddressOf(), nullptr);
-	//	context->ClearRenderTargetView(intersection->m_trimTexture1.rtv.Get(), clearColor);
-
-	//	UINT stride = sizeof(VertexPosition);
-	//	UINT offset = 0;
-	//	context->IASetVertexBuffers(0, 1, intersection->m_uvLinesBuffer1.GetAddressOf(), &stride, &offset);
-	//	context->Draw(intersection->m_uvLineCount1, 0);
-	//}
-
-	//if (intersection->m_uvLineCount2 > 0)
-	//{
-	//	D3D11_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(intersection->m_trimTexture2.width), static_cast<float>(intersection->m_trimTexture2.height), 0.0f, 1.0f };
-	//	context->RSSetViewports(1, &vp);
-
-	//	context->OMSetRenderTargets(1, intersection->m_trimTexture2.rtv.GetAddressOf(), nullptr);
-	//	context->ClearRenderTargetView(intersection->m_trimTexture2.rtv.Get(), clearColor);
-
-	//	UINT stride = sizeof(VertexPosition);
-	//	UINT offset = 0;
-	//	context->IASetVertexBuffers(0, 1, intersection->m_uvLinesBuffer2.GetAddressOf(), &stride, &offset);
-	//	context->Draw(intersection->m_uvLineCount2, 0);
-	//}
-
-	auto renderMask = [&](TrimTexture& tex, UINT triCount, ID3D11Buffer* triBuffer, UINT lineCount,
-		ID3D11Buffer* lineBuffer, bool reverse) {
-
-			D3D11_VIEWPORT vp = { 0.0f, 0.0f, static_cast<float>(tex.width), static_cast<float>(tex.height), 0.0f, 1.0f };
-			context->RSSetViewports(1, &vp);
-
-			// Clear Target: White (keep) or Black (discard) based on reverse flag
-			const float clearColor[4] = { reverse ? 0.0f : 1.0f, reverse ? 0.0f : 1.0f, reverse ? 0.0f : 1.0f, 1.0f };
-			context->OMSetRenderTargets(1, tex.rtv.GetAddressOf(), tex.dsv.Get());
-			context->ClearRenderTargetView(tex.rtv.Get(), clearColor);
-			context->ClearDepthStencilView(tex.dsv.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-
-			MathLib::Vec4f drawColor = reverse
-				? MathLib::Vec4f(1.0f, 1.0f, 1.0f, 1.0f)
-				: MathLib::Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
-
-			//if (count == 0) return;
-			if (triCount == 0 || triBuffer == nullptr)
-			{
-				if (lineCount > 0 && lineBuffer != nullptr)
-				{
-					PerObjectBuffer objData{};
-					objData.model = Mat4f::Identity();
-					objData.color = drawColor;
-					m_device.UpdateBuffer(m_cbPerObject, objData);
-
-					context->RSSetState(nullptr);
-					context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
-					context->OMSetDepthStencilState(nullptr, 0);
-					context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
-
-					UINT stride = sizeof(VertexPosition);
-					UINT offset = 0;
-					context->IASetVertexBuffers(0, 1, &lineBuffer, &stride, &offset);
-					context->Draw(lineCount, 0);
-				}
-
-				return;
-			}
-
-			PerObjectBuffer objData{};
-			objData.model = Mat4f::Identity();
-			objData.color = Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-			m_device.UpdateBuffer(m_cbPerObject, objData);
-
-			// PASS 1: Draw invisible triangles to mark the Stencil Buffer
-			context->RSSetState(rsCullNone.Get());
-			context->OMSetBlendState(bsNoColor.Get(), nullptr, 0xFFFFFFFF);
-			context->OMSetDepthStencilState(dsMarkStencil.Get(), 0);
-			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-			UINT stride = sizeof(VertexPosition);
-			UINT offset = 0;
-			context->IASetVertexBuffers(0, 1, &triBuffer, &stride, &offset);
-			context->Draw(triCount, 0);
-
-			// PASS 2: Draw Fullscreen Quad where Stencil is 1
-			objData.color = drawColor;
-			m_device.UpdateBuffer(m_cbPerObject, objData);
-
-			context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF); // Restore Color
-			context->OMSetDepthStencilState(dsApplyMask.Get(), 0); // Test Stencil == 1
-			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-
-			context->IASetVertexBuffers(0, 1, s_fullscreenQuad.GetAddressOf(), &stride, &offset);
-			context->Draw(4, 0);
-		};
-
-
-	renderMask(intersection->m_trimTexture1, intersection->m_trimPolygonCount1, intersection->m_trimPolygonBuffer1.Get(), intersection->m_uvLineCount1, intersection->m_uvLinesBuffer1.Get(), intersection->m_reverseTrimS1);
-	renderMask(intersection->m_trimTexture2, intersection->m_trimPolygonCount2, intersection->m_trimPolygonBuffer2.Get(), intersection->m_uvLineCount2, intersection->m_uvLinesBuffer2.Get(), intersection->m_reverseTrimS2);
-
-	//renderMask(intersection->m_trimTexture1, intersection->m_trimPolygonCount1, intersection->m_trimPolygonBuffer1.Get(), intersection->m_reverseTrimS1);
-	//renderMask(intersection->m_trimTexture2, intersection->m_trimPolygonCount2, intersection->m_trimPolygonBuffer2.Get(), intersection->m_reverseTrimS2);
-
-	context->OMSetRenderTargets(1, oldRTV.GetAddressOf(), oldDSV.Get());
-	context->RSSetViewports(1, &oldViewport);
-
-	context->OMSetDepthStencilState(nullptr, 0);
-	context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
-	context->RSSetState(nullptr);
-}
-
-void CadApplication::DrawToruses(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	context->IASetInputLayout(m_layoutUV.Get());
-	context->VSSetShader(m_torusVertexShader.Get(), nullptr, 0);
-	for (auto& obj : m_sceneObjects)
-	{
-		if (auto torus = obj->As<Torus>())
-		{
-			torus->UpdateMesh(m_device);
-
-			ID3D11ShaderResourceView* srvToBind = torus->m_trimTextureSRV ? torus->m_trimTextureSRV.Get() : m_dummyTrimTextureSRV.Get();
-			context->PSSetShaderResources(0, 1, &srvToBind);
-
-			PerObjectBuffer objData;
-			objData.model = torus->m_modelMatrix;
-			objData.color = torus->selected ? Vec4f(1.0f, 1.0f, 0.0f, 1.0f) : Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-			m_device.UpdateBuffer(m_cbPerObject, objData);
-
-			UINT stride = sizeof(VertexPositionUV);
-			UINT offset = 0;
-			context->IASetVertexBuffers(0, 1, torus->GetVertexBuffer().GetAddressOf(), &stride, &offset);
-			context->IASetIndexBuffer(torus->GetIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
-			context->DrawIndexed(static_cast<UINT>(torus->indices.size()), 0, 0);
-		}
-	}
-
-	context->PSSetShaderResources(0, 1, m_dummyTrimTextureSRV.GetAddressOf());
-	context->IASetInputLayout(m_layout.Get());
-	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-}
-
-void CadApplication::DrawCursors(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context)
-{
-	UINT stride = sizeof(VertexPosition);
-	UINT offset = 0;
-	context->IASetVertexBuffers(0, 1, m_cursor.GetVertexBuffer().GetAddressOf(), &stride, &offset);
-	DrawCursor(m_cursorPosition, 0.1f);
-	auto selectionCenter = GetSelectionCenter();
-	if (selectionCenter)
-		DrawCursor(*selectionCenter, 0.06f);
 }
 
 void CadApplication::HandleSurfaceListSelection(Surface* surface, size_t index, bool ctrlHeld, bool shiftHeld)

@@ -942,7 +942,7 @@ void CadGuiManager::DrawIntersectionList(std::shared_ptr<Intersection> intersect
 	}
 
 	if (changed)
-		m_app.RenderTrimTextures(intersection.get(), m_app.m_device.getContext());
+		m_app.RenderTrimTextures(intersection.get());
 
 	bool isPreviewS1 = (m_previewIntersection.lock() == intersection && m_previewSurfaceIndex == 1);
 	bool isPreviewS2 = (m_previewIntersection.lock() == intersection && m_previewSurfaceIndex == 2);
