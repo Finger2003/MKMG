@@ -67,6 +67,30 @@
     <Filter Include="Pliki shaderów\PS">
       <UniqueIdentifier>{bb03875e-3e16-484c-a77b-070387efdb25}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Pliki nagłówkowe\rendering">
+      <UniqueIdentifier>{10ac3156-5601-4266-84d0-8d20e814760e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Pliki źródłowe\rendering">
+      <UniqueIdentifier>{a9a3d735-de7d-4dbd-a37b-44da17f45b6e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Pliki nagłówkowe\geometry\math">
+      <UniqueIdentifier>{b9404393-b896-4e3d-b32f-870bca46fb9e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Pliki źródłowe\geometry\math">
+      <UniqueIdentifier>{e529c220-31b5-44b5-bbd5-0a29ddf4193e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Pliki źródłowe\gui">
+      <UniqueIdentifier>{3d95aab0-a072-4043-ae03-afa249088deb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Pliki nagłówkowe\gui">
+      <UniqueIdentifier>{52bbe41a-71cf-4ba7-a3a9-fa6a7e5188cb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Pliki nagłówkowe\scene">
+      <UniqueIdentifier>{08235151-c876-4895-95e3-1c2594709a71}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Pliki źródłowe\scene">
+      <UniqueIdentifier>{8abb4dd5-fbc8-434f-b136-3cac28e8c3a0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -76,9 +100,6 @@
       <Filter>Pliki źródłowe</Filter>
     </ClCompile>
     <ClCompile Include="CadApplication.cpp">
-      <Filter>Pliki źródłowe</Filter>
-    </ClCompile>
-    <ClCompile Include="Cursor3D.cpp">
       <Filter>Pliki źródłowe</Filter>
     </ClCompile>
     <ClCompile Include="SceneObject.cpp">
@@ -135,29 +156,32 @@
     <ClCompile Include="SurfaceBuilder.cpp">
       <Filter>Pliki źródłowe\geometry\surfaces</Filter>
     </ClCompile>
-    <ClCompile Include="HoleDetection.cpp">
-      <Filter>Pliki źródłowe\geometry</Filter>
-    </ClCompile>
-    <ClCompile Include="GregoryPatch.cpp">
-      <Filter>Pliki źródłowe\geometry</Filter>
-    </ClCompile>
-    <ClCompile Include="Intersection.cpp">
-      <Filter>Pliki źródłowe</Filter>
+    <ClCompile Include="SceneRenderer.cpp">
+      <Filter>Pliki źródłowe\rendering</Filter>
     </ClCompile>
     <ClCompile Include="TrimTexture.cpp">
-      <Filter>Pliki źródłowe</Filter>
+      <Filter>Pliki źródłowe\rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="Cursor3D.cpp">
+      <Filter>Pliki źródłowe\rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="HoleDetection.cpp">
+      <Filter>Pliki źródłowe\geometry\math</Filter>
+    </ClCompile>
+    <ClCompile Include="GregoryPatch.cpp">
+      <Filter>Pliki źródłowe\geometry\curves</Filter>
     </ClCompile>
     <ClCompile Include="GeometryMath.cpp">
-      <Filter>Pliki źródłowe</Filter>
-    </ClCompile>
-    <ClCompile Include="SceneSerializer.cpp">
-      <Filter>Pliki źródłowe</Filter>
+      <Filter>Pliki źródłowe\geometry\math</Filter>
     </ClCompile>
     <ClCompile Include="CadGuiManager.cpp">
-      <Filter>Pliki źródłowe</Filter>
+      <Filter>Pliki źródłowe\gui</Filter>
     </ClCompile>
-    <ClCompile Include="SceneRenderer.cpp">
-      <Filter>Pliki źródłowe</Filter>
+    <ClCompile Include="Intersection.cpp">
+      <Filter>Pliki źródłowe\geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneSerializer.cpp">
+      <Filter>Pliki źródłowe\scene</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -168,9 +192,6 @@
       <Filter>Pliki nagłówkowe</Filter>
     </ClInclude>
     <ClInclude Include="CadApplication.h">
-      <Filter>Pliki nagłówkowe</Filter>
-    </ClInclude>
-    <ClInclude Include="Cursor3D.h">
       <Filter>Pliki nagłówkowe</Filter>
     </ClInclude>
     <ClInclude Include="structs.h">
@@ -233,29 +254,32 @@
     <ClInclude Include="SurfaceBuilder.h">
       <Filter>Pliki nagłówkowe\geometry\surfaces</Filter>
     </ClInclude>
-    <ClInclude Include="HoleDetection.h">
-      <Filter>Pliki nagłówkowe\geometry</Filter>
-    </ClInclude>
-    <ClInclude Include="GregoryPatch.h">
-      <Filter>Pliki nagłówkowe\geometry</Filter>
-    </ClInclude>
-    <ClInclude Include="Intersection.h">
-      <Filter>Pliki nagłówkowe</Filter>
-    </ClInclude>
-    <ClInclude Include="TrimTexture.h">
-      <Filter>Pliki nagłówkowe</Filter>
-    </ClInclude>
-    <ClInclude Include="GeometryMath.h">
-      <Filter>Pliki nagłówkowe</Filter>
-    </ClInclude>
-    <ClInclude Include="SceneSerializer.h">
-      <Filter>Pliki nagłówkowe</Filter>
-    </ClInclude>
-    <ClInclude Include="CadGuiManager.h">
-      <Filter>Pliki nagłówkowe</Filter>
+    <ClInclude Include="Cursor3D.h">
+      <Filter>Pliki nagłówkowe\rendering</Filter>
     </ClInclude>
     <ClInclude Include="SceneRenderer.h">
-      <Filter>Pliki nagłówkowe</Filter>
+      <Filter>Pliki nagłówkowe\rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="TrimTexture.h">
+      <Filter>Pliki nagłówkowe\rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="GregoryPatch.h">
+      <Filter>Pliki nagłówkowe\geometry\surfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="HoleDetection.h">
+      <Filter>Pliki nagłówkowe\geometry\math</Filter>
+    </ClInclude>
+    <ClInclude Include="GeometryMath.h">
+      <Filter>Pliki nagłówkowe\geometry\math</Filter>
+    </ClInclude>
+    <ClInclude Include="Intersection.h">
+      <Filter>Pliki nagłówkowe\geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="CadGuiManager.h">
+      <Filter>Pliki nagłówkowe\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneSerializer.h">
+      <Filter>Pliki nagłówkowe\scene</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
