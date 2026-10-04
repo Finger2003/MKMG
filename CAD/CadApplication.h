@@ -247,7 +247,6 @@ private:
 
 
 #pragma region Intersections
-	MathLib::Vec4f m_intersectionStartParams{ 0.0f, 0.0f, 0.0f, 0.0f };
 	void ActionFindIntersection();
 	void RenderTrimTextures(Intersection* intersection) { m_sceneRenderer.RenderTrimTextures(intersection); }
 #pragma endregion

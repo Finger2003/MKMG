@@ -81,7 +81,7 @@ namespace GeometryMath
 		SceneObject* obj1,
 		SceneObject* obj2,
 		bool isSelfIntersection,
-		const MathLib::Vec4f& maxDomains, // x: maxU1, y: maxV1, z: maxU2, w: maxV2
+		const Vec4f& maxDomains, // x: maxU1, y: maxV1, z: maxU2, w: maxV2
 		float step,
 		std::optional<float3> cursorHint);
 

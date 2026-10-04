@@ -1312,7 +1312,6 @@ void CadApplication::ActionFindIntersection()
 		return;
 
 	auto& result = *resultOpt;
-	m_intersectionStartParams = result.params.front();
 
 	auto isS1Dim = [](int dim) { return dim == 0 || dim == 1; };
 	auto isS2Dim = [](int dim) { return dim == 2 || dim == 3; };
