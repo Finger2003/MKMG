@@ -7,12 +7,22 @@
 class SceneObject;
 class BezierSurface;
 class BSplineSurface;
+struct float3;
 
 namespace GeometryMath
 {
 	using MathLib::Vec3f;
 	using MathLib::Vec4f;
 	using MathLib::Mat4f;
+
+	struct IntersectionResult
+	{
+		std::vector<Vec3f> points;
+		std::vector<Vec4f> params;
+		bool isClosedLoop;
+		int forwardHitDim;
+		int backwardHitDim;
+	};
 
 	struct SurfaceEvalResult
 	{
@@ -67,6 +77,14 @@ namespace GeometryMath
 #pragma endregion
 
 #pragma region Intersection Solvers
+	std::optional<IntersectionResult> CalculateIntersection(
+		SceneObject* obj1,
+		SceneObject* obj2,
+		bool isSelfIntersection,
+		const MathLib::Vec4f& maxDomains, // x: maxU1, y: maxV1, z: maxU2, w: maxV2
+		float step,
+		std::optional<float3> cursorHint);
+
 	std::optional<Vec4f> SolveLinearSystem(Mat4f J, Vec4f F);
 	std::optional<Vec4f> FindIntersectionNextPoint(SceneObject* obj1, SceneObject* obj2, Vec4f startParams, Vec3f p0, Vec3f t, float d, int depth = 0);
 	std::optional<Vec4f> FindExactEdgePoint(SceneObject* obj1, SceneObject* obj2, Vec4f startGuess, int boundaryDim, float boundaryValue);
