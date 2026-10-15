@@ -159,6 +159,7 @@
     <ClCompile Include="CadGuiManager.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CamGuiManager.cpp" />
+    <ClCompile Include="Clock.cpp" />
     <ClCompile Include="Cursor3D.cpp" />
     <ClCompile Include="Curve.cpp" />
     <ClCompile Include="DxApplication.cpp" />
@@ -197,6 +198,7 @@
     <ClInclude Include="CadGuiManager.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CamGuiManager.h" />
+    <ClInclude Include="Clock.h" />
     <ClInclude Include="Cursor3D.h" />
     <ClInclude Include="Curve.h" />
     <ClInclude Include="DxApplication.h" />

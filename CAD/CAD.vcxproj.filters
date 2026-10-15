@@ -186,6 +186,9 @@
     <ClCompile Include="CamGuiManager.cpp">
       <Filter>Pliki źródłowe\gui</Filter>
     </ClCompile>
+    <ClCompile Include="Clock.cpp">
+      <Filter>Pliki źródłowe\win32</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -286,6 +289,9 @@
     </ClInclude>
     <ClInclude Include="CamGuiManager.h">
       <Filter>Pliki nagłówkowe\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="Clock.h">
+      <Filter>Pliki nagłówkowe\win32</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
