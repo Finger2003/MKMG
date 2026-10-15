@@ -99,9 +99,6 @@
     <ClCompile Include="pch.cpp">
       <Filter>Pliki źródłowe</Filter>
     </ClCompile>
-    <ClCompile Include="CadApplication.cpp">
-      <Filter>Pliki źródłowe</Filter>
-    </ClCompile>
     <ClCompile Include="SceneObject.cpp">
       <Filter>Pliki źródłowe\geometry</Filter>
     </ClCompile>
@@ -182,6 +179,12 @@
     </ClCompile>
     <ClCompile Include="SceneSerializer.cpp">
       <Filter>Pliki źródłowe\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="CadApplication.cpp">
+      <Filter>Pliki źródłowe</Filter>
+    </ClCompile>
+    <ClCompile Include="CamGuiManager.cpp">
+      <Filter>Pliki źródłowe\gui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -280,6 +283,9 @@
     </ClInclude>
     <ClInclude Include="SceneSerializer.h">
       <Filter>Pliki nagłówkowe\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="CamGuiManager.h">
+      <Filter>Pliki nagłówkowe\gui</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

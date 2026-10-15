@@ -12,7 +12,6 @@ class CadGuiManager
 {
 public:
 	explicit CadGuiManager(CadApplication& app) : m_app(app) {}
-	~CadGuiManager() = default;
 
 	void DrawMenu();
 

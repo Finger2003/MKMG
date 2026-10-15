@@ -21,16 +21,10 @@ namespace
 
 void CadGuiManager::DrawMenu()
 {
-	ImGui_ImplDX11_NewFrame();
-	ImGui_ImplWin32_NewFrame();
-	ImGui::NewFrame();
-
 	DrawSidebarPanel();
 	DrawBoxSelectionOverlay();
 	DrawIntersectionDialog();
 	DrawTrimTextureOverlay();
-
-	ImGui::Render();
 }
 
 void CadGuiManager::DrawSidebarPanel()
@@ -42,7 +36,19 @@ void CadGuiManager::DrawSidebarPanel()
 		ImGuiWindowFlags_NoResize |
 		ImGuiWindowFlags_NoCollapse;
 
-	ImGui::Begin("Menu", nullptr);
+	ImGui::Begin("Inspector", nullptr, windowFlags);
+
+	int currentMode = static_cast<int>(m_app.getAppMode());
+	ImGui::Text("Application Mode");
+	if (ImGui::RadioButton("CAD Modeling", &currentMode, 0))
+		m_app.setAppMode(AppMode::CAD_Modeling);
+
+	ImGui::SameLine();
+	if (ImGui::RadioButton("CAM Simulation", &currentMode, 1))
+		m_app.setAppMode(AppMode::CAM_Simulation);
+
+	ImGui::Separator();
+	ImGui::Spacing();
 
 	DrawActionCombo();
 	ImGui::Separator();

@@ -39,7 +39,7 @@ namespace
 }
 
 CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight, std::wstring wndTitle)
-	:DxApplication(hInstance, wndWidth, wndHeight, wndTitle), m_guiManager(*this), m_sceneRenderer(m_device)
+	:DxApplication(hInstance, wndWidth, wndHeight, wndTitle), m_cadGuiManager(*this), m_camGuiManager(*this), m_sceneRenderer(m_device)
 {
 	SIZE wndSize = m_window.getClientSize();
 	m_depthBuffer = m_device.CreateDepthStencilView(wndSize);
@@ -659,7 +659,7 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 		}
 		else if (msg.wParam == 'I')
 		{
-			m_guiManager.ShowIntersectionPopup();
+			m_cadGuiManager.ShowIntersectionPopup();
 			return true;
 		}
 		break;
@@ -694,6 +694,9 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 	}
 	case WM_LBUTTONDOWN:
 	{
+		if (m_appMode == AppMode::CAM_Simulation)
+			return true;
+
 		WORD fwKeys = LOWORD(msg.wParam);
 		bool ctrlHeld = (fwKeys & MK_CONTROL) != 0;
 		bool shiftHeld = (fwKeys & MK_SHIFT) != 0;
@@ -717,17 +720,6 @@ bool CadApplication::ProcessMessage(WindowMessage& msg)
 			return true;
 		}
 
-		//if (bPressed)
-		//{
-		//	if (!ctrlHeld)
-		//		ClearSelection();
-
-		//	m_isBoxSelecting = true;
-		//	m_boxSelectStart = { xPos, yPos };
-		//	m_boxSelectCurrent = { xPos, yPos };
-		//	SetCapture(m_window.getHandle());
-		//	return true;
-		//}
 
 		auto pickedIndex = PickClosestPoint(xPos, yPos);
 		if (pickedIndex.has_value())
@@ -1056,7 +1048,16 @@ void CadApplication::UpdateResources(int width, int height)
 
 void CadApplication::Render()
 {
-	m_guiManager.DrawMenu();
+	ImGui_ImplDX11_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+
+	if (m_appMode == AppMode::CAD_Modeling)
+		m_cadGuiManager.DrawMenu();
+	else
+		m_camGuiManager.DrawMenu();
+
+	ImGui::Render();
 
 	auto& context = m_device.getContext();
 	const float clear_color[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
@@ -1075,7 +1076,7 @@ void CadApplication::Render()
 		GetSelectionCenter(),
 		m_showBernsteinPoints,
 		m_renderSize,
-		m_guiManager.IsSurfacePreviewActive(),
+		m_cadGuiManager.IsSurfacePreviewActive(),
 		m_surfaceBuilder,
 		m_depthBuffer.Get()
 	);
@@ -1303,10 +1304,10 @@ void CadApplication::ActionFindIntersection()
 	}
 
 	std::optional<float3> cursorHint = std::nullopt;
-	if (m_guiManager.UseCursorAsHint())
+	if (m_cadGuiManager.UseCursorAsHint())
 		cursorHint = m_cursorPosition;
 
-	auto resultOpt = GeometryMath::CalculateIntersection(obj1, obj2, isSelfIntersection, maxDomains, m_guiManager.GetIntersectionStep(), cursorHint);
+	auto resultOpt = GeometryMath::CalculateIntersection(obj1, obj2, isSelfIntersection, maxDomains, m_cadGuiManager.GetIntersectionStep(), cursorHint);
 
 	if (!resultOpt)
 		return;

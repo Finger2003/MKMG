@@ -16,35 +16,17 @@
 #include "GregoryPatch.h"
 #include "Intersection.h"
 #include "CadGuiManager.h"
+#include "CamGuiManager.h"
 #include "SceneRenderer.h"
 
-//struct PerPointBuffer
-//{
-//	MathLib::Vec4f color;
-//};
-//
-//
-//struct PerObjectBuffer
-//{
-//	MathLib::Mat4f model;
-//	MathLib::Vec4f color;
-//	MathLib::Vec4f surfaceParams;
-//};
-//
-//struct PerPassBuffer
-//{
-//	MathLib::Mat4f viewProj;
-//	float aspectRatio;
-//	float renderSize[2];
-//	float padding;
-//	MathLib::Vec4f stereoTint;
-//};
+enum class AppMode
+{
+	CAD_Modeling,
+	CAM_Simulation
+};
 
 enum class InteractionMode
 {
-	//None,
-	//Rotating,
-	//Translating,
 	None,
 	Orbiting,
 	Panning
@@ -121,6 +103,10 @@ public:
 	 */
 	void UpdateResources(int width, int height) override;
 
+
+	AppMode getAppMode() const { return m_appMode; }
+	void setAppMode(AppMode mode) { m_appMode = mode; }
+	HWND getWindowHandle() const { return m_window.getHandle(); }
 protected:
 	void Render() override; // Renders the scene to the window.
 
@@ -129,6 +115,8 @@ protected:
 	SceneRenderer m_sceneRenderer;
 
 private:
+	AppMode m_appMode = AppMode::CAD_Modeling;
+
 #pragma region Constants
 	static constexpr float cMenuWidth = 400.0f;
 	static constexpr int cMinWidth = 500;
@@ -172,7 +160,9 @@ private:
 	void ApplyVirtualEditTransform(int mouseX, int mouseY);
 #pragma region Menu Methods
 	friend class CadGuiManager;
-	CadGuiManager m_guiManager;
+	friend class CamGuiManager;
+	CadGuiManager m_cadGuiManager;
+	CamGuiManager m_camGuiManager;
 	void InitImGui();
 	void HandleSurfaceListSelection(Surface* surface, size_t index, bool ctrlHeld, bool shiftHeld);
 	void AddTorusAtCursor();
@@ -233,7 +223,13 @@ private:
 
 
 	template <IsFileDialog DialogType>
-	std::wstring ShowFileDialog();
+	std::wstring ShowFileDialog(
+		const std::vector<COMDLG_FILTERSPEC>& filters = {
+			{ L"JSON Scene Files (*.json)", L"*.json" },
+			{ L"All files (*.*)", L"*.*" }
+		},
+		const wchar_t* defaultExt = L"json",
+		const wchar_t* defaultFileName = L"scene.json");
 #pragma endregion
 
 	void ActionMergeSelectedPoints();
@@ -274,7 +270,10 @@ inline void CadApplication::CreateCurveFromSelectedPoints()
 }
 
 template<IsFileDialog DialogType>
-inline std::wstring CadApplication::ShowFileDialog()
+inline std::wstring CadApplication::ShowFileDialog(
+	const std::vector<COMDLG_FILTERSPEC>& filters,
+	const wchar_t* defaultExt,
+	const wchar_t* defaultFileName)
 {
 	std::wstring resultPath = L"";
 	DialogType* pDialog = nullptr;
@@ -282,12 +281,15 @@ inline std::wstring CadApplication::ShowFileDialog()
 	if (FAILED(CoCreateInstance(DialogTraits<DialogType>::Clsid, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pDialog))))
 		return L"";
 
-	COMDLG_FILTERSPEC rgSpec[] = { { L"JSON Scene Files", L"*.json" },{ L"All Files", L"*.*" } };
-	pDialog->SetFileTypes(ARRAYSIZE(rgSpec), rgSpec);
-	pDialog->SetDefaultExtension(L"json");
+	if (!filters.empty())
+		pDialog->SetFileTypes(static_cast<UINT>(filters.size()), filters.data());
+
+	if (defaultExt)
+		pDialog->SetDefaultExtension(defaultExt);
 
 	if constexpr (std::is_same_v<DialogType, IFileSaveDialog>)
-		pDialog->SetFileName(L"scene.json");
+		if (defaultFileName)
+			pDialog->SetFileName(defaultFileName);
 
 	if (SUCCEEDED(pDialog->Show(m_window.getHandle())))
 	{
