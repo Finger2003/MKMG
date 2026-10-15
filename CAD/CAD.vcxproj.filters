@@ -189,6 +189,9 @@
     <ClCompile Include="Clock.cpp">
       <Filter>Pliki źródłowe\win32</Filter>
     </ClCompile>
+    <ClCompile Include="MillingSimulator.cpp">
+      <Filter>Pliki źródłowe</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -292,6 +295,9 @@
     </ClInclude>
     <ClInclude Include="Clock.h">
       <Filter>Pliki nagłówkowe\win32</Filter>
+    </ClInclude>
+    <ClInclude Include="MillingSimulator.h">
+      <Filter>Pliki nagłówkowe</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

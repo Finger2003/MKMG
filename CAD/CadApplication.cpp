@@ -1048,6 +1048,11 @@ void CadApplication::UpdateResources(int width, int height)
 
 void CadApplication::Render()
 {
+	float dt = static_cast<float>(m_clock.Query());
+	dt = std::min(dt, 0.1f); // Limit delta time to avoid large jumps in case of a pause or breakpoint
+	if (m_appMode == AppMode::CAM_Simulation)
+		m_millingSimulator.Update(dt);
+
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();

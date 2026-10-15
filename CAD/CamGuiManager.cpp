@@ -102,15 +102,7 @@ void CamGuiManager::DrawGCodeSection()
 				: tempPath;
 
 			auto cutterCfgOpt = ParseCutterFromExtension(tempFilename);
-			if (cutterCfgOpt)
-			{
-				m_loadedGCodePath = std::move(tempPath);
-				m_loadedGCodeFile = std::move(tempFilename);
-
-				m_cutterFlat = cutterCfgOpt->isFlat;
-				m_cutterSize = cutterCfgOpt->diameter;
-			}
-			else
+			if (!cutterCfgOpt)
 			{
 				MessageBoxA(
 					m_app.getWindowHandle(),
@@ -118,13 +110,30 @@ void CamGuiManager::DrawGCodeSection()
 					"Required extension format:\n"
 					" - .kXX for ball nose end mill (e.g., .k08)\n"
 					" - .fXX for flat end mill (e.g., .f12)\n\n"
-					"Cutter settings remain unchanged.",
+					"File was not loaded.",
 					"Extension Warning",
 					MB_OK | MB_ICONWARNING
 				);
 			}
+			else if (!m_app.getMillingSimulator().LoadGCode(tempPath))
+			{
+				MessageBoxA(
+					m_app.getWindowHandle(),
+					"Failed to open the file or no valid G01 instructions were found.",
+					"G-Code Load Error",
+					MB_OK | MB_ICONERROR
+				);
+			}
+			else
+			{
+				m_loadedGCodePath = std::move(tempPath);
+				m_loadedGCodeFile = std::move(tempFilename);
 
-			// TODO: Load GCODE instructions
+				m_cutterFlat = cutterCfgOpt->isFlat;
+				m_cutterSize = cutterCfgOpt->diameter;
+
+				m_app.getMillingSimulator().setCutterParams({ m_cutterSize, m_cutterHeight, m_cutterFlat });
+			}
 		}
 	}
 
@@ -155,9 +164,14 @@ void CamGuiManager::DrawMaterialSection()
 
 void CamGuiManager::DrawSimulationSection()
 {
+	auto& sim = m_app.getMillingSimulator();
+
 	if (ImGui::CollapsingHeader("Simulation", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		ImGui::SliderFloat("speed", &m_simSpeed, 1.0f, 100.0f, "%.0f");
+		if(ImGui::SliderFloat("speed", &m_simSpeed, 1.0f, 100.0f, "%.0f"))
+		{
+			sim.setSpeed(m_simSpeed);
+		}
 
 		ImGui::Spacing();
 
@@ -165,22 +179,29 @@ void CamGuiManager::DrawSimulationSection()
 		float spacing = ImGui::GetStyle().ItemSpacing.x;
 		float btnWidth = (availWidth - spacing * 2.0f) / 3.0f;
 
+		ImGui::BeginDisabled(!sim.hasLoadedPath());
 		if (ImGui::Button("Start", ImVec2(btnWidth, 0.0f)))
 		{
-			// TODO: Start/Resume simulation
+			sim.Start();
 		}
 
 		ImGui::SameLine();
 		if (ImGui::Button("Stop", ImVec2(btnWidth, 0.0f)))
 		{
-			// TODO: Pause simulation
+			sim.Stop();
 		}
 
 		ImGui::SameLine();
 		if (ImGui::Button("Restart", ImVec2(btnWidth, 0.0f)))
 		{
-			// TODO: Return cutter to the initial position
+			sim.Restart();
 		}
+		ImGui::EndDisabled();
+
+		const auto& pos = sim.getCutterPosition();
+		ImGui::Spacing();
+		ImGui::TextDisabled("Segment: %zu / %zu", sim.getCurrentSegmentIndex(), sim.getTotalSegments());
+		ImGui::TextDisabled("Mill Pos: X:%.2f Y:%.2f Z:%.2f", pos.x, pos.y, pos.z);
 	}
 }
 

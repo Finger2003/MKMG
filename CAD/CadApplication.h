@@ -18,6 +18,8 @@
 #include "CadGuiManager.h"
 #include "CamGuiManager.h"
 #include "SceneRenderer.h"
+#include "Clock.h"
+#include "MillingSimulator.h"
 
 enum class AppMode
 {
@@ -107,6 +109,9 @@ public:
 	AppMode getAppMode() const { return m_appMode; }
 	void setAppMode(AppMode mode) { m_appMode = mode; }
 	HWND getWindowHandle() const { return m_window.getHandle(); }
+
+	MillingSimulator& getMillingSimulator() { return m_millingSimulator; }
+	const MillingSimulator& getMillingSimulator() const { return m_millingSimulator; }
 protected:
 	void Render() override; // Renders the scene to the window.
 
@@ -200,12 +205,7 @@ private:
 	float m_focalLength = 5.0f;
 	MathLib::Vec4f m_leftEyeColor = { 114.0f / 255.0f, 0.0f, 0.0f, 1.0f };
 	MathLib::Vec4f m_rightEyeColor = { 0.0f, 58.0f / 255.0f, 58.0f / 255.0f, 1.0f };
-	void InitStereoBlendStates();
-	void SetupStereoCamera(bool isLeftEye, const MathLib::Vec4f& eyeTint);
 #pragma endregion
-
-	void DrawScene(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context);
-
 
 #pragma region SurfaceCreation
 
@@ -246,6 +246,10 @@ private:
 	void ActionFindIntersection();
 	void RenderTrimTextures(Intersection* intersection) { m_sceneRenderer.RenderTrimTextures(intersection); }
 #pragma endregion
+
+
+	Clock m_clock;
+	MillingSimulator m_millingSimulator;
 };
 
 
