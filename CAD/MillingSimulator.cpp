@@ -9,58 +9,68 @@ bool MillingSimulator::LoadGCode(const std::string& filepath)
 		return false;
 
 	std::vector<float3> parsedWaypoints;
-	float3 currentPost{ 0.0f, 0.0f, 0.0f };
+	float3 currentPos{ 0.0f, 0.0f, 0.0f };
 
 	std::string line;
 	while (std::getline(file, line))
 	{
-		if (line.empty() || line[0] == '%' || line[0] == '/')
+		std::string_view view(line);
+
+		// Skip empty lines
+		size_t firstValid = view.find_first_not_of(" \t\r\n");
+		if (firstValid == std::string_view::npos)
 			continue;
 
-		size_t g01Pos = line.find("G01");
+		view.remove_prefix(firstValid);
+
+		// Ignore comments
+		if (view.front() == '%' || view.front() == '/' || view.front() == ';')
+			continue;
+
+		// Look for G01 command
+		size_t g01Pos = view.find("G01");
 		if (g01Pos == std::string::npos)
 			continue;
 
-		size_t i = g01Pos + 3;
-		bool hasCoordinate = false;
-		while (i < line.size())
-		{
-			// Skip whitespace before the coordinate
-			while (i < line.size() && std::isspace(line[i]))
-				i++;
+		// Move past "G01"
+		view.remove_prefix(g01Pos + 3);
 
-			if (i >= line.size())
+		bool hasCoordinate = false;
+		while (!view.empty())
+		{
+			// Find the next axis letter (X, Y, or Z)
+			size_t axisPos = view.find_first_of("XYZxyz");
+
+			// No more axis letters found, break the loop
+			if (axisPos == std::string_view::npos)
 				break;
 
-			char axis = std::toupper(line[i++]);
-			if (axis != 'X' && axis != 'Y' && axis != 'Z')
-				continue;
+			char axis = static_cast<char>(std::toupper(view[axisPos]));
+			view.remove_prefix(axisPos + 1);
 
-			// Skip whitespace between axis and the number
-			while (i < line.size() && std::isspace(line[i]))
-				i++;
+			// Skip whitespace after the axis letter
+			size_t numStart = view.find_first_not_of(" \t\r\n");
+			if (numStart == std::string_view::npos)
+				break;
 
-			// Parse the floating-point number after the axis letter
+			view.remove_prefix(numStart);
+
 			float val = 0.0f;
-			const char* start = line.data() + i;
-			const char* end = line.data() + line.size();
+			auto [ptr, ec] = std::from_chars(view.data(), view.data() + view.size(), val);
 
-			auto [ptr, ec] = std::from_chars(start, end, val);
 			if (ec == std::errc{})
 			{
-				if (axis == 'X') currentPost.x = val;
-				else if (axis == 'Y') currentPost.y = val;
-				else if (axis == 'Z') currentPost.z = val;
+				if (axis == 'X') currentPos.x = val;
+				else if (axis == 'Y') currentPos.y = val;
+				else if (axis == 'Z') currentPos.z = val;
 
 				hasCoordinate = true;
-
-				// Move the index to the position after the parsed number
-				i = static_cast<size_t>(ptr - line.data());
+				view.remove_prefix(ptr - view.data());
 			}
 		}
 
 		if (hasCoordinate)
-			parsedWaypoints.push_back(currentPost);
+			parsedWaypoints.push_back(currentPos);
 	}
 
 	if (parsedWaypoints.empty())
