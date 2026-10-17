@@ -12,6 +12,7 @@ struct Surface;
 struct Intersection;
 struct SurfaceBuilder;
 struct float3;
+class MillingSimulator;
 
 struct PerPointBuffer
 {
@@ -54,9 +55,9 @@ public:
 		std::optional<float3> selectionCenter,
 		bool showBernsteinPoints,
 		SIZE renderSize,
-		bool isSurfacePreviewActive,
-		const SurfaceBuilder& surfaceBuilder,
-		ID3D11DepthStencilView* depthBuffer
+		ID3D11DepthStencilView* depthBuffer,
+		const SurfaceBuilder* surfaceBuilder = nullptr,
+		const MillingSimulator* millingSimulator = nullptr
 		);
 
 	void RenderTrimTextures(Intersection* intersection);
@@ -107,20 +108,21 @@ private:
 
     // Internal rendering helpers
     void DrawScenePass(const std::vector<std::shared_ptr<SceneObject>>& sceneObjects, const float3& cursorPosition, const std::optional<float3>& selectionCenter, 
-		bool showBernsteinPoints, bool isSurfacePreviewActive, const SurfaceBuilder& surfaceBuilder);
+		bool showBernsteinPoints, const SurfaceBuilder* surfaceBuilder, const MillingSimulator* millingSimulator);
     
     void DrawCursors(const float3& cursorPosition, const std::optional<float3>& selectionCenter);
     void DrawCursor(const float3& position, float scale);
     void DrawToruses(const std::vector<std::shared_ptr<SceneObject>>& objects);
-    void DrawPoints(const std::vector<std::shared_ptr<SceneObject>>& objects, bool isSurfacePreviewActive, const SurfaceBuilder& surfaceBuilder);
+    void DrawPoints(const std::vector<std::shared_ptr<SceneObject>>& objects, const SurfaceBuilder* surfaceBuilder);
     void DrawPolylines(const std::vector<std::shared_ptr<SceneObject>>& objects, bool showBernsteinPoints);
     void DrawBezierCurves(const std::vector<std::shared_ptr<SceneObject>>& objects);
     void DrawVirtualBernsteinPoints(const std::vector<std::shared_ptr<SceneObject>>& objects, bool showBernsteinPoints);
-    void DrawSurfaces(const std::vector<std::shared_ptr<SceneObject>>& objects, bool isSurfacePreviewActive, const SurfaceBuilder& surfaceBuilder);
+    void DrawSurfaces(const std::vector<std::shared_ptr<SceneObject>>& objects, const SurfaceBuilder* surfaceBuilder);
     void DrawSurface(const Microsoft::WRL::ComPtr<ID3D11DeviceContext>& context, Surface* surface, MathLib::Vec4f color);
     void DrawSurfacesPolylines(const std::vector<std::shared_ptr<SceneObject>>& objects);
     void DrawGregoryPatches(const std::vector<std::shared_ptr<SceneObject>>& objects);
     void DrawGregoryPatchesTangents(const std::vector<std::shared_ptr<SceneObject>>& objects);
     void DrawLinearIntersections(const std::vector<std::shared_ptr<SceneObject>>& objects);
     void DrawBezierIntersections(const std::vector<std::shared_ptr<SceneObject>>& objects);
+	void DrawMillingPath(const MillingSimulator* millingSimulator);
 };

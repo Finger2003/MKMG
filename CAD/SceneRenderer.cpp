@@ -13,6 +13,7 @@
 #include "SurfaceBuilder.h"
 #include "Intersection.h"
 #include "Camera.h"
+#include "MillingSimulator.h"
 
 using namespace MathLib;
 
@@ -95,7 +96,7 @@ SceneRenderer::SceneRenderer(const DxDevice& device) : m_device(device)
 
 void SceneRenderer::DrawScene(const Camera& camera, const std::vector<std::shared_ptr<SceneObject>>& sceneObjects, 
 	bool enableStereo, const MathLib::Vec4f& leftEyeColor, const MathLib::Vec4f& rightEyeColor, float eyeSeparation, float focalLength, 
-	const float3& cursorPosition, std::optional<float3> selectionCenter, bool showBernsteinPoints, SIZE renderSize, bool isSurfacePreviewActive, const SurfaceBuilder& surfaceBuilder, ID3D11DepthStencilView* depthBuffer)
+	const float3& cursorPosition, std::optional<float3> selectionCenter, bool showBernsteinPoints, SIZE renderSize, ID3D11DepthStencilView* depthBuffer, const SurfaceBuilder* surfaceBuilder, const MillingSimulator* millingSimulator)
 {
 	auto& context = m_device.getContext();
 
@@ -104,7 +105,7 @@ void SceneRenderer::DrawScene(const Camera& camera, const std::vector<std::share
 		context->OMSetBlendState(m_blendStateDefault.Get(), nullptr, 0xFFFFFFFF);
 		context->ClearDepthStencilView(depthBuffer, D3D11_CLEAR_DEPTH, 1.0f, 0);
 		SyncPerPassBuffer(camera, renderSize);
-		DrawScenePass(sceneObjects, cursorPosition, selectionCenter, showBernsteinPoints, isSurfacePreviewActive, surfaceBuilder);
+		DrawScenePass(sceneObjects, cursorPosition, selectionCenter, showBernsteinPoints, surfaceBuilder, millingSimulator);
 	}
 	else
 	{
@@ -113,12 +114,12 @@ void SceneRenderer::DrawScene(const Camera& camera, const std::vector<std::share
 		// Left eye
 		context->ClearDepthStencilView(depthBuffer, D3D11_CLEAR_DEPTH, 1.0f, 0);
 		SetupStereoCamera(camera, true, leftEyeColor, eyeSeparation, focalLength, renderSize);
-		DrawScenePass(sceneObjects, cursorPosition, selectionCenter, showBernsteinPoints, isSurfacePreviewActive, surfaceBuilder);
+		DrawScenePass(sceneObjects, cursorPosition, selectionCenter, showBernsteinPoints, surfaceBuilder, millingSimulator);
 
 		// Right eye
 		context->ClearDepthStencilView(depthBuffer, D3D11_CLEAR_DEPTH, 1.0f, 0);
 		SetupStereoCamera(camera, false, rightEyeColor, eyeSeparation, focalLength, renderSize);
-		DrawScenePass(sceneObjects, cursorPosition, selectionCenter, showBernsteinPoints, isSurfacePreviewActive, surfaceBuilder);
+		DrawScenePass(sceneObjects, cursorPosition, selectionCenter, showBernsteinPoints, surfaceBuilder, millingSimulator);
 
 		context->OMSetBlendState(m_blendStateDefault.Get(), nullptr, 0xFFFFFFFF);
 	}
@@ -363,8 +364,8 @@ void SceneRenderer::SyncPerPassBuffer(const Camera& camera, SIZE renderSize)
 	}
 }
 
-void SceneRenderer::DrawScenePass(const std::vector<std::shared_ptr<SceneObject>>& sceneObjects, const float3& cursorPosition, const std::optional<float3>& selectionCenter,
-	bool showBernsteinPoints, bool isSurfacePreviewActive, const SurfaceBuilder& surfaceBuilder)
+void SceneRenderer::DrawScenePass(const std::vector<std::shared_ptr<SceneObject>>& sceneObjects, const float3& cursorPosition, const std::optional<float3>& selectionCenter, 
+	bool showBernsteinPoints, const SurfaceBuilder* surfaceBuilder, const MillingSimulator* millingSimulator)
 {
 	auto& context = m_device.getContext();
 
@@ -392,6 +393,7 @@ void SceneRenderer::DrawScenePass(const std::vector<std::shared_ptr<SceneObject>
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
 	DrawPolylines(sceneObjects, showBernsteinPoints);
 	DrawLinearIntersections(sceneObjects);
+	DrawMillingPath(millingSimulator);
 
 	// LineList Elements
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
@@ -410,7 +412,7 @@ void SceneRenderer::DrawScenePass(const std::vector<std::shared_ptr<SceneObject>
 	context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
 	context->GSSetShader(m_pointGeometryShader.Get(), nullptr, 0);
 	context->PSSetShader(m_pointPixelShader.Get(), nullptr, 0);
-	DrawPoints(sceneObjects, isSurfacePreviewActive, surfaceBuilder);
+	DrawPoints(sceneObjects, surfaceBuilder);
 	DrawVirtualBernsteinPoints(sceneObjects, showBernsteinPoints);
 
 	context->GSSetShader(nullptr, nullptr, 0);
@@ -423,7 +425,7 @@ void SceneRenderer::DrawScenePass(const std::vector<std::shared_ptr<SceneObject>
 	context->DSSetShader(m_surfaceDomainShader.Get(), nullptr, 0);
 	context->PSSetShader(m_trimPixelShader.Get(), nullptr, 0);
 
-	DrawSurfaces(sceneObjects, isSurfacePreviewActive, surfaceBuilder);
+	DrawSurfaces(sceneObjects, surfaceBuilder);
 
 	// Gregory Patches
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_20_CONTROL_POINT_PATCHLIST);
@@ -504,7 +506,7 @@ void SceneRenderer::DrawToruses(const std::vector<std::shared_ptr<SceneObject>>&
 	}
 }
 
-void SceneRenderer::DrawPoints(const std::vector<std::shared_ptr<SceneObject>>& objects, bool isSurfacePreviewActive, const SurfaceBuilder& surfaceBuilder)
+void SceneRenderer::DrawPoints(const std::vector<std::shared_ptr<SceneObject>>& objects, const SurfaceBuilder* surfaceBuilder)
 {
 	auto& context = m_device.getContext();
 	UINT stride = sizeof(VertexPosition);
@@ -522,9 +524,9 @@ void SceneRenderer::DrawPoints(const std::vector<std::shared_ptr<SceneObject>>& 
 		}
 	}
 
-	if (isSurfacePreviewActive)
+	if (surfaceBuilder)
 	{
-		for (auto& point : surfaceBuilder.rawPoints)
+		for (auto& point : surfaceBuilder->rawPoints)
 		{
 			PerObjectBuffer objData;
 			objData.model = Mat4f::Translation(point.x, point.y, point.z);
@@ -630,17 +632,17 @@ void SceneRenderer::DrawVirtualBernsteinPoints(const std::vector<std::shared_ptr
 	}
 }
 
-void SceneRenderer::DrawSurfaces(const std::vector<std::shared_ptr<SceneObject>>& objects, bool isSurfacePreviewActive, const SurfaceBuilder& surfaceBuilder)
+void SceneRenderer::DrawSurfaces(const std::vector<std::shared_ptr<SceneObject>>& objects, const SurfaceBuilder* surfaceBuilder)
 {
 	auto& context = m_device.getContext();
 
 	context->IASetInputLayout(m_layoutUV.Get());
-	if (isSurfacePreviewActive && surfaceBuilder.m_patchIndexCount > 0)// && m_previewSurface)
+	if (surfaceBuilder && surfaceBuilder->m_patchIndexCount > 0)// && m_previewSurface)
 	{
 		UINT stride = sizeof(VertexPositionUV);
 		UINT offset = 0;
-		context->IASetVertexBuffers(0, 1, surfaceBuilder.m_patchVertexBuffer.GetAddressOf(), &stride, &offset);
-		context->IASetIndexBuffer(surfaceBuilder.m_patchIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+		context->IASetVertexBuffers(0, 1, surfaceBuilder->m_patchVertexBuffer.GetAddressOf(), &stride, &offset);
+		context->IASetIndexBuffer(surfaceBuilder->m_patchIndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 		PerObjectBuffer objData;
 		objData.color = Vec4f(0.0f, 0.5f, 1.0f, 1.0f);
 		auto updateAndDraw = [&](float xParam, float yParam) {
@@ -652,11 +654,11 @@ void SceneRenderer::DrawSurfaces(const std::vector<std::shared_ptr<SceneObject>>
 				0.0f
 			};
 			m_device.UpdateBuffer(m_cbPerObject, objData);
-			context->DrawIndexed(surfaceBuilder.m_patchIndexCount, 0, 0);
+			context->DrawIndexed(surfaceBuilder->m_patchIndexCount, 0, 0);
 			};
 
-		updateAndDraw(0.0f, surfaceBuilder.linesPerSegmentU);
-		updateAndDraw(1.0f, surfaceBuilder.linesPerSegmentV);
+		updateAndDraw(0.0f, surfaceBuilder->linesPerSegmentU);
+		updateAndDraw(1.0f, surfaceBuilder->linesPerSegmentV);
 	}
 
 	for (auto& obj : objects)
@@ -837,4 +839,20 @@ void SceneRenderer::DrawBezierIntersections(const std::vector<std::shared_ptr<Sc
 	}
 }
 
+void SceneRenderer::DrawMillingPath(const MillingSimulator* millingSimulator)
+{
+	if (!millingSimulator || millingSimulator->getPathVertexCount() < 2)
+		return;
 
+	auto& context = m_device.getContext();
+
+	PerObjectBuffer objData{};
+	objData.model = Mat4f::Identity();
+	objData.color = Vec4f(0.0f, 1.0f, 0.0f, 1.0f);
+	m_device.UpdateBuffer(m_cbPerObject, objData);
+
+	UINT stride = sizeof(VertexPosition);
+	UINT offset = 0;
+	context->IASetVertexBuffers(0, 1, millingSimulator->getPathVertexBuffer().GetAddressOf(), &stride, &offset);
+	context->Draw(millingSimulator->getPathVertexCount(), 0);
+}

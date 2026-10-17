@@ -39,7 +39,8 @@ namespace
 }
 
 CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight, std::wstring wndTitle)
-	:DxApplication(hInstance, wndWidth, wndHeight, wndTitle), m_cadGuiManager(*this), m_camGuiManager(*this), m_sceneRenderer(m_device)
+	:DxApplication(hInstance, wndWidth, wndHeight, wndTitle), m_cadGuiManager(*this), m_camGuiManager(*this), 
+	m_millingSimulator(m_device), m_sceneRenderer(m_device)
 {
 	SIZE wndSize = m_window.getClientSize();
 	m_depthBuffer = m_device.CreateDepthStencilView(wndSize);
@@ -48,82 +49,7 @@ CadApplication::CadApplication(HINSTANCE hInstance, int wndWidth, int wndHeight,
 	Viewport viewport{ wndSize };
 	m_device.getContext()->RSSetViewports(1, &viewport);
 
-	//const auto vsByteCode = DxDevice::LoadByteCode(L"VertexShader.cso");
-	//const auto psByteCode = DxDevice::LoadByteCode(L"PixelShader.cso");
-	//const auto pointVsByteCode = DxDevice::LoadByteCode(L"PointVS.cso");
-	//const auto pointPsByteCode = DxDevice::LoadByteCode(L"PointPS.cso");
-	//const auto pointGsByteCode = DxDevice::LoadByteCode(L"PointGS.cso");
-	//const auto bezierVsByteCode = DxDevice::LoadByteCode(L"BezierVS.cso");
-	//const auto bezierGsByteCode = DxDevice::LoadByteCode(L"BezierGS.cso");
-	//const auto surfaceVsByteCode = DxDevice::LoadByteCode(L"SurfaceVS.cso");
-	//const auto surfaceHsByteCode = DxDevice::LoadByteCode(L"SurfaceHS.cso");
-	//const auto surfaceDsByteCode = DxDevice::LoadByteCode(L"SurfaceDS.cso");
-	//const auto gregoryVsByteCode = DxDevice::LoadByteCode(L"GregoryVS.cso");
-	//const auto gregoryHsByteCode = DxDevice::LoadByteCode(L"GregoryHS.cso");
-	//const auto gregoryDsByteCode = DxDevice::LoadByteCode(L"GregoryDS.cso");
-	//const auto torusVSByteCode = DxDevice::LoadByteCode(L"TorusVS.cso");
-	//const auto trimPSByteCode = DxDevice::LoadByteCode(L"TrimPS.cso");
-
-	//m_vertexShader = m_device.CreateVertexShader(vsByteCode);
-	//m_pixelShader = m_device.CreatePixelShader(psByteCode);
-	//m_pointVertexShader = m_device.CreateVertexShader(pointVsByteCode);
-	//m_pointPixelShader = m_device.CreatePixelShader(pointPsByteCode);
-	//m_pointGeometryShader = m_device.CreateGeometryShader(pointGsByteCode);
-	//m_bezierVertexShader = m_device.CreateVertexShader(bezierVsByteCode);
-	//m_bezierGeometryShader = m_device.CreateGeometryShader(bezierGsByteCode);
-	//m_surfaceVertexShader = m_device.CreateVertexShader(surfaceVsByteCode);
-	//m_surfaceDomainShader = m_device.CreateDomainShader(surfaceDsByteCode);
-	//m_surfaceHullShader = m_device.CreateHullShader(surfaceHsByteCode);
-	//m_gregoryVertexShader = m_device.CreateVertexShader(gregoryVsByteCode);
-	//m_gregoryDomainShader = m_device.CreateDomainShader(gregoryDsByteCode);
-	//m_gregoryHullShader = m_device.CreateHullShader(gregoryHsByteCode);
-	//m_torusVertexShader = m_device.CreateVertexShader(torusVSByteCode);
-	//m_trimPixelShader = m_device.CreatePixelShader(trimPSByteCode);
-
-	//vector<D3D11_INPUT_ELEMENT_DESC> inputElements = {
-	//	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	//};
-	//m_layout = m_device.CreateInputLayout(inputElements, vsByteCode);
-
-	//std::vector<D3D11_INPUT_ELEMENT_DESC> uvInputElements = {
-	//	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	//	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	//};
-	//m_layoutUV = m_device.CreateInputLayout(uvInputElements, torusVSByteCode);
-
-
-	//// Create the constant buffers for MVP matrices
-	//m_cbPerPass = m_device.CreateConstantBuffer<PerPassBuffer>();
-	//m_cbPerObject = m_device.CreateConstantBuffer<PerObjectBuffer>();
-	//InitStereoBlendStates();
 	InitImGui();
-
-	//D3D11_TEXTURE2D_DESC texDesc = {};
-	//texDesc.Width = 1;
-	//texDesc.Height = 1;
-	//texDesc.MipLevels = 1;
-	//texDesc.ArraySize = 1;
-	//texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	//texDesc.SampleDesc.Count = 1;
-	//texDesc.Usage = D3D11_USAGE_IMMUTABLE;
-	//texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-
-	//uint32_t whitePixel = 0xFFFFFFFF;
-	//D3D11_SUBRESOURCE_DATA initData = { &whitePixel, sizeof(uint32_t), 0 };
-	//Microsoft::WRL::ComPtr<ID3D11Texture2D> dummyTex;
-	//m_device.get()->CreateTexture2D(&texDesc, &initData, dummyTex.GetAddressOf());
-	//m_device.get()->CreateShaderResourceView(dummyTex.Get(), nullptr, m_dummyTrimTextureSRV.GetAddressOf());
-
-	//D3D11_SAMPLER_DESC sampDesc = {};
-	//sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-	//sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-	//sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-	//sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-	//sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-	//m_device.get()->CreateSamplerState(&sampDesc, m_trimSampler.GetAddressOf());
-
-
-	//Cursor3D::InitSharedGeometry(m_device);
 }
 
 std::optional<VirtualPointMapping> CadApplication::PickVirtualPoint(int mouseX, int mouseY, float toleranceSq)
@@ -1081,9 +1007,9 @@ void CadApplication::Render()
 		GetSelectionCenter(),
 		m_showBernsteinPoints,
 		m_renderSize,
-		m_cadGuiManager.IsSurfacePreviewActive(),
-		m_surfaceBuilder,
-		m_depthBuffer.Get()
+		m_depthBuffer.Get(),
+		m_cadGuiManager.IsSurfacePreviewActive() ? &m_surfaceBuilder : nullptr,
+		m_appMode == AppMode::CAM_Simulation ? &m_millingSimulator : nullptr
 	);
 
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());

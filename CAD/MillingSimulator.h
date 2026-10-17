@@ -1,5 +1,6 @@
 #pragma once
 #include "structs.h"
+#include "DxDevice.h"
 
 struct CutterParameters
 {
@@ -11,7 +12,7 @@ struct CutterParameters
 class MillingSimulator
 {
 public:
-	MillingSimulator() = default;
+	MillingSimulator(const DxDevice& device) : m_device(device) {}
 
 	// Loads and parses G01 instructions from an ASCII file.
 	// Returns true if at least one valid waypoint was loaded.
@@ -42,9 +43,14 @@ public:
 	size_t getCurrentSegmentIndex() const { return m_currentSegment; }
 	size_t getTotalSegments() const { return m_waypoints.empty() ? 0 : m_waypoints.size() - 1; }
 	const std::vector<float3>& GetWaypoints() const { return m_waypoints; }
+
+	const Microsoft::WRL::ComPtr<ID3D11Buffer>& getPathVertexBuffer() const { return m_pathVertexBuffer; }
+	UINT getPathVertexCount() const { return m_pathVertexCount; }
 #pragma endregion
 private:
 	void MillSegment(const MathLib::Vec3f& startPos, const MathLib::Vec3f& endPos);
+	void UpdatePathBuffer();
+	const DxDevice& m_device;
 
 	std::vector<float3> m_waypoints;
 	float3 m_cutterPosition{ 0.0f, 0.0f, 0.0f };
@@ -53,5 +59,9 @@ private:
 	bool m_isRunning = false;
 	float m_speed = 10.0f;
 	CutterParameters m_cutter{};
+
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_pathVertexBuffer;
+	UINT m_pathBufferCapacity = 0;
+	UINT m_pathVertexCount = 0;
 };
 

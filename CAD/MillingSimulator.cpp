@@ -76,6 +76,15 @@ bool MillingSimulator::LoadGCode(const std::string& filepath)
 	if (parsedWaypoints.empty())
 		return false;
 	m_waypoints = std::move(parsedWaypoints);
+
+	UINT requiredCapacity = static_cast<UINT>(m_waypoints.size());
+	if (!m_pathVertexBuffer || m_pathBufferCapacity < requiredCapacity)
+	{
+		m_pathBufferCapacity = requiredCapacity;
+		m_pathVertexBuffer = m_device.CreateDynamicVertexBuffer<VertexPosition>(m_pathBufferCapacity);
+	}
+
+	Restart();
 	return true;
 }
 
@@ -120,6 +129,8 @@ void MillingSimulator::Update(float dt)
 		if (m_currentSegment + 1 >= m_waypoints.size())
 			m_isRunning = false;
 	}
+
+	UpdatePathBuffer();
 }
 
 void MillingSimulator::Restart()
@@ -127,6 +138,7 @@ void MillingSimulator::Restart()
 	m_isRunning = false;
 	m_currentSegment = 0;
 	m_cutterPosition = m_waypoints.empty() ? float3{ 0.0f, 0.0f, 0.0f } : m_waypoints.front();
+	UpdatePathBuffer();
 }
 
 void MillingSimulator::InstantComplete()
@@ -142,7 +154,32 @@ void MillingSimulator::InstantComplete()
 		m_currentSegment++;
 	}
 	m_isRunning = false;
+	UpdatePathBuffer();
 }
 
 void MillingSimulator::MillSegment(const MathLib::Vec3f& startPos, const MathLib::Vec3f& endPos)
 {}
+
+void MillingSimulator::UpdatePathBuffer()
+{
+	if (m_waypoints.size() < 2)
+	{
+		m_pathVertexCount = 0;
+		return;
+	}
+
+	std::vector<VertexPosition> vertices;
+
+	bool hasInProgressSegment = (m_currentSegment + 1 < m_waypoints.size());
+	size_t totalVerts = (m_currentSegment + 1) + (hasInProgressSegment ? 1 : 0);
+	vertices.reserve(totalVerts);
+
+	for (size_t i = 0; i <= m_currentSegment; i++)
+		vertices.push_back({ m_waypoints[i].x, m_waypoints[i].y, m_waypoints[i].z });
+
+	if (hasInProgressSegment)
+		vertices.push_back({ m_cutterPosition.x, m_cutterPosition.y, m_cutterPosition.z });
+
+	m_pathVertexCount = static_cast<UINT>(vertices.size());
+	m_device.UpdateBuffer(m_pathVertexBuffer, vertices.data(), m_pathVertexCount * sizeof(VertexPosition));
+}
