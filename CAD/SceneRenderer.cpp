@@ -846,8 +846,10 @@ void SceneRenderer::DrawMillingPath(const MillingSimulator* millingSimulator)
 
 	auto& context = m_device.getContext();
 
+	constexpr float cMmToWorld = 0.05f; // 1 world unit = 20 mm
+
 	PerObjectBuffer objData{};
-	objData.model = Mat4f::Identity();
+	objData.model = Mat4f::Scaling(cMmToWorld);
 	objData.color = Vec4f(0.0f, 1.0f, 0.0f, 1.0f);
 	m_device.UpdateBuffer(m_cbPerObject, objData);
 
