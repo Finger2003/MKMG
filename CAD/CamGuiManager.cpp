@@ -158,7 +158,7 @@ void CamGuiManager::DrawMaterialSection()
 		ImGui::InputFloat("size x [cm]", &m_simSizeX, 0.5f, 1.0f, "%.1f");
 		ImGui::InputFloat("size y [cm]", &m_simSizeY, 0.5f, 1.0f, "%.1f");
 		ImGui::InputFloat("size z [cm]", &m_simSizeZ, 0.5f, 1.0f, "%.1f");
-		ImGui::InputFloat("base height", &m_simBaseHeight, 0.5f, 1.0f, "%.1f");
+		ImGui::InputFloat("base height [mm]", &m_simBaseHeight, 0.5f, 1.0f, "%.1f");
 	}
 }
 
@@ -168,7 +168,7 @@ void CamGuiManager::DrawSimulationSection()
 
 	if (ImGui::CollapsingHeader("Simulation", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		if(ImGui::SliderFloat("speed", &m_simSpeed, 1.0f, 100.0f, "%.0f"))
+		if (ImGui::SliderFloat("speed", &m_simSpeed, 1.0f, 1000.0f, "%.0f"))
 		{
 			sim.setSpeed(m_simSpeed);
 		}
@@ -177,25 +177,24 @@ void CamGuiManager::DrawSimulationSection()
 
 		float availWidth = ImGui::GetContentRegionAvail().x;
 		float spacing = ImGui::GetStyle().ItemSpacing.x;
-		float btnWidth = (availWidth - spacing * 2.0f) / 3.0f;
+		float btnWidth = (availWidth - spacing * 2.0f) / 2.0f;
 
 		ImGui::BeginDisabled(!sim.hasLoadedPath());
+
 		if (ImGui::Button("Start", ImVec2(btnWidth, 0.0f)))
-		{
 			sim.Start();
-		}
 
 		ImGui::SameLine();
 		if (ImGui::Button("Stop", ImVec2(btnWidth, 0.0f)))
-		{
 			sim.Stop();
-		}
+
+		if (ImGui::Button("Restart", ImVec2(btnWidth, 0.0f)))
+			sim.Restart();
 
 		ImGui::SameLine();
-		if (ImGui::Button("Restart", ImVec2(btnWidth, 0.0f)))
-		{
-			sim.Restart();
-		}
+		if (ImGui::Button("Instant", ImVec2(btnWidth, 0.0f)))
+			sim.InstantComplete();
+
 		ImGui::EndDisabled();
 
 		const auto& pos = sim.getCutterPosition();
