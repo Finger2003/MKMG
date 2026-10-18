@@ -77,7 +77,10 @@ bool MillingSimulator::LoadGCode(const std::string& filepath)
 		return false;
 	m_waypoints = std::move(parsedWaypoints);
 
-	UINT requiredCapacity = static_cast<UINT>(m_waypoints.size());
+	size_t size = m_waypoints.size();
+	UINT requiredCapacity = static_cast<UINT>(size);
+	m_pathVertices.reserve(size);
+
 	if (!m_pathVertexBuffer || m_pathBufferCapacity < requiredCapacity)
 	{
 		m_pathBufferCapacity = requiredCapacity;
@@ -138,6 +141,7 @@ void MillingSimulator::Restart()
 	m_isRunning = false;
 	m_currentSegment = 0;
 	m_cutterPosition = m_waypoints.empty() ? float3{ 0.0f, 0.0f, 0.0f } : m_waypoints.front();
+	m_pathVertices.clear();
 	UpdatePathBuffer();
 }
 
@@ -164,22 +168,26 @@ void MillingSimulator::UpdatePathBuffer()
 {
 	if (m_waypoints.size() < 2)
 	{
-		m_pathVertexCount = 0;
+		m_pathVertices.clear();
 		return;
 	}
 
-	std::vector<VertexPosition> vertices;
+	// Remove the previous frame's temporary cutter position
+	if (!m_pathVertices.empty())
+		m_pathVertices.pop_back();
 
+	// Append any new waypoints that have been reached since the last update
+	while (m_pathVertices.size() <= m_currentSegment)
+	{
+		const float3& wp = m_waypoints[m_pathVertices.size()];
+		m_pathVertices.push_back({ wp.x, wp.y, wp.z });
+	}
+
+	// Append the current in-progress cutter position
 	bool hasInProgressSegment = (m_currentSegment + 1 < m_waypoints.size());
-	size_t totalVerts = (m_currentSegment + 1) + (hasInProgressSegment ? 1 : 0);
-	vertices.reserve(totalVerts);
-
-	for (size_t i = 0; i <= m_currentSegment; i++)
-		vertices.push_back({ m_waypoints[i].x, m_waypoints[i].y, m_waypoints[i].z });
-
 	if (hasInProgressSegment)
-		vertices.push_back({ m_cutterPosition.x, m_cutterPosition.y, m_cutterPosition.z });
+		m_pathVertices.push_back({ m_cutterPosition.x, m_cutterPosition.y, m_cutterPosition.z });
 
-	m_pathVertexCount = static_cast<UINT>(vertices.size());
-	m_device.UpdateBuffer(m_pathVertexBuffer, vertices.data(), m_pathVertexCount * sizeof(VertexPosition));
+	// Update the GPU buffer
+	m_device.UpdateBuffer(m_pathVertexBuffer, m_pathVertices.data(), m_pathVertices.size() * sizeof(VertexPosition));
 }

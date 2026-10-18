@@ -45,7 +45,7 @@ public:
 	const std::vector<float3>& GetWaypoints() const { return m_waypoints; }
 
 	const Microsoft::WRL::ComPtr<ID3D11Buffer>& getPathVertexBuffer() const { return m_pathVertexBuffer; }
-	UINT getPathVertexCount() const { return m_pathVertexCount; }
+	UINT getPathVertexCount() const { return static_cast<UINT>(m_pathVertices.size()); }
 #pragma endregion
 private:
 	void MillSegment(const MathLib::Vec3f& startPos, const MathLib::Vec3f& endPos);
@@ -60,8 +60,9 @@ private:
 	float m_speed = 10.0f;
 	CutterParameters m_cutter{};
 
+	std::vector<VertexPosition> m_pathVertices;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_pathVertexBuffer;
 	UINT m_pathBufferCapacity = 0;
-	UINT m_pathVertexCount = 0;
+	//UINT m_pathVertexCount = 0;
 };
 
