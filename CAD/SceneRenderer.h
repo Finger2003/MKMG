@@ -101,6 +101,10 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_dummyTrimTextureSRV;
 	Microsoft::WRL::ComPtr<ID3D11SamplerState> m_trimSampler;
 
+	
+	Microsoft::WRL::ComPtr<ID3D11VertexShader> m_blockVertexShader;
+	Microsoft::WRL::ComPtr<ID3D11PixelShader> m_blockPixelShader;
+
 	// Internal stereoscopy helpers
     void InitStereoBlendStates();
     void SetupStereoCamera(const Camera& camera, bool isLeftEye, const MathLib::Vec4f& eyeTint, float eyeSeparation, float focalLength, SIZE renderSize);

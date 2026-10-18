@@ -34,6 +34,8 @@ SceneRenderer::SceneRenderer(const DxDevice& device) : m_device(device)
 	const auto gregoryDsByteCode = DxDevice::LoadByteCode(L"GregoryDS.cso");
 	const auto torusVSByteCode = DxDevice::LoadByteCode(L"TorusVS.cso");
 	const auto trimPSByteCode = DxDevice::LoadByteCode(L"TrimPS.cso");
+	const auto blockVSByteCode = DxDevice::LoadByteCode(L"BlockVS.cso");
+	const auto blockPSByteCode = DxDevice::LoadByteCode(L"BlockPS.cso");
 
 	m_vertexShader = device.CreateVertexShader(vsByteCode);
 	m_pixelShader = device.CreatePixelShader(psByteCode);
@@ -50,6 +52,8 @@ SceneRenderer::SceneRenderer(const DxDevice& device) : m_device(device)
 	m_gregoryHullShader = device.CreateHullShader(gregoryHsByteCode);
 	m_torusVertexShader = device.CreateVertexShader(torusVSByteCode);
 	m_trimPixelShader = device.CreatePixelShader(trimPSByteCode);
+	m_blockVertexShader = device.CreateVertexShader(blockVSByteCode);
+	m_blockPixelShader = device.CreatePixelShader(blockPSByteCode);
 
 
 	std::vector<D3D11_INPUT_ELEMENT_DESC> inputElements = {

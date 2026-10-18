@@ -346,6 +346,12 @@
     <FxCompile Include="TrimPS.hlsl">
       <Filter>Pliki shaderów\PS</Filter>
     </FxCompile>
+    <FxCompile Include="BlockVS.hlsl">
+      <Filter>Pliki shaderów\VS</Filter>
+    </FxCompile>
+    <FxCompile Include="BlockPS.hlsl">
+      <Filter>Pliki shaderów\PS</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
