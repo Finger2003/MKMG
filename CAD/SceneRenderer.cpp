@@ -442,6 +442,12 @@ void SceneRenderer::DrawScenePass(const std::vector<std::shared_ptr<SceneObject>
 
 	context->HSSetShader(nullptr, nullptr, 0);
 	context->DSSetShader(nullptr, nullptr, 0);
+
+	// Block
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	context->VSSetShader(m_blockVertexShader.Get(), nullptr, 0);
+	context->PSSetShader(m_blockPixelShader.Get(), nullptr, 0);
+	DrawMillingBlock(millingSimulator);
 }
 
 void SceneRenderer::DrawCursors(const float3& cursorPosition, const std::optional<float3>& selectionCenter)
@@ -861,4 +867,24 @@ void SceneRenderer::DrawMillingPath(const MillingSimulator* millingSimulator)
 	UINT offset = 0;
 	context->IASetVertexBuffers(0, 1, millingSimulator->getPathVertexBuffer().GetAddressOf(), &stride, &offset);
 	context->Draw(millingSimulator->getPathVertexCount(), 0);
+}
+
+void SceneRenderer::DrawMillingBlock(const MillingSimulator* millingSimulator)
+{
+	if (!millingSimulator || millingSimulator->getBlockIndexCount() == 0)
+		return;
+
+	auto& context = m_device.getContext();
+
+	constexpr float cMmToWorld = 0.05f; // 1 world unit = 20 mm
+	PerObjectBuffer objData{};
+	objData.model = Mat4f::Scaling(cMmToWorld);
+	objData.color = Vec4f(0.75f, 0.60f, 0.42f, 1.0f);
+	m_device.UpdateBuffer(m_cbPerObject, objData);
+
+	UINT stride = sizeof(VertexPosition);
+	UINT offset = 0;
+	context->IASetVertexBuffers(0, 1, millingSimulator->getBlockVertexBuffer().GetAddressOf(), &stride, &offset);
+	context->IASetIndexBuffer(millingSimulator->getBlockIndexBuffer().Get(), DXGI_FORMAT_R32_UINT, 0);
+	context->DrawIndexed(millingSimulator->getBlockIndexCount(), 0, 0);
 }

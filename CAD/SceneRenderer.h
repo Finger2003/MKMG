@@ -129,4 +129,5 @@ private:
     void DrawLinearIntersections(const std::vector<std::shared_ptr<SceneObject>>& objects);
     void DrawBezierIntersections(const std::vector<std::shared_ptr<SceneObject>>& objects);
 	void DrawMillingPath(const MillingSimulator* millingSimulator);
+	void DrawMillingBlock(const MillingSimulator* millingSimulator);
 };

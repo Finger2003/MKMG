@@ -9,10 +9,20 @@ struct CutterParameters
 	bool isFlat = false;
 };
 
+struct BlockParameters
+{
+	int divX = 600;
+	int divZ = 600;
+	float sizeX = 150.0f;     // [mm] (15 cm)
+	float sizeY = 50.0f;      // [mm] (5 cm height)
+	float sizeZ = 150.0f;     // [mm] (15 cm)
+	float baseHeight = 15.0f; // [mm]
+};
+
 class MillingSimulator
 {
 public:
-	MillingSimulator(const DxDevice& device) : m_device(device) {}
+	MillingSimulator(const DxDevice& device) : m_device(device) { InitBlock(m_block); }
 
 	// Loads and parses G01 instructions from an ASCII file.
 	// Returns true if at least one valid waypoint was loaded.
@@ -20,6 +30,8 @@ public:
 
 	// Advances the cutter along the loaded path independently of frame rate.
 	void Update(float dt);
+
+	void InitBlock(const BlockParameters& params);
 
 #pragma region Playback Controls
 	void Start() { if (m_waypoints.size() >= 2) m_isRunning = true; }
@@ -46,10 +58,16 @@ public:
 
 	const Microsoft::WRL::ComPtr<ID3D11Buffer>& getPathVertexBuffer() const { return m_pathVertexBuffer; }
 	UINT getPathVertexCount() const { return static_cast<UINT>(m_pathVertices.size()); }
+
+	const Microsoft::WRL::ComPtr<ID3D11Buffer>& getBlockVertexBuffer() const { return m_blockVertexBuffer; }
+	const Microsoft::WRL::ComPtr<ID3D11Buffer>& getBlockIndexBuffer() const { return m_blockIndexBuffer; }
+	UINT getBlockIndexCount() const { return m_blockIndexCount; }
 #pragma endregion
 private:
 	void MillSegment(const MathLib::Vec3f& startPos, const MathLib::Vec3f& endPos);
 	void UpdatePathBuffer();
+	void UpdateBlockBuffer();
+
 	const DxDevice& m_device;
 
 	std::vector<float3> m_waypoints;
@@ -59,10 +77,16 @@ private:
 	bool m_isRunning = false;
 	float m_speed = 10.0f;
 	CutterParameters m_cutter{};
+	BlockParameters m_block{};
 
 	std::vector<VertexPosition> m_pathVertices;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_pathVertexBuffer;
 	UINT m_pathBufferCapacity = 0;
-	//UINT m_pathVertexCount = 0;
+	
+	std::vector<VertexPosition> m_blockVertices;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_blockVertexBuffer;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_blockIndexBuffer;
+	UINT m_blockIndexCount = 0;
+	bool m_isBlockDirty = false;
 };
 

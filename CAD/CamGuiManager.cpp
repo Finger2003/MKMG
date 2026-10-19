@@ -159,6 +159,19 @@ void CamGuiManager::DrawMaterialSection()
 		ImGui::InputFloat("size y [cm]", &m_simSizeY, 0.5f, 1.0f, "%.1f");
 		ImGui::InputFloat("size z [cm]", &m_simSizeZ, 0.5f, 1.0f, "%.1f");
 		ImGui::InputFloat("base height [mm]", &m_simBaseHeight, 0.5f, 1.0f, "%.1f");
+
+		ImGui::Spacing();
+		if (ImGui::Button("Reset / Apply Material", ImVec2(-1.0f, 0.0f)))
+		{
+			BlockParameters blockParams;
+			blockParams.divX = m_simDivX;
+			blockParams.divZ = m_simDivZ;
+			blockParams.sizeX = m_simSizeX * 10.0f; // cm -> mm
+			blockParams.sizeY = m_simSizeY * 10.0f; // cm -> mm
+			blockParams.sizeZ = m_simSizeZ * 10.0f; // cm -> mm
+			blockParams.baseHeight = m_simBaseHeight;
+			m_app.getMillingSimulator().InitBlock(blockParams);
+		}
 	}
 }
 
@@ -208,8 +221,12 @@ void CamGuiManager::DrawCutterSection()
 {
 	if (ImGui::CollapsingHeader("Cutter", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		ImGui::InputFloat("size", &m_cutterSize, 0.1f, 0.5f, "%.2f");
-		ImGui::InputFloat("height", &m_cutterHeight, 0.5f, 1.0f, "%.1f");
-		ImGui::Checkbox("flat", &m_cutterFlat);
+		bool changed = false;
+		changed |= ImGui::InputFloat("size", &m_cutterSize, 0.1f, 0.5f, "%.2f");
+		changed |= ImGui::InputFloat("height", &m_cutterHeight, 0.5f, 1.0f, "%.1f");
+		changed |= ImGui::Checkbox("flat", &m_cutterFlat);
+
+		if (changed)
+			m_app.getMillingSimulator().setCutterParams({ m_cutterSize, m_cutterHeight, m_cutterFlat });
 	}
 }
