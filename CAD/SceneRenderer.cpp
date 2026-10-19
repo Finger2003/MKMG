@@ -100,7 +100,7 @@ SceneRenderer::SceneRenderer(const DxDevice& device) : m_device(device)
 
 void SceneRenderer::DrawScene(const Camera& camera, const std::vector<std::shared_ptr<SceneObject>>& sceneObjects, 
 	bool enableStereo, const MathLib::Vec4f& leftEyeColor, const MathLib::Vec4f& rightEyeColor, float eyeSeparation, float focalLength, 
-	const float3& cursorPosition, std::optional<float3> selectionCenter, bool showBernsteinPoints, SIZE renderSize, ID3D11DepthStencilView* depthBuffer, const SurfaceBuilder* surfaceBuilder, const MillingSimulator* millingSimulator)
+	const float3& cursorPosition, std::optional<float3> selectionCenter, bool showBernsteinPoints, SIZE renderSize, ID3D11DepthStencilView* depthBuffer, const SurfaceBuilder* surfaceBuilder, const MillingSimulator* millingSimulator, bool drawMillingPath)
 {
 	auto& context = m_device.getContext();
 
@@ -109,7 +109,7 @@ void SceneRenderer::DrawScene(const Camera& camera, const std::vector<std::share
 		context->OMSetBlendState(m_blendStateDefault.Get(), nullptr, 0xFFFFFFFF);
 		context->ClearDepthStencilView(depthBuffer, D3D11_CLEAR_DEPTH, 1.0f, 0);
 		SyncPerPassBuffer(camera, renderSize);
-		DrawScenePass(sceneObjects, cursorPosition, selectionCenter, showBernsteinPoints, surfaceBuilder, millingSimulator);
+		DrawScenePass(sceneObjects, cursorPosition, selectionCenter, showBernsteinPoints, surfaceBuilder, millingSimulator, drawMillingPath);
 	}
 	else
 	{
@@ -118,12 +118,12 @@ void SceneRenderer::DrawScene(const Camera& camera, const std::vector<std::share
 		// Left eye
 		context->ClearDepthStencilView(depthBuffer, D3D11_CLEAR_DEPTH, 1.0f, 0);
 		SetupStereoCamera(camera, true, leftEyeColor, eyeSeparation, focalLength, renderSize);
-		DrawScenePass(sceneObjects, cursorPosition, selectionCenter, showBernsteinPoints, surfaceBuilder, millingSimulator);
+		DrawScenePass(sceneObjects, cursorPosition, selectionCenter, showBernsteinPoints, surfaceBuilder, millingSimulator, drawMillingPath);
 
 		// Right eye
 		context->ClearDepthStencilView(depthBuffer, D3D11_CLEAR_DEPTH, 1.0f, 0);
 		SetupStereoCamera(camera, false, rightEyeColor, eyeSeparation, focalLength, renderSize);
-		DrawScenePass(sceneObjects, cursorPosition, selectionCenter, showBernsteinPoints, surfaceBuilder, millingSimulator);
+		DrawScenePass(sceneObjects, cursorPosition, selectionCenter, showBernsteinPoints, surfaceBuilder, millingSimulator, drawMillingPath);
 
 		context->OMSetBlendState(m_blendStateDefault.Get(), nullptr, 0xFFFFFFFF);
 	}
@@ -369,7 +369,7 @@ void SceneRenderer::SyncPerPassBuffer(const Camera& camera, SIZE renderSize)
 }
 
 void SceneRenderer::DrawScenePass(const std::vector<std::shared_ptr<SceneObject>>& sceneObjects, const float3& cursorPosition, const std::optional<float3>& selectionCenter, 
-	bool showBernsteinPoints, const SurfaceBuilder* surfaceBuilder, const MillingSimulator* millingSimulator)
+	bool showBernsteinPoints, const SurfaceBuilder* surfaceBuilder, const MillingSimulator* millingSimulator, bool drawMillingPath)
 {
 	auto& context = m_device.getContext();
 
@@ -397,7 +397,8 @@ void SceneRenderer::DrawScenePass(const std::vector<std::shared_ptr<SceneObject>
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
 	DrawPolylines(sceneObjects, showBernsteinPoints);
 	DrawLinearIntersections(sceneObjects);
-	DrawMillingPath(millingSimulator);
+	if (drawMillingPath)
+		DrawMillingPath(millingSimulator);
 
 	// LineList Elements
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);

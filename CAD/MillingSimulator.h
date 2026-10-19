@@ -19,6 +19,16 @@ struct BlockParameters
 	float baseHeight = 15.0f; // [mm]
 };
 
+struct MillingErrorInfo
+{
+	size_t lineNumber = 0;
+	float3 moveStartGCode{}; // Original G-Code coordinates (X, Y, Z)
+	float3 moveEndGCode{};   // Original G-Code coordinates (X, Y, Z)
+	float3 errorPosGCode{};  // Original G-Code coordinates (X, Y, Z) at the moment of error
+	std::string errorDescription;
+	std::string dumpFilePath;
+};
+
 class MillingSimulator
 {
 public:
@@ -56,6 +66,15 @@ public:
 	size_t getTotalSegments() const { return m_waypoints.empty() ? 0 : m_waypoints.size() - 1; }
 	const std::vector<float3>& GetWaypoints() const { return m_waypoints; }
 
+	void setPauseOnError(bool pause) { m_pauseOnError = pause; }
+	bool getPauseOnError() const { return m_pauseOnError; }
+	std::optional<MillingErrorInfo> ConsumePendingError()
+	{
+		auto err = std::move(m_pendingError);
+		m_pendingError.reset();
+		return err;
+	}
+
 	const Microsoft::WRL::ComPtr<ID3D11Buffer>& getPathVertexBuffer() const { return m_pathVertexBuffer; }
 	UINT getPathVertexCount() const { return static_cast<UINT>(m_pathVertices.size()); }
 
@@ -64,13 +83,23 @@ public:
 	UINT getBlockIndexCount() const { return m_blockIndexCount; }
 #pragma endregion
 private:
-	void MillSegment(const MathLib::Vec3f& startPos, const MathLib::Vec3f& endPos);
+	bool MillSegment(const MathLib::Vec3f& startPos, const MathLib::Vec3f& endPos);
+	void ReportMillingError(uint32_t errorFlags, const MathLib::Vec3f& errorScenePos);
 	void UpdatePathBuffer();
 	void UpdateBlockBuffer();
 
 	const DxDevice& m_device;
 
 	std::vector<float3> m_waypoints;
+	std::vector<size_t> m_waypointLines;
+	std::string m_loadedFilePath;
+	std::string m_dumpFilePath;
+	bool m_hasWrittenErrorToDump = false;
+	bool m_pauseOnError = true;
+	std::optional<MillingErrorInfo> m_pendingError;
+	uint32_t m_reportedSegmentErrors = 0;
+	bool m_enableErrorDetection = true;
+
 	float3 m_cutterPosition{ 0.0f, 0.0f, 0.0f };
 	size_t m_currentSegment = 0;
 

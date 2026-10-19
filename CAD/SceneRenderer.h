@@ -57,7 +57,8 @@ public:
 		SIZE renderSize,
 		ID3D11DepthStencilView* depthBuffer,
 		const SurfaceBuilder* surfaceBuilder = nullptr,
-		const MillingSimulator* millingSimulator = nullptr
+		const MillingSimulator* millingSimulator = nullptr,
+		bool drawMillingPath = true
 		);
 
 	void RenderTrimTextures(Intersection* intersection);
@@ -112,7 +113,7 @@ private:
 
     // Internal rendering helpers
     void DrawScenePass(const std::vector<std::shared_ptr<SceneObject>>& sceneObjects, const float3& cursorPosition, const std::optional<float3>& selectionCenter, 
-		bool showBernsteinPoints, const SurfaceBuilder* surfaceBuilder, const MillingSimulator* millingSimulator);
+		bool showBernsteinPoints, const SurfaceBuilder* surfaceBuilder, const MillingSimulator* millingSimulator, bool drawMillingPath);
     
     void DrawCursors(const float3& cursorPosition, const std::optional<float3>& selectionCenter);
     void DrawCursor(const float3& position, float scale);

@@ -8,7 +8,7 @@ public:
     explicit CamGuiManager(CadApplication& app) : m_app(app) {}
 
     void DrawMenu();
-
+    bool ShouldDrawMillingPath() const { return m_showMillingPath; }
 private:
     void DrawModeSelector();
     void DrawGCodeSection();
@@ -32,6 +32,8 @@ private:
 
 #pragma region Simulation    
     float m_simSpeed = 10.0f;
+    bool m_showMillingPath = true;
+    bool m_showErrorPopup = true;
 #pragma endregion
 
 #pragma region Cutter

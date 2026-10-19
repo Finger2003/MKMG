@@ -66,6 +66,29 @@ void CamGuiManager::DrawMenu()
 	DrawCutterSection();
 
 	ImGui::End();
+
+	if (auto errOpt = m_app.getMillingSimulator().ConsumePendingError())
+	{
+		if (m_showErrorPopup)
+		{
+			const auto& err = *errOpt;
+			std::ostringstream msg;
+			msg << "Milling simulation was paused due to a milling error!\n\n"
+				<< "Reason(s):\n" << err.errorDescription << "\n"
+				<< "Original G-Code Line: " << err.lineNumber << "\n"
+				<< std::fixed << std::setprecision(3)
+				<< "Move From: X=" << err.moveStartGCode.x << " Y=" << err.moveStartGCode.y << " Z=" << err.moveStartGCode.z << "\n"
+				<< "Move To:   X=" << err.moveEndGCode.x << " Y=" << err.moveEndGCode.y << " Z=" << err.moveEndGCode.z << "\n\n"
+				<< "Error details saved to dump file:\n" << err.dumpFilePath;
+
+			MessageBoxA(
+				m_app.getWindowHandle(),
+				msg.str().c_str(),
+				"Milling Error Detected",
+				MB_OK | MB_ICONERROR
+			);
+		}
+	}
 }
 
 void CamGuiManager::DrawModeSelector()
@@ -131,6 +154,7 @@ void CamGuiManager::DrawGCodeSection()
 
 				m_cutterFlat = cutterCfgOpt->isFlat;
 				m_cutterSize = cutterCfgOpt->diameter;
+				m_cutterHeight = m_cutterSize * 2.0f;
 
 				m_app.getMillingSimulator().setCutterParams({ m_cutterSize, m_cutterHeight, m_cutterFlat });
 			}
@@ -182,10 +206,12 @@ void CamGuiManager::DrawSimulationSection()
 	if (ImGui::CollapsingHeader("Simulation", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		if (ImGui::SliderFloat("speed", &m_simSpeed, 1.0f, 1000.0f, "%.0f"))
-		{
 			sim.setSpeed(m_simSpeed);
-		}
 
+		ImGui::Spacing();
+		ImGui::Checkbox("Show milling path", &m_showMillingPath);
+		if (ImGui::Checkbox("Show error popups & Pause", &m_showErrorPopup))
+			sim.setPauseOnError(m_showErrorPopup);
 		ImGui::Spacing();
 
 		float availWidth = ImGui::GetContentRegionAvail().x;

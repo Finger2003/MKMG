@@ -1009,7 +1009,8 @@ void CadApplication::Render()
 		m_renderSize,
 		m_depthBuffer.Get(),
 		m_cadGuiManager.IsSurfacePreviewActive() ? &m_surfaceBuilder : nullptr,
-		m_appMode == AppMode::CAM_Simulation ? &m_millingSimulator : nullptr
+		m_appMode == AppMode::CAM_Simulation ? &m_millingSimulator : nullptr,
+		m_camGuiManager.ShouldDrawMillingPath()
 	);
 
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
