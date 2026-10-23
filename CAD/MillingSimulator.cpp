@@ -163,11 +163,11 @@ void MillingSimulator::Update(float dt)
 			MathLib::Vec3f dir = toTarget / distToTarget;
 			MathLib::Vec3f nextPos = cutterPosVec + dir * distanceToTravel;
 			//MillSegment(cutterPosVec, nextPos);
+			m_cutterPosition = nextPos;
 
 			if (!MillSegment(cutterPosVec, nextPos))
 				break;
 
-			m_cutterPosition = nextPos;
 			distanceToTravel = 0.0f;
 		}
 
@@ -333,7 +333,10 @@ bool MillingSimulator::MillSegment(const MathLib::Vec3f& startPos, const MathLib
 
 	const int totalCols = m_block.divX + 3; // (divX + 1) + 2 skirt columns
 	constexpr float cHeightEps = 1e-4f;
+	const float centerDeadZoneSq = R2 * 0.01f; // (0.1 * R)^2
+
 	uint32_t detectedErrors = Error_None;
+	bool isCenterEngaged = false;
 
 	for (int iz = izMin; iz <= izMax; iz++)
 	{
@@ -350,11 +353,12 @@ bool MillingSimulator::MillSegment(const MathLib::Vec3f& startPos, const MathLib
 
 			float cutHeight = m_block.sizeY;
 			float entryTipY = startPos.y;
+			float distSq = 0.0f;
 			//float tipY = startPos.y;
 
 			if (isVerticalPlunge)
 			{
-				float distSq = vx * vx + vz * vz;
+				distSq = vx * vx + vz * vz;
 				if (distSq > R2)
 					continue;
 
@@ -373,7 +377,7 @@ bool MillingSimulator::MillSegment(const MathLib::Vec3f& startPos, const MathLib
 					float tBest = std::clamp(t, 0.0f, 1.0f);
 					float qx = ux * tBest - vx;
 					float qz = uz * tBest - vz;
-					float distSq = qx * qx + qz * qz;
+					distSq = qx * qx + qz * qz;
 					if (distSq > R2)
 						continue;
 
@@ -404,13 +408,16 @@ bool MillingSimulator::MillSegment(const MathLib::Vec3f& startPos, const MathLib
 					{
 						float tBest = (dy >= 0.0f) ? tEnter : tExit;
 						cutHeight = startPos.y + tBest * dy;
+						float qx = ux * tBest - vx;
+						float qz = uz * tBest - vz;
+						distSq = qx * qx + qz * qz;
 					}
 					else
 					{
 						float tBest = std::clamp(t - slopeFactor * dt, 0.0f, 1.0f);
 						float qx = ux * tBest - vx;
 						float qz = uz * tBest - vz;
-						float distSq = qx * qx + qz * qz;
+						distSq = qx * qx + qz * qz;
 						cutHeight = startPos.y + tBest * dy + R - std::sqrt(std::max(0.0f, R2 - distSq));
 					}
 				}
@@ -426,15 +433,21 @@ bool MillingSimulator::MillSegment(const MathLib::Vec3f& startPos, const MathLib
 				if (cutHeight < m_block.baseHeight - cHeightEps)
 					detectedErrors |= Error_BelowBaseHeight;
 
-				// 3. Check vertical / near-vertical downward milling
-				if (isSteepDownwardMove)
-					detectedErrors |= Error_VerticalDownward;
+				//// 3. Check vertical / near-vertical downward milling
+				//if (isSteepDownwardMove)
+				//	detectedErrors |= Error_VerticalDownward;
+
+				if (distSq < centerDeadZoneSq)
+					isCenterEngaged = true;
 
 				vert.y = cutHeight;
 				m_isBlockDirty = true;
 			}
 		}
 	}
+	
+	if (isSteepDownwardMove && isCenterEngaged)
+		detectedErrors |= Error_VerticalDownward;
 
 	uint32_t newErrors = detectedErrors & ~m_reportedSegmentErrors;
 	if (newErrors != Error_None)
