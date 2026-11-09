@@ -10,7 +10,8 @@ namespace
 		Error_None = 0,
 		Error_NonCuttingPart = 1 << 0,
 		Error_BelowBaseHeight = 1 << 1,
-		Error_VerticalDownward = 1 << 2
+		Error_VerticalDownward = 1 << 2,
+		Error_FlatDownward = 1 << 3
 	};
 
 	float3 SceneToGCodeCoords(const float3& scenePos)
@@ -325,7 +326,8 @@ bool MillingSimulator::MillSegment(const MathLib::Vec3f& startPos, const MathLib
 
 	constexpr float cVertTolRad = cVerticalAngleToleranceDeg * (std::numbers::pi_v<float> / 180.0f);
 	const float maxAllowedTan = std::tan(cVertTolRad);
-	const bool isSteepDownwardMove = (dy < -1e-6f) && (lenXZ <= (-dy) * maxAllowedTan);
+	const bool isDownwardMove = (dy < -1e-6f);
+	const bool isSteepDownwardMove = isDownwardMove && (lenXZ <= (-dy) * maxAllowedTan);
 
 	const float invLenXZSq = isVerticalPlunge ? 0.0f : (1.0f / lenXZSq);
 	const float invLenXZ = std::sqrt(invLenXZSq);
@@ -336,7 +338,6 @@ bool MillingSimulator::MillSegment(const MathLib::Vec3f& startPos, const MathLib
 	const float centerDeadZoneSq = R2 * 0.01f; // (0.1 * R)^2
 
 	uint32_t detectedErrors = Error_None;
-	bool isCenterEngaged = false;
 
 	for (int iz = izMin; iz <= izMax; iz++)
 	{
@@ -433,21 +434,22 @@ bool MillingSimulator::MillSegment(const MathLib::Vec3f& startPos, const MathLib
 				if (cutHeight < m_block.baseHeight - cHeightEps)
 					detectedErrors |= Error_BelowBaseHeight;
 
-				//// 3. Check vertical / near-vertical downward milling
-				//if (isSteepDownwardMove)
-				//	detectedErrors |= Error_VerticalDownward;
-
-				if (distSq < centerDeadZoneSq)
-					isCenterEngaged = true;
+				// 3. Check downward milling with flat cutter and steep downward milling with ball nose cutter
+				if (m_cutter.isFlat)
+				{
+					if (isDownwardMove)
+						detectedErrors |= Error_FlatDownward;
+				} 
+				else if (isSteepDownwardMove && distSq < centerDeadZoneSq)
+				{
+					detectedErrors |= Error_VerticalDownward;
+				}
 
 				vert.y = cutHeight;
 				m_isBlockDirty = true;
 			}
 		}
 	}
-	
-	if (isSteepDownwardMove && isCenterEngaged)
-		detectedErrors |= Error_VerticalDownward;
 
 	uint32_t newErrors = detectedErrors & ~m_reportedSegmentErrors;
 	if (newErrors != Error_None)
@@ -493,6 +495,10 @@ void MillingSimulator::ReportMillingError(uint32_t errorFlags, const MathLib::Ve
 		desc << "- Vertical downward milling detected (plunge angle < "
 			<< std::fixed << std::setprecision(1) << cVerticalAngleToleranceDeg
 			<< " deg from vertical).\n";
+	}
+	if (errorFlags & Error_FlatDownward)
+	{
+		desc << "- Downward milling with a flat-end cutter detected.\n";
 	}
 	info.errorDescription = desc.str();
 
