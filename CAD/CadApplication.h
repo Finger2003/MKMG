@@ -112,6 +112,7 @@ public:
 
 	MillingSimulator& getMillingSimulator() { return m_millingSimulator; }
 	const MillingSimulator& getMillingSimulator() const { return m_millingSimulator; }
+	const std::vector<std::shared_ptr<SceneObject>>& getSceneObjects() const { return m_sceneObjects; }
 protected:
 	void Render() override; // Renders the scene to the window.
 

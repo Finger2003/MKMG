@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "CamGuiManager.h"
 #include "CadApplication.h"
+#include "PathGenerator.h"
 #include "../ImGuiLib/imgui.h"
 #include "../ImGuiLib/imgui_impl_win32.h"
 #include "../ImGuiLib/imgui_impl_dx11.h"
@@ -61,6 +62,7 @@ void CamGuiManager::DrawMenu()
 
 	DrawModeSelector();
 	DrawGCodeSection();
+	DrawPathGenerationSection();
 	DrawMaterialSection();
 	DrawSimulationSection();
 	DrawCutterSection();
@@ -167,6 +169,74 @@ void CamGuiManager::DrawGCodeSection()
 
 	ImGui::Spacing();
 	ImGui::Separator();
+}
+
+void CamGuiManager::DrawPathGenerationSection()
+{
+	if (ImGui::CollapsingHeader("Roughing Generation (K16)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::InputFloat("stepover [mm]", &m_roughStepover, 0.5f, 1.0f, "%.2f");
+		ImGui::InputFloat("surface margin [mm]", &m_roughSurfaceMargin, 0.1f, 0.5f, "%.2f");
+		ImGui::InputFloat("base margin [mm]", &m_roughBaseMargin, 0.1f, 0.5f, "%.2f");
+		ImGui::InputFloat("layer 1 height [mm]", &m_roughLayer1Height, 0.5f, 1.0f, "%.1f");
+
+		m_roughStepover = std::clamp(m_roughStepover, 0.5f, 15.0f);
+		m_roughSurfaceMargin = std::max(0.0f, m_roughSurfaceMargin);
+		m_roughBaseMargin = std::max(0.1f, m_roughBaseMargin);
+		m_roughLayer1Height = std::clamp(m_roughLayer1Height, m_simBaseHeight + 2.0f, m_simSizeY * 10.0f - 1.0f);
+
+		ImGui::Spacing();
+		if (ImGui::Button("Generate Roughing Path (1.k16)", ImVec2(-1.0f, 0.0f)))
+		{
+			const std::vector<COMDLG_FILTERSPEC> saveFilters = {
+				{ L"K16 Ball-Nose Path (*.k16)", L"*.k16" },
+				{ L"All Files (*.*)", L"*.*" }
+			};
+			std::wstring widePath = m_app.ShowFileDialog<IFileSaveDialog>(saveFilters, L"k16", L"1.k16");
+			if (!widePath.empty())
+			{
+				std::string savePath(widePath.begin(), widePath.end());
+
+				RoughingParameters params{};
+				params.cutterDiameter = 16.0f;
+				params.cutterFluteHeight = 32.0f;
+				params.blockSizeX = m_simSizeX * 10.0f;
+				params.blockSizeY = m_simSizeY * 10.0f;
+				params.blockSizeZ = m_simSizeZ * 10.0f;
+				params.baseHeight = m_simBaseHeight;
+				params.gridDivX = std::max(2, m_simDivX);
+				params.gridDivZ = std::max(2, m_simDivZ);
+				params.surfaceMargin = m_roughSurfaceMargin;
+				params.baseMargin = m_roughBaseMargin;
+				params.layer1Height = m_roughLayer1Height;
+				params.stepover = m_roughStepover;
+
+				auto waypoints = PathGenerator::GenerateRoughingPath(m_app.getSceneObjects(), params);
+				if (!PathGenerator::ExportGCode(savePath, waypoints))
+				{
+					MessageBoxA(
+						m_app.getWindowHandle(),
+						"Failed to export the generated roughing path to the selected file.",
+						"Export Error",
+						MB_OK | MB_ICONERROR
+					);
+				}
+				else if (m_app.getMillingSimulator().LoadGCode(savePath))
+				{
+					size_t lastSlash = savePath.find_last_of("\\/");
+					m_loadedGCodeFile = (lastSlash != std::string::npos)
+						? savePath.substr(lastSlash + 1)
+						: savePath;
+					m_loadedGCodePath = std::move(savePath);
+
+					m_cutterFlat = false;
+					m_cutterSize = 16.0f;
+					m_cutterHeight = 32.0f;
+					m_app.getMillingSimulator().setCutterParams({ m_cutterSize, m_cutterHeight, m_cutterFlat });
+				}
+			}
+		}
+	}
 }
 
 void CamGuiManager::DrawMaterialSection()

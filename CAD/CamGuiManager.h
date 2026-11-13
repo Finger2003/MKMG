@@ -12,6 +12,7 @@ public:
 private:
     void DrawModeSelector();
     void DrawGCodeSection();
+    void DrawPathGenerationSection();
     void DrawMaterialSection();
     void DrawSimulationSection();
     void DrawCutterSection();
@@ -20,6 +21,13 @@ private:
 
     std::string m_loadedGCodePath = "";
     std::string m_loadedGCodeFile = "None";
+
+#pragma region RoughingGeneration
+    float m_roughStepover = 7.5f;
+    float m_roughSurfaceMargin = 0.5f;
+    float m_roughBaseMargin = 0.5f;
+    float m_roughLayer1Height = 33.0f;
+#pragma endregion
 
 #pragma region Material
     int m_simDivX = 600;

@@ -125,6 +125,11 @@ namespace MathLib
 			return _mm_sub_ps(mul1, mul2);
 		}
 
+		static Vec3f lerp(const Vec3f& a, const Vec3f& b, float t)
+		{
+			return a * (1.0f - t) + b * t;
+		}
+
 		Vec3f operator-() const
 		{
 			return _mm_sub_ps(_mm_setzero_ps(), v);
