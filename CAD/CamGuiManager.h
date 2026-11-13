@@ -1,6 +1,7 @@
 #pragma once
 
 class CadApplication;
+struct SceneObject;
 
 class CamGuiManager
 {
@@ -27,6 +28,8 @@ private:
     float m_roughSurfaceMargin = 0.5f;
     float m_roughBaseMargin = 0.5f;
     float m_roughLayer1Height = 33.0f;
+    std::weak_ptr<SceneObject> m_roughBaseSurface;
+    bool m_roughBaseAutoDetected = false;
 #pragma endregion
 
 #pragma region Material

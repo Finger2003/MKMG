@@ -23,6 +23,8 @@ struct RoughingParameters
 
 	float maxPlungeSlope = 4.0f;     // Max downward dY / dXZ slope (~14 deg from vertical)
 	float simplifyTolerance = 0.03f; // [mm] Collinear / envelope simplification tolerance along scanlines
+
+	SceneObject* baseSurface = nullptr; // Optional designated flat base plane surface (uses baseHeight + baseMargin)
 };
 
 class PathGenerator

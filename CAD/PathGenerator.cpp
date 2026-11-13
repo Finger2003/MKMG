@@ -220,7 +220,7 @@ namespace
 
 		for (const auto& obj : sceneObjects)
 		{
-			if (!obj)
+			if (!obj || obj.get() == params.baseSurface)
 				continue;
 
 			if (auto surf = obj->As<Surface>())
@@ -472,7 +472,13 @@ std::vector<float3> PathGenerator::GenerateRoughingPath(
 	effectiveParams.gridDivX = divX;
 	effectiveParams.gridDivZ = divZ;
 
-	// 1. Build dense surface height map from all multi-segment surfaces & toruses
+	if (effectiveParams.baseSurface != nullptr)
+	{
+		auto eval = GeometryMath::EvaluateParametric(effectiveParams.baseSurface, 0.5f, 0.5f);
+		effectiveParams.baseHeight = std::max(effectiveParams.baseHeight, eval.p.y * cWorldToMm);
+	}
+
+	// 1. Build dense surface height map from all non-base surfaces & toruses
 	std::vector<float> surfaceHeightGrid = BuildSurfaceHeightMap(sceneObjects, effectiveParams);
 
 	// 2. Compute ball-nose cutter location (CL) height map to prevent undercutting V-valleys & steep walls

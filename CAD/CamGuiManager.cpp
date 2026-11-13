@@ -2,9 +2,12 @@
 #include "CamGuiManager.h"
 #include "CadApplication.h"
 #include "PathGenerator.h"
+#include "Surface.h"
 #include "../ImGuiLib/imgui.h"
 #include "../ImGuiLib/imgui_impl_win32.h"
 #include "../ImGuiLib/imgui_impl_dx11.h"
+#include <algorithm>
+#include <cctype>
 
 namespace
 {
@@ -175,6 +178,64 @@ void CamGuiManager::DrawPathGenerationSection()
 {
 	if (ImGui::CollapsingHeader("Roughing Generation (K16)", ImGuiTreeNodeFlags_DefaultOpen))
 	{
+		const auto& sceneObjects = m_app.getSceneObjects();
+		if (sceneObjects.empty())
+		{
+			m_roughBaseAutoDetected = false;
+			m_roughBaseSurface.reset();
+		}
+
+		auto selectedBase = m_roughBaseSurface.lock();
+		if (!m_roughBaseAutoDetected && !sceneObjects.empty())
+		{
+			for (const auto& obj : sceneObjects)
+			{
+				if (obj && obj->As<Surface>())
+				{
+					std::string lowerName = obj->name;
+					std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
+						[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+					if (lowerName.find("plane") != std::string::npos)
+					{
+						selectedBase = obj;
+						m_roughBaseSurface = obj;
+						break;
+					}
+				}
+			}
+			m_roughBaseAutoDetected = true;
+		}
+
+		const char* previewName = selectedBase ? selectedBase->name.c_str() : "(None - use base height)";
+		if (ImGui::BeginCombo("base surface", previewName))
+		{
+			bool noneSelected = (selectedBase == nullptr);
+			if (ImGui::Selectable("(None - use base height)", noneSelected))
+			{
+				m_roughBaseSurface.reset();
+				selectedBase = nullptr;
+			}
+			if (noneSelected)
+				ImGui::SetItemDefaultFocus();
+
+			for (const auto& obj : sceneObjects)
+			{
+				if (!obj || !obj->As<Surface>())
+					continue;
+
+				bool isSelected = (selectedBase == obj);
+				std::string label = obj->name + "##" + std::to_string(obj->m_id);
+				if (ImGui::Selectable(label.c_str(), isSelected))
+				{
+					m_roughBaseSurface = obj;
+					selectedBase = obj;
+				}
+				if (isSelected)
+					ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+
 		ImGui::InputFloat("stepover [mm]", &m_roughStepover, 0.5f, 1.0f, "%.2f");
 		ImGui::InputFloat("surface margin [mm]", &m_roughSurfaceMargin, 0.1f, 0.5f, "%.2f");
 		ImGui::InputFloat("base margin [mm]", &m_roughBaseMargin, 0.1f, 0.5f, "%.2f");
@@ -210,8 +271,9 @@ void CamGuiManager::DrawPathGenerationSection()
 				params.baseMargin = m_roughBaseMargin;
 				params.layer1Height = m_roughLayer1Height;
 				params.stepover = m_roughStepover;
+				params.baseSurface = selectedBase.get();
 
-				auto waypoints = PathGenerator::GenerateRoughingPath(m_app.getSceneObjects(), params);
+				auto waypoints = PathGenerator::GenerateRoughingPath(sceneObjects, params);
 				if (!PathGenerator::ExportGCode(savePath, waypoints))
 				{
 					MessageBoxA(
