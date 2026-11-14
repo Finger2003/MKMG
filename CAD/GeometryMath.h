@@ -88,6 +88,7 @@ namespace GeometryMath
 	std::optional<Vec4f> SolveLinearSystem(Mat4f J, Vec4f F);
 	std::optional<Vec4f> FindIntersectionNextPoint(SceneObject* obj1, SceneObject* obj2, Vec4f startParams, Vec3f p0, Vec3f t, float d, int depth = 0);
 	std::optional<Vec4f> FindExactEdgePoint(SceneObject* obj1, SceneObject* obj2, Vec4f startGuess, int boundaryDim, float boundaryValue);
+	bool IsOnOpenBoundary(SceneObject* obj, float u, float v);
 #pragma endregion
 
 #pragma region Patch Intersection

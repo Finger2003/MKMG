@@ -10,6 +10,8 @@
 #include "Torus.h"
 #include "DxDevice.h" 
 #include "../MathLib/Mat4f.h"
+#include "Intersection.h"
+#include "GregoryPatch.h"
 
 #include <nlohmann/json.hpp>
 using namespace nlohmann;
@@ -47,6 +49,9 @@ void SceneSerializer::Save(const std::wstring& filePath, const std::vector<std::
 
 	for (const auto& obj : objects)
 	{
+		if (obj->IsA(ObjectType::Intersection) || obj->IsA(ObjectType::GregoryPatch))
+			continue;
+
 		if (obj->type == ObjectType::Point)
 			pointsArray.push_back(obj->Serialize());
 		else

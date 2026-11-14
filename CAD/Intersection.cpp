@@ -177,13 +177,13 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 			});
 	}
 
-	auto closeThroughBoundary = [&](std::vector<Vec2f>& c) -> bool
+	auto closeThroughBoundary = [&](std::vector<Vec2f>& c, int preStartEdge = -1, int preEndEdge = -1) -> bool
 		{
 			if (c.size() < 2)
 				return false;
 
-			int startEdge = getEdge(c.front().x, c.front().y);
-			int endEdge = getEdge(c.back().x, c.back().y);
+			int startEdge = (preStartEdge >= 0) ? preStartEdge : getEdge(c.front().x, c.front().y);
+			int endEdge = (preEndEdge >= 0) ? preEndEdge : getEdge(c.back().x, c.back().y);
 
 			if (startEdge == -1 || endEdge == -1)
 				return false;
@@ -312,11 +312,38 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 			return true;
 		};
 
+	const float thresholdU = maxU * 0.5f;
+	const float thresholdV = maxV * 0.5f;
+
+	auto unwrapContour = [&](std::vector<Vec2f>& pts)
+		{
+			if (pts.size() < 2)
+				return;
+
+			std::vector<Vec2f> unwrapped;
+			unwrapped.reserve(pts.size());
+			unwrapped.push_back(pts[0]);
+
+			for (size_t i = 1; i < pts.size(); i++)
+			{
+				Vec2f p = pts[i];
+				const Vec2f& prev = unwrapped.back();
+
+				while (p.x - prev.x > thresholdU) p.x -= maxU;
+				while (prev.x - p.x > thresholdU) p.x += maxU;
+
+				while (p.y - prev.y > thresholdV) p.y -= maxV;
+				while (prev.y - p.y > thresholdV) p.y += maxV;
+
+				unwrapped.push_back(p);
+			}
+
+			pts = std::move(unwrapped);
+		};
+
 	if (mode == TrimFillMode::ClosedLoop)
 	{
 		int crossU = 0, crossV = 0;
-		const float thresholdU = maxU * 0.5f;
-		const float thresholdV = maxV * 0.5f;
 		for (size_t i = 0; i < contour.size(); i++)
 		{
 			auto p0 = contour[i];
@@ -340,29 +367,23 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 		}
 		else
 		{
-			std::vector<Vec2f> unwrapped;
-			unwrapped.push_back(contour[0]);
-
-			for (size_t i = 1; i < contour.size(); i++)
-			{
-				Vec2f p = contour[i];
-				Vec2f prev = unwrapped.back();
-
-				if (p.x - prev.x > thresholdU) p.x -= maxU;
-				else if (prev.x - p.x > thresholdU) p.x += maxU;
-
-				if (p.y - prev.y > thresholdV) p.y -= maxV;
-				else if (prev.y - p.y > thresholdV) p.y += maxV;
-
-				unwrapped.push_back(p);
-			}
-			contour = unwrapped;
+			unwrapContour(contour);
 			contour.push_back(contour.front()); // Close the loop
 		}
 	}
 	else if (mode == TrimFillMode::BoundaryToBoundary)
 	{
-		if (!closeThroughBoundary(contour))
+		int startEdge = getEdge(contour.front().x, contour.front().y);
+		int endEdge = getEdge(contour.back().x, contour.back().y);
+		if (startEdge == -1 || endEdge == -1)
+			return triangles;
+
+		contour.front() = snapToEdge(contour.front(), startEdge);
+		contour.back() = snapToEdge(contour.back(), endEdge);
+
+		unwrapContour(contour);
+
+		if (!closeThroughBoundary(contour, startEdge, endEdge))
 			return triangles;
 	}
 
@@ -388,12 +409,12 @@ std::vector<VertexPosition> Intersection::GenerateTrimPolygon(bool isSurface1)
 		baseTriangles.push_back({ toNDCU(contour[i + 1].x, maxU), toNDCV(contour[i + 1].y, maxV), 0.0f });
 	}
 
-	int startX = (maxUnwrappedU > maxU) ? -1 : 0;
-	int endX = (minUnwrappedU < 0.0f) ? 1 : 0;
-	int startY = (maxUnwrappedV > maxV) ? -1 : 0;
-	int endY = (minUnwrappedV < 0.0f) ? 1 : 0;
+	int startX = (maxUnwrappedU > maxU) ? -static_cast<int>(std::ceil((maxUnwrappedU - maxU) / maxU)) : 0;
+	int endX = (minUnwrappedU < 0.0f) ? static_cast<int>(std::ceil(-minUnwrappedU / maxU)) : 0;
+	int startY = (maxUnwrappedV > maxV) ? -static_cast<int>(std::ceil((maxUnwrappedV - maxV) / maxV)) : 0;
+	int endY = (minUnwrappedV < 0.0f) ? static_cast<int>(std::ceil(-minUnwrappedV / maxV)) : 0;
 
-	// Duplicate triangles in a 3x3 grid to ensure seamless texture wrapping
+	// Duplicate triangles across wrapped periods to ensure seamless texture wrapping
 	for (int offsetX = startX; offsetX <= endX; offsetX++)
 	{
 		for (int offsetY = startY; offsetY <= endY; offsetY++)
@@ -525,84 +546,81 @@ void BezierIntersection::InitBezierGeometry(const DxDevice& device)
 
 
 	size_t n = P.size();
-	std::vector<Vec3f> D(n);
+	if (n < 2)
+		return;
 
-	//if (m_isClosedLoop && n > 2)
-	//{
-	//	int unique_n = static_cast<int>(n) - 1;
-	//	int pad = std::min(10, unique_n - 1);
+	constexpr float cornerCosThreshold = 0.85f;
+	auto isCorner = [cornerCosThreshold](const Vec3f& prev, const Vec3f& curr, const Vec3f& next) -> bool {
+		Vec3f d0 = curr - prev;
+		Vec3f d1 = next - curr;
+		float l0 = d0.length();
+		float l1 = d1.length();
+		if (l0 < 1e-6f || l1 < 1e-6f)
+			return false;
+		return Vec3f::dot(d0 * (1.0f / l0), d1 * (1.0f / l1)) < cornerCosThreshold;
+	};
 
-	//	std::vector<Vec3f> P_pad;
-	//	P_pad.reserve(n + 2 * pad);
-
-	//	// Prefix padding
-	//	for (int i = unique_n - pad; i < unique_n; i++)
-	//		P_pad.push_back(P[i]);
-	//	// Core body
-	//	for (int i = 0; i < static_cast<int>(n); i++)
-	//		P_pad.push_back(P[i]);
-	//	// Suffix padding
-	//	for (int i = 1; i <= pad; i++)
-	//		P_pad.push_back(P[i]);
-
-	//	size_t n_pad = P_pad.size();
-	//	std::vector<float> h(n_pad - 1);
-	//	for (size_t i = 0; i < n_pad - 1; i++)
-	//		h[i] = (P_pad[i + 1] - P_pad[i]).length();
-
-	//	std::vector<float> a(n_pad), b(n_pad), c(n_pad);
-	//	std::vector<Vec3f> d(n_pad);
-
-	//	b[0] = 1.0f; 
-	//	c[0] = 1.0f; 
-	//	d[0] = (P_pad[1] - P_pad[0]) * (2.0f / h[0]);
-	//	for (size_t i = 1; i < n_pad - 1; i++)
-	//	{
-	//		a[i] = h[i]; 
-	//		b[i] = 2.0f * (h[i - 1] + h[i]); 
-	//		c[i] = h[i - 1];
-	//		d[i] = (P_pad[i] - P_pad[i - 1]) * (3.0f * h[i] / h[i - 1]) + (P_pad[i + 1] - P_pad[i]) * (3.0f * h[i - 1] / h[i]);
-	//	}
-	//	a[n_pad - 1] = 1.0f;
-	//	b[n_pad - 1] = 1.0f;
-	//	d[n_pad - 1] = (P_pad[n_pad - 1] - P_pad[n_pad - 2]) * (2.0f / h[n_pad - 2]);
-
-	//	std::vector<float> c_prime(n_pad);
-	//	std::vector<MathLib::Vec3f> d_prime(n_pad);
-	//	c_prime[0] = c[0] / b[0]; d_prime[0] = d[0] * (1.0f / b[0]);
-
-	//	for (size_t i = 1; i < n_pad; i++)
-	//	{
-	//		float m = 1.0f / (b[i] - a[i] * c_prime[i - 1]);
-	//		c_prime[i] = c[i] * m;
-	//		d_prime[i] = (d[i] - d_prime[i - 1] * a[i]) * m;
-	//	}
-
-	//	std::vector<MathLib::Vec3f> D_pad(n_pad);
-	//	D_pad[n_pad - 1] = d_prime[n_pad - 1];
-	//	for (int i = static_cast<int>(n_pad - 2); i >= 0; i--)
-	//		D_pad[i] = d_prime[i] - D_pad[i + 1] * c_prime[i];
-
-	//	for (int i = 0; i < static_cast<int>(n); i++)
-	//		D[i] = D_pad[i + pad];
-	//	D[n - 1] = D[0];
-	//}
-	if (n == 2)
-	{
-		float h0 = (P[1] - P[0]).length();
-		if (h0 > 1e-8f)
+	auto solveOpenChain = [](const std::vector<Vec3f>& subP) -> std::vector<Vec3f> {
+		size_t m = subP.size();
+		std::vector<Vec3f> D(m);
+		if (m == 2)
 		{
-			D[0] = (P[1] - P[0]) * (1.0f / h0);
-			D[1] = (P[1] - P[0]) * (1.0f / h0);
+			float h0 = std::max((subP[1] - subP[0]).length(), 1e-6f);
+			D[0] = (subP[1] - subP[0]) * (1.0f / h0);
+			D[1] = D[0];
+			return D;
 		}
-	}
-	else if (m_isClosedLoop && n > 3)
-	{
-		int unique_n = static_cast<int>(n) - 1;
+
+		std::vector<float> h(m - 1);
+		for (size_t i = 0; i < m - 1; i++)
+			h[i] = std::max((subP[i + 1] - subP[i]).length(), 1e-6f);
+
+		std::vector<float> a(m), b(m), c(m);
+		std::vector<Vec3f> d(m);
+
+		b[0] = 1.0f;
+		c[0] = 1.0f;
+		d[0] = (subP[1] - subP[0]) * (2.0f / h[0]);
+
+		for (size_t i = 1; i < m - 1; i++)
+		{
+			a[i] = h[i];
+			b[i] = 2.0f * (h[i - 1] + h[i]);
+			c[i] = h[i - 1];
+			d[i] = (subP[i] - subP[i - 1]) * (3.0f * h[i] / h[i - 1]) + (subP[i + 1] - subP[i]) * (3.0f * h[i - 1] / h[i]);
+		}
+
+		a[m - 1] = 1.0f;
+		b[m - 1] = 1.0f;
+		d[m - 1] = (subP[m - 1] - subP[m - 2]) * (2.0f / h[m - 2]);
+
+		std::vector<float> c_prime(m);
+		std::vector<Vec3f> d_prime(m);
+		c_prime[0] = c[0] / b[0];
+		d_prime[0] = d[0] * (1.0f / b[0]);
+
+		for (size_t i = 1; i < m; i++)
+		{
+			float inv = 1.0f / (b[i] - a[i] * c_prime[i - 1]);
+			c_prime[i] = c[i] * inv;
+			d_prime[i] = (d[i] - d_prime[i - 1] * a[i]) * inv;
+		}
+
+		D[m - 1] = d_prime[m - 1];
+		for (int i = static_cast<int>(m) - 2; i >= 0; i--)
+			D[i] = d_prime[i] - D[i + 1] * c_prime[i];
+
+		return D;
+	};
+
+	auto solveClosedLoop = [](const std::vector<Vec3f>& loopP) -> std::vector<Vec3f> {
+		int m = static_cast<int>(loopP.size());
+		int unique_n = m - 1;
+		std::vector<Vec3f> D(m);
 
 		std::vector<float> h(unique_n);
 		for (int i = 0; i < unique_n; i++)
-			h[i] = (P[(i + 1) % unique_n] - P[i]).length();
+			h[i] = std::max((loopP[(i + 1) % unique_n] - loopP[i]).length(), 1e-6f);
 
 		std::vector<float> a(unique_n), b(unique_n), c(unique_n);
 		std::vector<Vec3f> d(unique_n);
@@ -613,7 +631,7 @@ void BezierIntersection::InitBezierGeometry(const DxDevice& device)
 			a[i] = h[i];
 			b[i] = 2.0f * (h[prev] + h[i]);
 			c[i] = h[prev];
-			d[i] = (P[i] - P[prev]) * (3.0f * h[i] / h[prev]) + (P[(i + 1) % unique_n] - P[i]) * (3.0f * h[prev] / h[i]);
+			d[i] = (loopP[i] - loopP[prev]) * (3.0f * h[i] / h[prev]) + (loopP[(i + 1) % unique_n] - loopP[i]) * (3.0f * h[prev] / h[i]);
 		}
 
 		float gamma = -b[0];
@@ -639,15 +657,15 @@ void BezierIntersection::InitBezierGeometry(const DxDevice& device)
 
 			for (int i = 1; i < unique_n; i++)
 			{
-				float m = 1.0f / (b_prime[i] - a_prime[i] * c_star[i - 1]);
-				c_star[i] = c_prime[i] * m;
-				out[i] = (d_input[i] - out[i - 1] * a_prime[i]) * m;
+				float inv = 1.0f / (b_prime[i] - a_prime[i] * c_star[i - 1]);
+				c_star[i] = c_prime[i] * inv;
+				out[i] = (d_input[i] - out[i - 1] * a_prime[i]) * inv;
 			}
 			for (int i = unique_n - 2; i >= 0; i--)
 			{
 				out[i] = out[i] - out[i + 1] * c_star[i];
 			}
-			};
+		};
 
 		std::vector<Vec3f> Y;
 		SolveThomas(d, Y);
@@ -662,64 +680,92 @@ void BezierIntersection::InitBezierGeometry(const DxDevice& device)
 		for (int i = 0; i < unique_n; i++)
 			D[i] = Y[i] - v_dot_y * (Q[i] * scalar_ratio);
 
-		D[n - 1] = D[0];
+		D[m - 1] = D[0];
+		return D;
+	};
+
+	std::vector<VertexPosition> bezierVertices;
+	auto appendBezierSegments = [&bezierVertices](const std::vector<Vec3f>& subP, const std::vector<Vec3f>& subD) {
+		for (size_t i = 0; i < subP.size() - 1; i++)
+		{
+			float hi = (subP[i + 1] - subP[i]).length();
+			Vec3f b0 = subP[i];
+			Vec3f b1 = subP[i] + subD[i] * (hi / 3.0f);
+			Vec3f b2 = subP[i + 1] - subD[i + 1] * (hi / 3.0f);
+			Vec3f b3 = subP[i + 1];
+
+			bezierVertices.push_back({ b0.x, b0.y, b0.z });
+			bezierVertices.push_back({ b1.x, b1.y, b1.z });
+			bezierVertices.push_back({ b2.x, b2.y, b2.z });
+			bezierVertices.push_back({ b3.x, b3.y, b3.z });
+		}
+	};
+
+	if (m_isClosedLoop && n > 3)
+	{
+		int unique_n = static_cast<int>(n) - 1;
+		std::vector<int> corners;
+		for (int i = 0; i < unique_n; i++)
+		{
+			int prev = (i - 1 + unique_n) % unique_n;
+			int next = (i + 1) % unique_n;
+			if (isCorner(P[prev], P[i], P[next]))
+				corners.push_back(i);
+		}
+
+		if (corners.empty())
+		{
+			std::vector<Vec3f> D = solveClosedLoop(P);
+			appendBezierSegments(P, D);
+		}
+		else
+		{
+			int c0 = corners[0];
+			std::vector<Vec3f> rotatedP;
+			rotatedP.reserve(unique_n + 1);
+			for (int k = 0; k <= unique_n; k++)
+				rotatedP.push_back(P[(c0 + k) % unique_n]);
+
+			std::vector<int> splitIndices;
+			splitIndices.reserve(corners.size() + 1);
+			for (int c : corners)
+				splitIndices.push_back((c - c0 + unique_n) % unique_n);
+			std::sort(splitIndices.begin(), splitIndices.end());
+			splitIndices.push_back(unique_n);
+
+			for (size_t s = 0; s + 1 < splitIndices.size(); s++)
+			{
+				int a = splitIndices[s];
+				int b = splitIndices[s + 1];
+				if (b <= a)
+					continue;
+				std::vector<Vec3f> subP(rotatedP.begin() + a, rotatedP.begin() + b + 1);
+				std::vector<Vec3f> subD = solveOpenChain(subP);
+				appendBezierSegments(subP, subD);
+			}
+		}
 	}
 	else
 	{
-		std::vector<float> h(n - 1);
-		for (size_t i = 0; i < n - 1; i++)
-			h[i] = (P[i + 1] - P[i]).length();
-
-		std::vector<float> a(n), b(n), c(n);
-		std::vector<Vec3f> d(n);
-
-		b[0] = 1.0f;
-		c[0] = 1.0f;
-		d[0] = (P[1] - P[0]) * (2.0f / h[0]);
-
-		for (size_t i = 1; i < n - 1; i++)
+		std::vector<size_t> splitIndices;
+		splitIndices.push_back(0);
+		for (size_t i = 1; i + 1 < n; i++)
 		{
-			a[i] = h[i]; 
-			b[i] = 2.0f * (h[i - 1] + h[i]); 
-			c[i] = h[i - 1];
-			d[i] = (P[i] - P[i - 1]) * (3.0f * h[i] / h[i - 1]) + (P[i + 1] - P[i]) * (3.0f * h[i - 1] / h[i]);
+			if (isCorner(P[i - 1], P[i], P[i + 1]))
+				splitIndices.push_back(i);
 		}
+		splitIndices.push_back(n - 1);
 
-		a[n - 1] = 1.0f;
-		b[n - 1] = 1.0f;
-		d[n - 1] = (P[n - 1] - P[n - 2]) * (2.0f / h[n - 2]);
-
-		std::vector<float> c_prime(n);
-		std::vector<Vec3f> d_prime(n);
-		c_prime[0] = c[0] / b[0];
-		d_prime[0] = d[0] * (1.0f / b[0]);
-
-		for (size_t i = 1; i < n; i++)
+		for (size_t s = 0; s + 1 < splitIndices.size(); s++)
 		{
-			float m = 1.0f / (b[i] - a[i] * c_prime[i - 1]);
-			c_prime[i] = c[i] * m;
-			d_prime[i] = (d[i] - d_prime[i - 1] * a[i]) * m;
+			size_t a = splitIndices[s];
+			size_t b = splitIndices[s + 1];
+			if (b <= a)
+				continue;
+			std::vector<Vec3f> subP(P.begin() + a, P.begin() + b + 1);
+			std::vector<Vec3f> subD = solveOpenChain(subP);
+			appendBezierSegments(subP, subD);
 		}
-
-		D[n - 1] = d_prime[n - 1];
-		for (int i = static_cast<int>(n - 2); i >= 0; i--)
-			D[i] = d_prime[i] - D[i + 1] * c_prime[i];
-	}
-
-	std::vector<VertexPosition> bezierVertices;
-	bezierVertices.reserve((n - 1) * 4);
-	for (size_t i = 0; i < n - 1; i++)
-	{
-		float hi = (P[i + 1] - P[i]).length();
-		Vec3f b0 = P[i];
-		Vec3f b1 = P[i] + D[i] * (hi / 3.0f);
-		Vec3f b2 = P[i + 1] - D[i + 1] * (hi / 3.0f);
-		Vec3f b3 = P[i + 1];
-
-		bezierVertices.push_back({ b0.x, b0.y, b0.z });
-		bezierVertices.push_back({ b1.x, b1.y, b1.z });
-		bezierVertices.push_back({ b2.x, b2.y, b2.z });
-		bezierVertices.push_back({ b3.x, b3.y, b3.z });
 	}
 
 	m_bezierVertexCount = static_cast<UINT>(bezierVertices.size());

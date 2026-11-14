@@ -1246,9 +1246,6 @@ void CadApplication::ActionFindIntersection()
 
 	auto& result = *resultOpt;
 
-	auto isS1Dim = [](int dim) { return dim == 0 || dim == 1; };
-	auto isS2Dim = [](int dim) { return dim == 2 || dim == 3; };
-
 	TrimFillMode trimModeS1 = TrimFillMode::None;
 	TrimFillMode trimModeS2 = TrimFillMode::None;
 
@@ -1257,13 +1254,22 @@ void CadApplication::ActionFindIntersection()
 		trimModeS1 = TrimFillMode::ClosedLoop;
 		trimModeS2 = TrimFillMode::ClosedLoop;
 	}
-	else
+	else if (!result.params.empty())
 	{
-		if (isS1Dim(result.forwardHitDim) && isS1Dim(result.backwardHitDim))
-			trimModeS1 = TrimFillMode::BoundaryToBoundary;
+		const Vec4f& pStart = result.params.front();
+		const Vec4f& pEnd = result.params.back();
 
-		if (isS2Dim(result.forwardHitDim) && isS2Dim(result.backwardHitDim))
+		if (GeometryMath::IsOnOpenBoundary(obj1, pStart.x, pStart.y) &&
+			GeometryMath::IsOnOpenBoundary(obj1, pEnd.x, pEnd.y))
+		{
+			trimModeS1 = TrimFillMode::BoundaryToBoundary;
+		}
+
+		if (GeometryMath::IsOnOpenBoundary(obj2, pStart.z, pStart.w) &&
+			GeometryMath::IsOnOpenBoundary(obj2, pEnd.z, pEnd.w))
+		{
 			trimModeS2 = TrimFillMode::BoundaryToBoundary;
+		}
 	}
 
 	auto intersection = std::make_shared<LinearIntersection>(

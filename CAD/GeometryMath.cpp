@@ -15,6 +15,77 @@ namespace
 		float dist;
 	};
 
+	float GetMaxU(SceneObject* obj)
+	{
+		if (auto surf = obj->As<Surface>())
+			return static_cast<float>(surf->GetSegmentsU());
+		return 1.0f;
+	}
+
+	float GetMaxV(SceneObject* obj)
+	{
+		if (auto surf = obj->As<Surface>())
+			return static_cast<float>(surf->GetSegmentsV());
+		return 1.0f;
+	}
+
+	bool IsSeamConnected(SceneObject* obj, bool inU, float otherParam)
+	{
+		if (obj->type == ObjectType::Torus)
+			return true;
+		if (!obj->IsA(ObjectType::Surface))
+			return false;
+		if (std::isnan(otherParam))
+			return false;
+
+		float maxU = GetMaxU(obj);
+		float maxV = GetMaxV(obj);
+		float maxOther = inU ? maxV : maxU;
+		float oc = std::clamp(otherParam, 0.0f, maxOther);
+
+		auto boundaryDistSqr = [&](float coord) {
+			Vec3f a = inU ? EvaluateParametric(obj, 0.0f, coord).p : EvaluateParametric(obj, coord, 0.0f).p;
+			Vec3f b = inU ? EvaluateParametric(obj, maxU, coord).p : EvaluateParametric(obj, coord, maxV).p;
+			return (a - b).length_sqr();
+		};
+
+		if (boundaryDistSqr(oc) >= 1e-6f)
+			return false;
+
+		if (oc <= 1e-4f || oc >= maxOther - 1e-4f)
+		{
+			float oi = (oc <= 1e-4f) ? std::min(maxOther, 0.01f) : std::max(0.0f, maxOther - 0.01f);
+			if (boundaryDistSqr(oi) >= 1e-6f)
+				return false;
+		}
+
+		return true;
+	}
+
+	bool IsSeamDim(SceneObject* obj1, SceneObject* obj2, const Vec4f& params, int dim)
+	{
+		SceneObject* obj = (dim < 2) ? obj1 : obj2;
+		bool inU = (dim == 0 || dim == 2);
+		float otherParam = params.f[inU ? (dim + 1) : (dim - 1)];
+		return IsSeamConnected(obj, inU, otherParam);
+	}
+
+	void WrapSeamConnectedParams(SceneObject* obj, float maxU, float maxV, float& u, float& v)
+	{
+		if ((u < 0.0f || u > maxU) && IsSeamConnected(obj, true, v))
+		{
+			u = std::fmod(u, maxU);
+			if (u < 0.0f)
+				u += maxU;
+		}
+		if ((v < 0.0f || v > maxV) && IsSeamConnected(obj, false, u))
+		{
+			v = std::fmod(v, maxV);
+			if (v < 0.0f)
+				v += maxV;
+		}
+	}
+
 	std::vector<Candidate> FindIntersectionCandidates(SceneObject* obj1, SceneObject* obj2, bool isSelfIntersection, const MathLib::Vec4f& maxDomains, std::optional<float3> cursorHint)
 	{
 		float maxU1 = maxDomains.x;
@@ -107,6 +178,28 @@ namespace
 			auto p1 = EvaluateParametric(obj1, currentParams.x, currentParams.y).p;
 			auto p2 = EvaluateParametric(obj2, currentParams.z, currentParams.w).p;
 			sortedCandidates.push_back({ currentParams, (p1 - p2).length_sqr() });
+
+			std::vector<MathLib::Vec4f> patchParams;
+			SurfacePatch root1 = { 0.0f, maxU1, 0.0f, maxV1, ComputePatchAABB(obj1, 0.0f, maxU1, 0.0f, maxV1) };
+			SurfacePatch root2 = { 0.0f, maxU2, 0.0f, maxV2, ComputePatchAABB(obj2, 0.0f, maxU2, 0.0f, maxV2) };
+			IntersectPatches(obj1, root1, obj2, root2, patchParams, isSelfIntersection);
+
+			std::vector<Candidate> patchCandidates;
+			patchCandidates.reserve(patchParams.size());
+			for (const auto& params : patchParams)
+			{
+				auto cp1 = EvaluateParametric(obj1, params.x, params.y).p;
+				auto cp2 = EvaluateParametric(obj2, params.z, params.w).p;
+				Vec3f mid = (cp1 + cp2) * 0.5f;
+				float score = (mid - cursorPos).length_sqr() + (cp1 - cp2).length_sqr();
+				patchCandidates.push_back({ params, score });
+			}
+
+			std::sort(patchCandidates.begin(), patchCandidates.end(), [](const Candidate& a, const Candidate& b) {
+				return a.dist < b.dist;
+				});
+
+			sortedCandidates.insert(sortedCandidates.end(), patchCandidates.begin(), patchCandidates.end());
 		}
 		else
 		{
@@ -139,11 +232,31 @@ namespace
 		float maxU2 = maxDomains.z;
 		float maxV2 = maxDomains.w;
 
+		auto applyBounds = [&](Vec4f& p) {
+			for (int d = 0; d < 4; d++)
+			{
+				float maxVal = maxDomains.f[d];
+				if (p.f[d] < 0.0f || p.f[d] > maxVal)
+				{
+					if (IsSeamDim(obj1, obj2, p, d))
+					{
+						p.f[d] = std::fmod(p.f[d], maxVal);
+						if (p.f[d] < 0.0f)
+							p.f[d] += maxVal;
+					}
+					else
+					{
+						p.f[d] = std::clamp(p.f[d], 0.0f, maxVal);
+					}
+				}
+			}
+			};
+
 		Vec4f currentParams = startParams;
-		float alpha = 0.01f;
+		float alpha = 0.5f;
 		constexpr float alphaIncrease = 1.2f;
 		constexpr float alphaReduction = 0.5f;
-		constexpr float tolerance = 1e-6f;
+		constexpr float tolerance = 1e-8f;
 		constexpr int maxIterations = 100;
 
 		SurfaceEvalResult eval1 = EvaluateParametric(obj1, currentParams.x, currentParams.y);
@@ -156,47 +269,75 @@ namespace
 			if (distSqr < tolerance)
 				break;
 
-			float gu = Vec3f::dot(D, eval1.du);
-			float gv = Vec3f::dot(D, eval1.dv);
-			float gs = Vec3f::dot(-D, eval2.du);
-			float gt = Vec3f::dot(-D, eval2.dv);
+			bool accepted = false;
 
-			Vec4f nextParams = currentParams - alpha * Vec4f(gu, gv, gs, gt);
+			if (!isSelfIntersection)
+			{
+				Vec3f np = Vec3f::cross(eval1.du, eval1.dv).normalize();
+				Vec3f nq = Vec3f::cross(eval2.du, eval2.dv).normalize();
+				Vec3f t = Vec3f::cross(np, nq);
 
-			auto applyBounds = [](float& val, float maxVal, SceneObject* obj) {
-				if (obj->type == ObjectType::Torus)
+				if (t.length_sqr() > 1e-8f)
 				{
-					val = std::fmod(val, maxVal);
-					if (val < 0.0f) val += maxVal;
+					Mat4f J(
+						Vec4f(eval1.du.x, eval1.dv.x, -eval2.du.x, -eval2.dv.x),
+						Vec4f(eval1.du.y, eval1.dv.y, -eval2.du.y, -eval2.dv.y),
+						Vec4f(eval1.du.z, eval1.dv.z, -eval2.du.z, -eval2.dv.z),
+						Vec4f(Vec3f::dot(eval1.du, t), Vec3f::dot(eval1.dv, t), 0.0f, 0.0f)
+					);
+					Vec4f F(-D.x, -D.y, -D.z, 0.0f);
+
+					if (auto deltaOpt = SolveLinearSystem(J, F))
+					{
+						for (float scale : { 1.0f, 0.5f, 0.25f, 0.1f, 0.02f })
+						{
+							Vec4f candParams = currentParams + (*deltaOpt) * scale;
+							applyBounds(candParams);
+
+							auto candEval1 = EvaluateParametric(obj1, candParams.x, candParams.y);
+							auto candEval2 = EvaluateParametric(obj2, candParams.z, candParams.w);
+
+							if ((candEval1.p - candEval2.p).length_sqr() < distSqr)
+							{
+								currentParams = candParams;
+								eval1 = candEval1;
+								eval2 = candEval2;
+								accepted = true;
+								break;
+							}
+						}
+					}
+				}
+			}
+
+			if (!accepted)
+			{
+				float gu = Vec3f::dot(D, eval1.du) / std::max(eval1.du.length_sqr(), 1e-4f);
+				float gv = Vec3f::dot(D, eval1.dv) / std::max(eval1.dv.length_sqr(), 1e-4f);
+				float gs = Vec3f::dot(-D, eval2.du) / std::max(eval2.du.length_sqr(), 1e-4f);
+				float gt = Vec3f::dot(-D, eval2.dv) / std::max(eval2.dv.length_sqr(), 1e-4f);
+
+				Vec4f nextParams = currentParams - alpha * Vec4f(gu, gv, gs, gt);
+				applyBounds(nextParams);
+
+				auto nextEval1 = EvaluateParametric(obj1, nextParams.x, nextParams.y);
+				auto nextEval2 = EvaluateParametric(obj2, nextParams.z, nextParams.w);
+
+				if ((nextEval1.p - nextEval2.p).length_sqr() < distSqr)
+				{
+					currentParams = nextParams;
+					eval1 = nextEval1;
+					eval2 = nextEval2;
+					alpha = std::min(alpha * alphaIncrease, 1.0f);
 				}
 				else
 				{
-					val = std::clamp(val, 0.0f, maxVal);
+					alpha *= alphaReduction;
 				}
-				};
 
-			applyBounds(nextParams.x, maxU1, obj1);
-			applyBounds(nextParams.y, maxV1, obj1);
-			applyBounds(nextParams.z, maxU2, obj2);
-			applyBounds(nextParams.w, maxV2, obj2);
-
-			auto nextEval1 = EvaluateParametric(obj1, nextParams.x, nextParams.y);
-			auto nextEval2 = EvaluateParametric(obj2, nextParams.z, nextParams.w);
-
-			if ((nextEval1.p - nextEval2.p).length_sqr() < distSqr)
-			{
-				currentParams = nextParams;
-				eval1 = nextEval1;
-				eval2 = nextEval2;
-				alpha *= alphaIncrease;
+				if (alpha < 1e-6f)
+					break;
 			}
-			else
-			{
-				alpha *= alphaReduction;
-			}
-
-			if (alpha < 1e-7f)
-				break;
 		}
 
 		if ((eval1.p - eval2.p).length_sqr() <= 1e-5f)
@@ -244,6 +385,7 @@ namespace
 		bool backwardHitEdge = false;
 		int forwardHitDim = -1;
 		int backwardHitDim = -1;
+		Vec3f startTangent{ 0.0f, 0.0f, 0.0f };
 
 		for (float direction : { 1.0f, -1.0f })
 		{
@@ -251,9 +393,13 @@ namespace
 				break;
 
 			Vec4f marchingParams = startParams;
-			Vec3f startTangent, prevTangent;
+			Vec3f prevTangent{ 0.0f, 0.0f, 0.0f };
+			Vec3f prevPos = startPos;
+			bool leftStartRadius = false;
 			int stepCount = 0;
-			while (true)
+			constexpr int maxMarchSteps = 10000;
+
+			for (int iterGuard = 0; iterGuard < maxMarchSteps; iterGuard++)
 			{
 				auto [p1, du1, dv1] = EvaluateParametric(obj1, marchingParams.x, marchingParams.y);
 				auto [p2, du2, dv2] = EvaluateParametric(obj2, marchingParams.z, marchingParams.w);
@@ -272,18 +418,9 @@ namespace
 				}
 				else
 				{
-					t /= tLen;
-					if (stepCount == 0)
-					{
-						t *= direction;
-						if (direction == 1.0f)
-							startTangent = t;
-					}
-					else
-					{
-						if (Vec3f::dot(t, prevTangent) < 0.0f)
-							t = -t;
-					}
+					t = (t / tLen) * direction;
+					if (stepCount == 0 && direction == 1.0f)
+						startTangent = t;
 				}
 				prevTangent = t;
 
@@ -358,6 +495,11 @@ namespace
 							if (!isStrictlyOutOfBounds(*exactEdgeOpt))
 							{
 								finalParams = *exactEdgeOpt;
+								finalParams.x = std::clamp(finalParams.x, 0.0f, maxU1);
+								finalParams.y = std::clamp(finalParams.y, 0.0f, maxV1);
+								finalParams.z = std::clamp(finalParams.z, 0.0f, maxU2);
+								finalParams.w = std::clamp(finalParams.w, 0.0f, maxV2);
+								finalParams.f[hitDim] = hitTarget;
 								exactValid = true;
 							}
 						}
@@ -365,11 +507,13 @@ namespace
 						{
 							auto [g_p1, g_du1, g_dv1] = EvaluateParametric(obj1, guess.x, guess.y);
 							auto [g_p2, g_du2, g_dv2] = EvaluateParametric(obj2, guess.z, guess.w);
-							if ((g_p1 - g_p2).length_sqr() > 1e-5)
+							if ((g_p1 - g_p2).length_sqr() > 1e-5f)
 								break;
 						}
 
 						auto [edgePos, _u, _v] = EvaluateParametric(obj1, finalParams.x, finalParams.y);
+						if ((edgePos - startPos).length_sqr() >= (step * step))
+							leftStartRadius = true;
 
 						Vec4f oppositeParams = finalParams;
 						float oppositeTarget = 0.0f;
@@ -410,6 +554,8 @@ namespace
 							}
 
 							marchingParams = oppositeParams;
+							prevPos = edgePos;
+							stepCount++;
 							continue;
 						}
 
@@ -434,14 +580,16 @@ namespace
 
 				marchingParams = *nextParamsOpt;
 				auto [newPos, _u, _v] = EvaluateParametric(obj1, marchingParams.x, marchingParams.y);
-				if (stepCount > 3 && (newPos - startPos).length_sqr() < (step * step) && Vec3f::dot(t, startTangent) > 0.0f)
+				float stepDistSqr = (newPos - prevPos).length_sqr();
+				float distToStartSqr = (newPos - startPos).length_sqr();
+				if (distToStartSqr >= (step * step))
+					leftStartRadius = true;
+
+				if (direction == 1.0f && stepCount > 3 && leftStartRadius && distToStartSqr <= std::max(step * step, stepDistSqr * 1.5f) && Vec3f::dot(t, startTangent) > 0.0f)
 				{
 					isClosedLoop = true;
-					if (direction == 1.0f)
-					{
-						forwardPoints.push_back(startPos);
-						forwardParams.push_back(marchingParams);
-					}
+					forwardPoints.push_back(startPos);
+					forwardParams.push_back(marchingParams);
 					break;
 				}
 
@@ -456,6 +604,7 @@ namespace
 					backwardParams.push_back(marchingParams);
 				}
 
+				prevPos = newPos;
 				stepCount++;
 			}
 		}
@@ -506,6 +655,10 @@ SurfaceEvalResult GeometryMath::EvaluateBezierSurface(BezierSurface* surf, float
 {
 	int segU = surf->GetSegmentsU();
 	int segV = surf->GetSegmentsV();
+	float maxU = static_cast<float>(segU);
+	float maxV = static_cast<float>(segV);
+
+	WrapSeamConnectedParams(surf, maxU, maxV, u, v);
 
 	int pu = std::clamp(static_cast<int>(u), 0, segU - 1);
 	int pv = std::clamp(static_cast<int>(v), 0, segV - 1);
@@ -546,6 +699,10 @@ SurfaceEvalResult GeometryMath::EvaluateBSplineSurface(BSplineSurface* surf, flo
 {
 	int segU = surf->GetSegmentsU();
 	int segV = surf->GetSegmentsV();
+	float maxU = static_cast<float>(segU);
+	float maxV = static_cast<float>(segV);
+
+	WrapSeamConnectedParams(surf, maxU, maxV, u, v);
 
 	int pu = std::clamp(static_cast<int>(u), 0, segU - 1);
 	int pv = std::clamp(static_cast<int>(v), 0, segV - 1);
@@ -651,19 +808,39 @@ std::optional<IntersectionResult> GeometryMath::CalculateIntersection(SceneObjec
 	if (candidates.empty())
 		return std::nullopt;
 
-	// STAGE 2: GRADIENT DESCENT
-	std::optional<Vec4f> refinedParams = std::nullopt;
+	// STAGE 2 & 3: REFINE AND TRACE THE INTERSECTION CURVE
+	std::vector<Vec4f> triedRefined;
+	constexpr int maxTraceAttempts = 5;
+
 	for (const auto& candidate : candidates)
 	{
-		if(refinedParams = RefineIntersectionPoint(obj1, obj2, candidate.params, maxDomains, isSelfIntersection))
-			break;		
+		auto refinedParams = RefineIntersectionPoint(obj1, obj2, candidate.params, maxDomains, isSelfIntersection);
+		if (!refinedParams)
+			continue;
+
+		bool alreadyTried = false;
+		for (const auto& prev : triedRefined)
+		{
+			Vec4f diff = *refinedParams - prev;
+			if (diff.x * diff.x + diff.y * diff.y + diff.z * diff.z + diff.w * diff.w < 1e-3f)
+			{
+				alreadyTried = true;
+				break;
+			}
+		}
+		if (alreadyTried)
+			continue;
+
+		triedRefined.push_back(*refinedParams);
+
+		if (auto result = TraceIntersectionPath(obj1, obj2, *refinedParams, step, maxDomains, isSelfIntersection))
+			return result;
+
+		if (static_cast<int>(triedRefined.size()) >= maxTraceAttempts)
+			break;
 	}
 
-	if (!refinedParams)
-		return std::nullopt;
-
-	// STAGE 3: TRACE THE INTERSECTION CURVE
-	return TraceIntersectionPath(obj1, obj2, *refinedParams, step, maxDomains, isSelfIntersection);
+	return std::nullopt;
 }
 std::optional<MathLib::Vec4f> GeometryMath::SolveLinearSystem(MathLib::Mat4f J, MathLib::Vec4f F)
 {
@@ -706,13 +883,22 @@ std::optional<MathLib::Vec4f> GeometryMath::SolveLinearSystem(MathLib::Mat4f J, 
 
 std::optional<MathLib::Vec4f> GeometryMath::FindIntersectionNextPoint(SceneObject* obj1, SceneObject* obj2, MathLib::Vec4f startParams, MathLib::Vec3f p0, MathLib::Vec3f t, float d, int depth)
 {
-	constexpr int maxDepth = 3;
+	constexpr int maxDepth = 10;
 	if (depth > maxDepth)
 		return std::nullopt;
 
+	Vec4f maxDomains(GetMaxU(obj1), GetMaxV(obj1), GetMaxU(obj2), GetMaxV(obj2));
+
+	auto [s_p1, s_du1, s_dv1] = EvaluateParametric(obj1, startParams.x, startParams.y);
+	auto [s_p2, s_du2, s_dv2] = EvaluateParametric(obj2, startParams.z, startParams.w);
+	Vec3f s_np = Vec3f::cross(s_du1, s_dv1).normalize();
+	Vec3f s_nq = Vec3f::cross(s_du2, s_dv2).normalize();
+	Vec3f s_rawT = Vec3f::cross(s_np, s_nq);
+	float dirSign = (Vec3f::dot(s_rawT, t) >= 0.0f) ? 1.0f : -1.0f;
+
 	Vec4f currentParams = startParams;
 	bool converged = false;
-	constexpr int maxIterations = 50;
+	constexpr int maxIterations = 35;
 	constexpr float F_dist_tolerance = 1e-8f;
 	constexpr float planeTolerance = 1e-4f;
 
@@ -726,7 +912,49 @@ std::optional<MathLib::Vec4f> GeometryMath::FindIntersectionNextPoint(SceneObjec
 
 		if (F_dist.length_sqr() < F_dist_tolerance && std::abs(planeDist) < planeTolerance)
 		{
-			converged = true;
+			if ((p1 - p0).length_sqr() <= (2.0f * d) * (2.0f * d))
+			{
+				bool validStep = true;
+				for (int dim = 0; dim < 4; dim++)
+				{
+					if (std::abs(currentParams.f[dim] - startParams.f[dim]) > std::max(maxDomains.f[dim] * 0.5f, 0.5f))
+					{
+						validStep = false;
+						break;
+					}
+					if (!IsSeamDim(obj1, obj2, currentParams, dim) && (currentParams.f[dim] < 0.0f || currentParams.f[dim] > maxDomains.f[dim]))
+					{
+						float target = (currentParams.f[dim] < 0.0f) ? 0.0f : maxDomains.f[dim];
+						float deltaD = currentParams.f[dim] - startParams.f[dim];
+						float tHit = (std::abs(deltaD) > 1e-8f) ? ((target - startParams.f[dim]) / deltaD) : 0.0f;
+						Vec4f guess = startParams + (currentParams - startParams) * tHit;
+						if (!FindExactEdgePoint(obj1, obj2, guess, dim, target))
+						{
+							validStep = false;
+							break;
+						}
+					}
+				}
+
+				if (validStep)
+				{
+					Vec3f np1 = Vec3f::cross(du1, dv1).normalize();
+					Vec3f nq1 = Vec3f::cross(du2, dv2).normalize();
+					Vec3f rawT1 = Vec3f::cross(np1, nq1);
+					float rawT1Len = rawT1.length();
+					if (depth < maxDepth && rawT1Len >= 0.05f)
+					{
+						Vec3f tNext = (rawT1 / rawT1Len) * dirSign;
+						if (Vec3f::dot(tNext, t) < 0.5f)
+						{
+							validStep = false;
+						}
+					}
+				}
+
+				if (validStep)
+					converged = true;
+			}
 			break;
 		}
 
@@ -743,22 +971,20 @@ std::optional<MathLib::Vec4f> GeometryMath::FindIntersectionNextPoint(SceneObjec
 		if (!deltaOpt)
 			break;
 
-		currentParams += *deltaOpt;
+		Vec4f delta = *deltaOpt;
+		float maxRelStep = 0.0f;
+		for (int dim = 0; dim < 4; dim++)
+			maxRelStep = std::max(maxRelStep, std::abs(delta.f[dim]) / std::max(maxDomains.f[dim], 1.0f));
+		if (maxRelStep > 0.5f)
+			delta *= (0.5f / maxRelStep);
+
+		currentParams += delta;
 	}
 
 	if (converged)
 		return currentParams;
-	else
-	{
-		auto halfStep1 = FindIntersectionNextPoint(obj1, obj2, startParams, p0, t, d / 2.0f, depth + 1);
-		if (!halfStep1)
-			return std::nullopt;
 
-		auto [p_mid, _1, _2] = EvaluateParametric(obj1, halfStep1->x, halfStep1->y);
-
-		auto halfStep2 = FindIntersectionNextPoint(obj1, obj2, *halfStep1, p_mid, t, d / 2.0f, depth + 1);
-		return halfStep2;
-	}
+	return FindIntersectionNextPoint(obj1, obj2, startParams, p0, t, d / 2.0f, depth + 1);
 }
 
 std::optional<MathLib::Vec4f> GeometryMath::FindExactEdgePoint(SceneObject* obj1, SceneObject* obj2, MathLib::Vec4f startGuess, int boundaryDim, float boundaryValue)
@@ -918,5 +1144,18 @@ void GeometryMath::IntersectPatches(SceneObject* obj1, SurfacePatch p1, SceneObj
 		for (int i = 0; i < 4; i++)
 			IntersectPatches(obj1, p1, obj2, sub[i], candidateParams, isSelfIntersection, depth + 1);
 	}
+}
+
+bool GeometryMath::IsOnOpenBoundary(SceneObject* obj, float u, float v)
+{
+	float maxU = GetMaxU(obj);
+	float maxV = GetMaxV(obj);
+	float edgeEps = std::max(maxU, maxV) * 1e-3f;
+
+	if ((u <= edgeEps || maxU - u <= edgeEps) && !IsSeamConnected(obj, true, v))
+		return true;
+	if ((v <= edgeEps || maxV - v <= edgeEps) && !IsSeamConnected(obj, false, u))
+		return true;
+	return false;
 }
 #pragma endregion
