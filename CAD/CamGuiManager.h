@@ -1,7 +1,7 @@
 #pragma once
 
 class CadApplication;
-struct SceneObject;
+struct Surface;
 
 class CamGuiManager
 {
@@ -28,8 +28,13 @@ private:
     float m_roughSurfaceMargin = 0.5f;
     float m_roughBaseMargin = 0.5f;
     float m_roughLayer1Height = 33.0f;
-    std::weak_ptr<SceneObject> m_roughBaseSurface;
-    bool m_roughBaseAutoDetected = false;
+    std::weak_ptr<Surface> m_baseSurface;
+    bool m_baseAutoDetected = false;
+#pragma endregion
+
+#pragma region FlatGeneration
+    float m_flatStepover = 8.5f;
+    float m_flatZigzagMargin = 1.0f;
 #pragma endregion
 
 #pragma region Material

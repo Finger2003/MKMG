@@ -176,43 +176,43 @@ void CamGuiManager::DrawGCodeSection()
 
 void CamGuiManager::DrawPathGenerationSection()
 {
-	if (ImGui::CollapsingHeader("Roughing Generation (K16)", ImGuiTreeNodeFlags_DefaultOpen))
+	const auto& sceneObjects = m_app.getSceneObjects();
+	if (sceneObjects.empty())
 	{
-		const auto& sceneObjects = m_app.getSceneObjects();
-		if (sceneObjects.empty())
-		{
-			m_roughBaseAutoDetected = false;
-			m_roughBaseSurface.reset();
-		}
+		m_baseAutoDetected = false;
+		m_baseSurface.reset();
+	}
 
-		auto selectedBase = m_roughBaseSurface.lock();
-		if (!m_roughBaseAutoDetected && !sceneObjects.empty())
+	auto selectedBase = m_baseSurface.lock();
+	if (!m_baseAutoDetected && !sceneObjects.empty())
+	{
+		for (const auto& obj : sceneObjects)
 		{
-			for (const auto& obj : sceneObjects)
+			if (auto surf = obj ? obj->AsShared<Surface>() : nullptr)
 			{
-				if (obj && obj->As<Surface>())
+				std::string lowerName = surf->name;
+				std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
+					[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+				if (lowerName.find("plane") != std::string::npos)
 				{
-					std::string lowerName = obj->name;
-					std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
-						[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-					if (lowerName.find("plane") != std::string::npos)
-					{
-						selectedBase = obj;
-						m_roughBaseSurface = obj;
-						break;
-					}
+					selectedBase = surf;
+					m_baseSurface = surf;
+					break;
 				}
 			}
-			m_roughBaseAutoDetected = true;
 		}
+		m_baseAutoDetected = true;
+	}
 
+	if (ImGui::CollapsingHeader("Roughing Generation (K16)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
 		const char* previewName = selectedBase ? selectedBase->name.c_str() : "(None - use base height)";
-		if (ImGui::BeginCombo("base surface", previewName))
+		if (ImGui::BeginCombo("base surface##rough", previewName))
 		{
 			bool noneSelected = (selectedBase == nullptr);
 			if (ImGui::Selectable("(None - use base height)", noneSelected))
 			{
-				m_roughBaseSurface.reset();
+				m_baseSurface.reset();
 				selectedBase = nullptr;
 			}
 			if (noneSelected)
@@ -220,15 +220,16 @@ void CamGuiManager::DrawPathGenerationSection()
 
 			for (const auto& obj : sceneObjects)
 			{
-				if (!obj || !obj->As<Surface>())
+				auto surf = obj ? obj->AsShared<Surface>() : nullptr;
+				if (!surf)
 					continue;
 
-				bool isSelected = (selectedBase == obj);
-				std::string label = obj->name + "##" + std::to_string(obj->m_id);
+				bool isSelected = (selectedBase == surf);
+				std::string label = surf->name + "##" + std::to_string(surf->m_id);
 				if (ImGui::Selectable(label.c_str(), isSelected))
 				{
-					m_roughBaseSurface = obj;
-					selectedBase = obj;
+					m_baseSurface = surf;
+					selectedBase = surf;
 				}
 				if (isSelected)
 					ImGui::SetItemDefaultFocus();
@@ -236,10 +237,10 @@ void CamGuiManager::DrawPathGenerationSection()
 			ImGui::EndCombo();
 		}
 
-		ImGui::InputFloat("stepover [mm]", &m_roughStepover, 0.5f, 1.0f, "%.2f");
-		ImGui::InputFloat("surface margin [mm]", &m_roughSurfaceMargin, 0.1f, 0.5f, "%.2f");
-		ImGui::InputFloat("base margin [mm]", &m_roughBaseMargin, 0.1f, 0.5f, "%.2f");
-		ImGui::InputFloat("layer 1 height [mm]", &m_roughLayer1Height, 0.5f, 1.0f, "%.1f");
+		ImGui::InputFloat("stepover [mm]##rough", &m_roughStepover, 0.5f, 1.0f, "%.2f");
+		ImGui::InputFloat("surface margin [mm]##rough", &m_roughSurfaceMargin, 0.1f, 0.5f, "%.2f");
+		ImGui::InputFloat("base margin [mm]##rough", &m_roughBaseMargin, 0.1f, 0.5f, "%.2f");
+		ImGui::InputFloat("layer 1 height [mm]##rough", &m_roughLayer1Height, 0.5f, 1.0f, "%.1f");
 
 		m_roughStepover = std::clamp(m_roughStepover, 0.5f, 15.0f);
 		m_roughSurfaceMargin = std::max(0.0f, m_roughSurfaceMargin);
@@ -298,6 +299,91 @@ void CamGuiManager::DrawPathGenerationSection()
 				}
 			}
 		}
+	}
+
+	if (ImGui::CollapsingHeader("Flat Milling Generation (F10)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		const char* previewName = selectedBase ? selectedBase->name.c_str() : "(Select base surface)";
+		if (ImGui::BeginCombo("base surface##flat", previewName))
+		{
+			for (const auto& obj : sceneObjects)
+			{
+				auto surf = obj ? obj->AsShared<Surface>() : nullptr;
+				if (!surf)
+					continue;
+
+				bool isSelected = (selectedBase == surf);
+				std::string label = surf->name + "##flat_" + std::to_string(surf->m_id);
+				if (ImGui::Selectable(label.c_str(), isSelected))
+				{
+					m_baseSurface = surf;
+					selectedBase = surf;
+				}
+				if (isSelected)
+					ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+
+		ImGui::InputFloat("stepover [mm]##flat", &m_flatStepover, 0.5f, 1.0f, "%.2f");
+		ImGui::InputFloat("zigzag margin [mm]##flat", &m_flatZigzagMargin, 0.1f, 0.5f, "%.2f");
+
+		m_flatStepover = std::clamp(m_flatStepover, 0.5f, 9.5f);
+		m_flatZigzagMargin = std::clamp(m_flatZigzagMargin, 0.1f, 5.0f);
+
+		ImGui::Spacing();
+		if (selectedBase == nullptr)
+			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Select a base surface first.");
+
+		ImGui::BeginDisabled(selectedBase == nullptr);
+		if (ImGui::Button("Generate Flat Path (2.f10)", ImVec2(-1.0f, 0.0f)))
+		{
+			const std::vector<COMDLG_FILTERSPEC> saveFilters = {
+				{ L"F10 Flat-End Path (*.f10)", L"*.f10" },
+				{ L"All Files (*.*)", L"*.*" }
+			};
+			std::wstring widePath = m_app.ShowFileDialog<IFileSaveDialog>(saveFilters, L"f10", L"2.f10");
+			if (!widePath.empty())
+			{
+				std::string savePath(widePath.begin(), widePath.end());
+
+				FlatMillingParameters params{};
+				params.cutterDiameter = 10.0f;
+				params.cutterFluteHeight = 20.0f;
+				params.blockSizeX = m_simSizeX * 10.0f;
+				params.blockSizeY = m_simSizeY * 10.0f;
+				params.blockSizeZ = m_simSizeZ * 10.0f;
+				params.baseHeight = m_simBaseHeight;
+				params.stepover = m_flatStepover;
+				params.zigzagMargin = m_flatZigzagMargin;
+				params.baseSurface = selectedBase.get();
+
+				auto waypoints = PathGenerator::GenerateFlatPath(sceneObjects, params);
+				if (!PathGenerator::ExportGCode(savePath, waypoints))
+				{
+					MessageBoxA(
+						m_app.getWindowHandle(),
+						"Failed to export the generated flat milling path to the selected file.",
+						"Export Error",
+						MB_OK | MB_ICONERROR
+					);
+				}
+				else if (m_app.getMillingSimulator().LoadGCode(savePath))
+				{
+					size_t lastSlash = savePath.find_last_of("\\/");
+					m_loadedGCodeFile = (lastSlash != std::string::npos)
+						? savePath.substr(lastSlash + 1)
+						: savePath;
+					m_loadedGCodePath = std::move(savePath);
+
+					m_cutterFlat = true;
+					m_cutterSize = 10.0f;
+					m_cutterHeight = 20.0f;
+					m_app.getMillingSimulator().setCutterParams({ m_cutterSize, m_cutterHeight, m_cutterFlat });
+				}
+			}
+		}
+		ImGui::EndDisabled();
 	}
 }
 
