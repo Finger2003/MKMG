@@ -335,7 +335,7 @@ bool MillingSimulator::MillSegment(const MathLib::Vec3f& startPos, const MathLib
 
 	const int totalCols = m_block.divX + 3; // (divX + 1) + 2 skirt columns
 	constexpr float cHeightEps = 1e-4f;
-	const float centerDeadZoneSq = R2 * 0.01f; // (0.1 * R)^2
+	const float centerDeadZoneSq = R2;// *0.25f; // (0.1 * R)^2
 
 	uint32_t detectedErrors = Error_None;
 

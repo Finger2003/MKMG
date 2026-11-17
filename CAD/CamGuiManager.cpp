@@ -8,6 +8,7 @@
 #include "../ImGuiLib/imgui_impl_dx11.h"
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
 
 namespace
 {
@@ -384,6 +385,159 @@ void CamGuiManager::DrawPathGenerationSection()
 			}
 		}
 		ImGui::EndDisabled();
+	}
+
+	if (!m_finishJsonAutoDetected)
+	{
+		const char* defaultJsonCandidates[] = {
+			"intersections.json",
+			"../intersections.json",
+			"../../intersections.json",
+			"intersections_v.json",
+			"../intersections_v.json",
+			"../../intersections_v.json"
+		};
+		for (const char* cand : defaultJsonCandidates)
+		{
+			std::error_code ec;
+			if (std::filesystem::exists(cand, ec))
+			{
+				std::filesystem::path absPath = std::filesystem::weakly_canonical(cand, ec);
+				m_finishJsonPath = ec ? std::string(cand) : absPath.string();
+				m_finishJsonFile = std::filesystem::path(m_finishJsonPath).filename().string();
+				break;
+			}
+		}
+		m_finishJsonAutoDetected = true;
+	}
+
+	if (ImGui::CollapsingHeader("Finishing Milling Generation (K08)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (ImGui::Button("Select Intersections JSON...", ImVec2(-1.0f, 0.0f)))
+		{
+			const std::vector<COMDLG_FILTERSPEC> jsonFilters = {
+				{ L"JSON Config Files (*.json)", L"*.json" },
+				{ L"All Files (*.*)", L"*.*" }
+			};
+			std::wstring widePath = m_app.ShowFileDialog<IFileOpenDialog>(jsonFilters, L"json", L"intersections.json");
+			if (!widePath.empty())
+			{
+				m_finishJsonPath = std::string(widePath.begin(), widePath.end());
+				size_t lastSlash = m_finishJsonPath.find_last_of("\\/");
+				m_finishJsonFile = (lastSlash != std::string::npos)
+					? m_finishJsonPath.substr(lastSlash + 1)
+					: m_finishJsonPath;
+			}
+		}
+
+		ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Config:");
+		ImGui::SameLine();
+		ImGui::TextWrapped("%s", m_finishJsonFile.c_str());
+
+		const char* previewName = selectedBase ? selectedBase->name.c_str() : "(None - use base height)";
+		if (ImGui::BeginCombo("base surface##finish", previewName))
+		{
+			bool noneSelected = (selectedBase == nullptr);
+			if (ImGui::Selectable("(None - use base height)", noneSelected))
+			{
+				m_baseSurface.reset();
+				selectedBase = nullptr;
+			}
+			if (noneSelected)
+				ImGui::SetItemDefaultFocus();
+
+			for (const auto& obj : sceneObjects)
+			{
+				auto surf = obj ? obj->AsShared<Surface>() : nullptr;
+				if (!surf)
+					continue;
+
+				bool isSelected = (selectedBase == surf);
+				std::string label = surf->name + "##finish_" + std::to_string(surf->m_id);
+				if (ImGui::Selectable(label.c_str(), isSelected))
+				{
+					m_baseSurface = surf;
+					selectedBase = surf;
+				}
+				if (isSelected)
+					ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+
+		ImGui::InputFloat("scallop height [mm]##finish", &m_finishScallopHeight, 0.005f, 0.02f, "%.3f");
+		ImGui::InputFloat("min stepover [mm]##finish", &m_finishMinStepover, 0.05f, 0.2f, "%.2f");
+		ImGui::InputFloat("max stepover [mm]##finish", &m_finishMaxStepover, 0.1f, 0.5f, "%.2f");
+		ImGui::InputFloat("chord tolerance [mm]##finish", &m_finishSimplifyTol, 0.002f, 0.01f, "%.3f");
+		ImGui::Checkbox("Include intersection groove passes", &m_finishIncludeGrooves);
+
+		m_finishScallopHeight = std::clamp(m_finishScallopHeight, 0.005f, 0.25f);
+		m_finishMinStepover = std::clamp(m_finishMinStepover, 0.15f, 3.0f);
+		m_finishMaxStepover = std::clamp(m_finishMaxStepover, m_finishMinStepover, 5.0f);
+		m_finishSimplifyTol = std::clamp(m_finishSimplifyTol, 0.002f, 0.10f);
+
+		ImGui::Spacing();
+		if (ImGui::Button("Generate Finishing Path (3.k08)", ImVec2(-1.0f, 0.0f)))
+		{
+			const std::vector<COMDLG_FILTERSPEC> saveFilters = {
+				{ L"K08 Ball-Nose Path (*.k08)", L"*.k08" },
+				{ L"All Files (*.*)", L"*.*" }
+			};
+			std::wstring widePath = m_app.ShowFileDialog<IFileSaveDialog>(saveFilters, L"k08", L"3.k08");
+			if (!widePath.empty())
+			{
+				std::string savePath(widePath.begin(), widePath.end());
+
+				FinishingParameters params{};
+				params.cutterDiameter = 8.0f;
+				params.cutterFluteHeight = 16.0f;
+				params.blockSizeX = m_simSizeX * 10.0f;
+				params.blockSizeY = m_simSizeY * 10.0f;
+				params.blockSizeZ = m_simSizeZ * 10.0f;
+				params.baseHeight = m_simBaseHeight;
+				params.gridDivX = std::max(600, m_simDivX);
+				params.gridDivZ = std::max(600, m_simDivZ);
+				params.scallopHeight = m_finishScallopHeight;
+				params.minStepover = m_finishMinStepover;
+				params.maxStepover = m_finishMaxStepover;
+				params.simplifyTolerance = m_finishSimplifyTol;
+				params.includeGroovePasses = m_finishIncludeGrooves;
+				params.baseSurface = selectedBase.get();
+				params.configJsonPath = m_finishJsonPath;
+
+				if (!m_finishJsonPath.empty())
+				{
+					PathGenerator::LoadFinishingConfigFromJson(
+						m_finishJsonPath,
+						params.surfaces,
+						params.intersections);
+				}
+
+				auto waypoints = PathGenerator::GenerateFinishingPath(sceneObjects, params);
+				if (!PathGenerator::ExportGCode(savePath, waypoints))
+				{
+					MessageBoxA(
+						m_app.getWindowHandle(),
+						"Failed to export the generated finishing path to the selected file.",
+						"Export Error",
+						MB_OK | MB_ICONERROR
+					);
+				}
+				else if (m_app.getMillingSimulator().LoadGCode(savePath))
+				{
+					size_t lastSlash = savePath.find_last_of("\\/");
+					m_loadedGCodeFile = (lastSlash != std::string::npos)
+						? savePath.substr(lastSlash + 1)
+						: savePath;
+					m_loadedGCodePath = std::move(savePath);
+
+					m_cutterFlat = false;
+					m_cutterSize = 8.0f;
+					m_cutterHeight = 16.0f;
+					m_app.getMillingSimulator().setCutterParams({ m_cutterSize, m_cutterHeight, m_cutterFlat });
+				}
+			}
+		}
 	}
 }
 

@@ -37,6 +37,17 @@ private:
     float m_flatZigzagMargin = 1.0f;
 #pragma endregion
 
+#pragma region FinishingGeneration
+    std::string m_finishJsonPath = "";
+    std::string m_finishJsonFile = "None";
+    bool m_finishJsonAutoDetected = false;
+    float m_finishScallopHeight = 0.2f;
+    float m_finishMinStepover = 0.35f;
+    float m_finishMaxStepover = 5.0f;
+    float m_finishSimplifyTol = 0.012f;
+    bool m_finishIncludeGrooves = true;
+#pragma endregion
+
 #pragma region Material
     int m_simDivX = 600;
     int m_simDivZ = 600;
