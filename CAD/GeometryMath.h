@@ -7,6 +7,7 @@
 class SceneObject;
 class BezierSurface;
 class BSplineSurface;
+class Torus;
 struct float3;
 
 namespace GeometryMath
@@ -31,10 +32,27 @@ namespace GeometryMath
 		Vec3f dv;
 	};
 
+	struct SurfaceEval2Result
+	{
+		Vec3f p;
+		Vec3f du;
+		Vec3f dv;
+		Vec3f duu;
+		Vec3f duv;
+		Vec3f dvv;
+	};
+
 	struct CurveEvalResult
 	{
 		Vec3f p;
 		Vec3f d;
+	};
+
+	struct CurveEval2Result
+	{
+		Vec3f p;
+		Vec3f d;
+		Vec3f dd;
 	};
 
 	struct AABB
@@ -70,13 +88,86 @@ namespace GeometryMath
 
 #pragma region Parametric Evaluations
 	CurveEvalResult EvaluateCubicDeCasteljau(float t, Vec3f p0, Vec3f p1, Vec3f p2, Vec3f p3);
+	CurveEval2Result EvaluateCubicDeCasteljau2(float t, Vec3f p0, Vec3f p1, Vec3f p2, Vec3f p3);
 	SurfaceEvalResult EvaluateBezierSurface(BezierSurface* surf, float u, float v);
+	SurfaceEval2Result EvaluateBezierSurface2(BezierSurface* surf, float u, float v);
 	CurveEvalResult EvaluateCubicDeBoor(float t, Vec3f p0, Vec3f p1, Vec3f p2, Vec3f p3);
+	CurveEval2Result EvaluateCubicDeBoor2(float t, Vec3f p0, Vec3f p1, Vec3f p2, Vec3f p3);
 	SurfaceEvalResult EvaluateBSplineSurface(BSplineSurface* surf, float u, float v);
+	SurfaceEval2Result EvaluateBSplineSurface2(BSplineSurface* surf, float u, float v);
+	SurfaceEvalResult EvaluateTorusSurface(Torus* torus, float u, float v);
+	SurfaceEval2Result EvaluateTorusSurface2(Torus* torus, float u, float v);
 	SurfaceEvalResult EvaluateParametric(SceneObject* obj, float u, float v);
+	SurfaceEval2Result EvaluateParametric2(SceneObject* obj, float u, float v);
+
+	struct IParametricSurface
+	{
+		virtual ~IParametricSurface() = default;
+		virtual SurfaceEvalResult Evaluate(float u, float v) const = 0;
+		virtual float GetMaxU() const = 0;
+		virtual float GetMaxV() const = 0;
+		virtual bool IsSeamConnected(bool inU, float otherParam) const = 0;
+		virtual float EstimatePatchPadding(
+			float u_min, float u_max,
+			float v_min, float v_max,
+			float maxDuLen, float maxDvLen) const
+		{
+			// The patch is sampled at 3x3 grid (step = 0.5 * range), so any point
+			// is at most 0.25 * range away in parameter space from the nearest sample.
+			float maxDistU = (u_max - u_min) * 0.25f;
+			float maxDistV = (v_max - v_min) * 0.25f;
+			return (maxDuLen * maxDistU + maxDvLen * maxDistV) * 1.2f;
+		}
+	};
+
+	class SceneSurfaceAdapter final : public IParametricSurface
+	{
+	public:
+		explicit SceneSurfaceAdapter(SceneObject* obj) : m_obj(obj) {}
+
+		SceneObject* GetSceneObject() const { return m_obj; }
+		SurfaceEvalResult Evaluate(float u, float v) const override;
+		float GetMaxU() const override;
+		float GetMaxV() const override;
+		bool IsSeamConnected(bool inU, float otherParam) const override;
+		float EstimatePatchPadding(
+			float u_min, float u_max,
+			float v_min, float v_max,
+			float maxDuLen, float maxDvLen) const override;
+
+	private:
+		SceneObject* m_obj = nullptr;
+	};
+
+	class OffsetSurface final : public IParametricSurface
+	{
+	public:
+		OffsetSurface(SceneObject* baseObj, float offsetWorld, bool forceUpwardNormal = true)
+			: m_baseObj(baseObj), m_offsetWorld(offsetWorld), m_forceUpwardNormal(forceUpwardNormal) {}
+
+		SceneObject* GetBaseObject() const { return m_baseObj; }
+		float GetOffsetWorld() const { return m_offsetWorld; }
+		SurfaceEvalResult Evaluate(float u, float v) const override;
+		float GetMaxU() const override;
+		float GetMaxV() const override;
+		bool IsSeamConnected(bool inU, float otherParam) const override;
+
+	private:
+		SceneObject* m_baseObj = nullptr;
+		float m_offsetWorld = 0.0f;
+		bool m_forceUpwardNormal = true;
+	};
 #pragma endregion
 
 #pragma region Intersection Solvers
+	std::optional<IntersectionResult> CalculateIntersection(
+		const IParametricSurface& surf1,
+		const IParametricSurface& surf2,
+		bool isSelfIntersection,
+		const Vec4f& maxDomains, // x: maxU1, y: maxV1, z: maxU2, w: maxV2
+		float step,
+		std::optional<float3> cursorHint);
+
 	std::optional<IntersectionResult> CalculateIntersection(
 		SceneObject* obj1,
 		SceneObject* obj2,
@@ -86,13 +177,18 @@ namespace GeometryMath
 		std::optional<float3> cursorHint);
 
 	std::optional<Vec4f> SolveLinearSystem(Mat4f J, Vec4f F);
+	std::optional<Vec4f> FindIntersectionNextPoint(const IParametricSurface& surf1, const IParametricSurface& surf2, Vec4f startParams, Vec3f p0, Vec3f t, float d, int depth = 0);
 	std::optional<Vec4f> FindIntersectionNextPoint(SceneObject* obj1, SceneObject* obj2, Vec4f startParams, Vec3f p0, Vec3f t, float d, int depth = 0);
+	std::optional<Vec4f> FindExactEdgePoint(const IParametricSurface& surf1, const IParametricSurface& surf2, Vec4f startGuess, int boundaryDim, float boundaryValue);
 	std::optional<Vec4f> FindExactEdgePoint(SceneObject* obj1, SceneObject* obj2, Vec4f startGuess, int boundaryDim, float boundaryValue);
+	bool IsOnOpenBoundary(const IParametricSurface& surf, float u, float v);
 	bool IsOnOpenBoundary(SceneObject* obj, float u, float v);
 #pragma endregion
 
 #pragma region Patch Intersection
+	AABB ComputePatchAABB(const IParametricSurface& surf, float u_min, float u_max, float v_min, float v_max);
 	AABB ComputePatchAABB(SceneObject* obj, float u_min, float u_max, float v_min, float v_max);
+	void IntersectPatches(const IParametricSurface& surf1, SurfacePatch p1, const IParametricSurface& surf2, SurfacePatch p2, std::vector<Vec4f>& candidateParams, bool isSelfIntersection, int depth = 0);
 	void IntersectPatches(SceneObject* obj1, SurfacePatch p1, SceneObject* obj2, SurfacePatch p2, std::vector<Vec4f>& candidateParams, bool isSelfIntersection, int depth = 0);
 #pragma endregion
 
@@ -129,6 +225,28 @@ namespace GeometryMath
 		return { p0123, derivative };
 	}
 
+	inline CurveEval2Result EvaluateCubicDeCasteljau2(float t, Vec3f p0, Vec3f p1, Vec3f p2, Vec3f p3)
+	{
+		float u = 1.0f - t;
+
+		// Level 1
+		Vec3f p01 = p0 * u + p1 * t;
+		Vec3f p12 = p1 * u + p2 * t;
+		Vec3f p23 = p2 * u + p3 * t;
+
+		// Level 2
+		Vec3f p012 = p01 * u + p12 * t;
+		Vec3f p123 = p12 * u + p23 * t;
+
+		// Level 3
+		Vec3f p0123 = p012 * u + p123 * t;
+
+		Vec3f derivative = (p123 - p012) * 3.0f;
+		Vec3f secondDerivative = (p23 - p12 * 2.0f + p01) * 6.0f;
+
+		return { p0123, derivative, secondDerivative };
+	}
+
 	inline CurveEvalResult EvaluateCubicDeBoor(float t, Vec3f p0, Vec3f p1, Vec3f p2, Vec3f p3)
 	{
 		// Level 1
@@ -147,6 +265,28 @@ namespace GeometryMath
 		Vec3f derivative = (p3_2 - p2_2) * 3.0f;
 
 		return { p3_3, derivative };
+	}
+
+	inline CurveEval2Result EvaluateCubicDeBoor2(float t, Vec3f p0, Vec3f p1, Vec3f p2, Vec3f p3)
+	{
+		// Level 1
+		Vec3f p1_1 = p0 * ((1.0f - t) / 3.0f) + p1 * ((t + 2.0f) / 3.0f);
+		Vec3f p2_1 = p1 * ((2.0f - t) / 3.0f) + p2 * ((t + 1.0f) / 3.0f);
+		Vec3f p3_1 = p2 * ((3.0f - t) / 3.0f) + p3 * (t / 3.0f);
+
+		// Level 2
+		Vec3f p2_2 = p1_1 * ((1.0f - t) / 2.0f) + p2_1 * ((t + 1.0f) / 2.0f);
+		Vec3f p3_2 = p2_1 * ((2.0f - t) / 2.0f) + p3_1 * (t / 2.0f);
+
+		// Level 3
+		Vec3f p3_3 = p2_2 * (1.0f - t) + p3_2 * t;
+
+		Vec3f derivative = (p3_2 - p2_2) * 3.0f;
+		Vec3f d2_0 = p0 - p1 * 2.0f + p2;
+		Vec3f d2_1 = p1 - p2 * 2.0f + p3;
+		Vec3f secondDerivative = d2_0 * (1.0f - t) + d2_1 * t;
+
+		return { p3_3, derivative, secondDerivative };
 	}
 #pragma endregion
 }
