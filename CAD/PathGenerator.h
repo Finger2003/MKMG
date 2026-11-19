@@ -26,7 +26,7 @@ struct RoughingParameters
 	SceneObject* baseSurface = nullptr; // Optional designated flat base plane surface (uses baseHeight + baseMargin)
 };
 
-struct BaseFinishingParameters
+struct FlatBaseParameters
 {
 	float cutterDiameter = 10.0f;       // [mm] F10 flat-end cutter (R = 5 mm)
 	float cutterFluteHeight = 20.0f;    // [mm] Max immersion depth = 2 * cutterDiameter
@@ -52,10 +52,10 @@ public:
 		const std::vector<std::shared_ptr<SceneObject>>& sceneObjects,
 		const RoughingParameters& params = {});
 
-	// Generates a flat base finishing + outer contour toolpath for F10 cutter
-	static std::vector<float3> GenerateBaseFinishingPath(
+	// Generates a flat base + outer contour toolpath for F10 cutter
+	static std::vector<float3> GenerateFlatBasePath(
 		const std::vector<std::shared_ptr<SceneObject>>& sceneObjects,
-		const BaseFinishingParameters& params = {});
+		const FlatBaseParameters& params = {});
 
 	// Exports simulator mm scene waypoints to a G-Code file (applying X->X, -Z->Y, Y->Z mapping)
 	static bool ExportGCode(

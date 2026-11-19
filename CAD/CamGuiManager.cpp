@@ -302,41 +302,41 @@ void CamGuiManager::DrawPathGenerationSection()
 		}
 	}
 
-	if (ImGui::CollapsingHeader("Base Finishing (F10)", ImGuiTreeNodeFlags_DefaultOpen))
+	if (ImGui::CollapsingHeader("Flat Base (F10)", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		auto selectedBase = m_roughBaseSurface.lock();
 
-		ImGui::InputFloat("stepover [mm]##base", &m_baseStepover, 0.5f, 1.0f, "%.2f");
-		ImGui::InputFloat("contour margin [mm]##base", &m_baseContourMargin, 0.1f, 0.5f, "%.2f");
+		ImGui::InputFloat("stepover [mm]##base", &m_flatBaseStepover, 0.5f, 1.0f, "%.2f");
+		ImGui::InputFloat("contour margin [mm]##base", &m_flatBaseContourMargin, 0.1f, 0.5f, "%.2f");
 
-		m_baseStepover = std::clamp(m_baseStepover, 0.5f, 9.9f);
-		m_baseContourMargin = std::max(0.0f, m_baseContourMargin);
+		m_flatBaseStepover = std::clamp(m_flatBaseStepover, 0.5f, 9.9f);
+		m_flatBaseContourMargin = std::max(0.0f, m_flatBaseContourMargin);
 
-		ImGui::Text("Seeds JSON: %s", m_baseSeedsJsonFile.c_str());
+		ImGui::Text("Seeds JSON: %s", m_flatBaseSeedsJsonFile.c_str());
 		if (ImGui::Button("Load Seeds JSON...##base"))
 		{
 			std::wstring wideJson = m_app.ShowFileDialog<IFileOpenDialog>(cCamSeedsDialogGuid);
 			if (!wideJson.empty())
 			{
-				m_baseSeedsJsonPath = std::string(wideJson.begin(), wideJson.end());
-				size_t lastSlash = m_baseSeedsJsonPath.find_last_of("\\/");
-				m_baseSeedsJsonFile = (lastSlash != std::string::npos)
-					? m_baseSeedsJsonPath.substr(lastSlash + 1)
-					: m_baseSeedsJsonPath;
+				m_flatBaseSeedsJsonPath = std::string(wideJson.begin(), wideJson.end());
+				size_t lastSlash = m_flatBaseSeedsJsonPath.find_last_of("\\/");
+				m_flatBaseSeedsJsonFile = (lastSlash != std::string::npos)
+					? m_flatBaseSeedsJsonPath.substr(lastSlash + 1)
+					: m_flatBaseSeedsJsonPath;
 			}
 		}
-		if (!m_baseSeedsJsonPath.empty())
+		if (!m_flatBaseSeedsJsonPath.empty())
 		{
 			ImGui::SameLine();
 			if (ImGui::Button("Clear##baseSeeds"))
 			{
-				m_baseSeedsJsonPath.clear();
-				m_baseSeedsJsonFile = "None";
+				m_flatBaseSeedsJsonPath.clear();
+				m_flatBaseSeedsJsonFile = "None";
 			}
 		}
 
 		ImGui::Spacing();
-		if (ImGui::Button("Generate Base Finishing (2.f10)", ImVec2(-1.0f, 0.0f)))
+		if (ImGui::Button("Generate Flat Base (2.f10)", ImVec2(-1.0f, 0.0f)))
 		{
 			const std::vector<COMDLG_FILTERSPEC> saveFilters = {
 				{ L"F10 Flat-End Path (*.f10)", L"*.f10" },
@@ -347,22 +347,22 @@ void CamGuiManager::DrawPathGenerationSection()
 			{
 				std::string savePath(widePath.begin(), widePath.end());
 
-				BaseFinishingParameters params{};
+				FlatBaseParameters params{};
 				params.blockSizeX = m_simSizeX * 10.0f;
 				params.blockSizeY = m_simSizeY * 10.0f;
 				params.blockSizeZ = m_simSizeZ * 10.0f;
 				params.baseHeight = m_simBaseHeight;
-				params.contourMargin = m_baseContourMargin;
-				params.stepover = m_baseStepover;
+				params.contourMargin = m_flatBaseContourMargin;
+				params.stepover = m_flatBaseStepover;
 				params.baseSurface = selectedBase.get();
-				params.seedsJsonPath = m_baseSeedsJsonPath;
+				params.seedsJsonPath = m_flatBaseSeedsJsonPath;
 
-				auto waypoints = PathGenerator::GenerateBaseFinishingPath(m_app.getSceneObjects(), params);
+				auto waypoints = PathGenerator::GenerateFlatBasePath(m_app.getSceneObjects(), params);
 				if (!PathGenerator::ExportGCode(savePath, waypoints))
 				{
 					MessageBoxA(
 						m_app.getWindowHandle(),
-						"Failed to export the generated base finishing path to the selected file.",
+						"Failed to export the generated flat base path to the selected file.",
 						"Export Error",
 						MB_OK | MB_ICONERROR
 					);

@@ -1373,11 +1373,184 @@ namespace
 
 		return (ComputePolylineLength2D(fwd) <= ComputePolylineLength2D(bwd)) ? fwd : bwd;
 	}
+
+	struct BaseWaypointWriter
+	{
+		std::vector<float3>& waypoints;
+		float baseY = 0.0f;
+
+		void Append(float x, float y, float z)
+		{
+			float3 pt(x, y, z);
+			if (waypoints.empty() || (pt.ToVec3f() - waypoints.back().ToVec3f()).length_sqr() > 1e-6f)
+				waypoints.push_back(pt);
+		}
+
+		void AppendBase(float x, float z)
+		{
+			Append(x, baseY, z);
+		}
+	};
+
+	void TraceSideZigzagPasses(
+		BaseWaypointWriter& writer,
+		const std::vector<Vec2f>& zigContour,
+		const std::vector<float>& zList,
+		bool isRightSide,
+		float outX,
+		float simplifyTol)
+	{
+		for (size_t k = 0; k + 1 < zList.size(); k += 2)
+		{
+			float zA = zList[k];
+			float zB = zList[k + 1];
+			auto hitsA = IntersectHorizontalWithPolygon2D(zA, zigContour);
+			auto hitsB = IntersectHorizontalWithPolygon2D(zB, zigContour);
+			if (hitsA.empty() || hitsB.empty())
+				continue;
+
+			const HorizontalHit2D& hitA = isRightSide ? hitsA.back() : hitsA.front();
+			const HorizontalHit2D& hitB = isRightSide ? hitsB.back() : hitsB.front();
+
+			writer.AppendBase(outX, zA);
+			writer.AppendBase(hitA.pt.x, hitA.pt.z);
+
+			std::vector<Vec2f> simpArc = SimplifyPolyline2D(ExtractShorterArc2D(zigContour, hitA, hitB), simplifyTol);
+			for (size_t m = 1; m < simpArc.size(); m++)
+				writer.AppendBase(simpArc[m].x, simpArc[m].z);
+
+			writer.AppendBase(outX, zB);
+		}
+
+		if (zList.size() % 2 == 1)
+		{
+			float zLast = zList.back();
+			auto hitsLast = IntersectHorizontalWithPolygon2D(zLast, zigContour);
+			if (!hitsLast.empty())
+			{
+				const HorizontalHit2D& hLast = isRightSide ? hitsLast.back() : hitsLast.front();
+				writer.AppendBase(outX, zLast);
+				writer.AppendBase(hLast.pt.x, zLast);
+				writer.AppendBase(outX, zLast);
+			}
+		}
+	}
+
+	std::vector<std::pair<HorizontalHit2D, HorizontalHit2D>> CollectOpenBaysAtZ(
+		const std::vector<Vec2f>& zigContour,
+		float zp)
+	{
+		std::vector<std::pair<HorizontalHit2D, HorizontalHit2D>> bays;
+		auto hits = IntersectHorizontalWithPolygon2D(zp, zigContour);
+		if (hits.size() >= 4)
+		{
+			for (size_t m = 1; m + 1 < hits.size(); m += 2)
+				bays.emplace_back(hits[m], hits[m + 1]);
+		}
+		return bays;
+	}
+
+	void AppendOpenBaysAlongLine(
+		BaseWaypointWriter& writer,
+		const std::vector<std::pair<HorizontalHit2D, HorizontalHit2D>>& bays,
+		float zp,
+		bool leftToRight)
+	{
+		if (bays.empty())
+			return;
+
+		auto emitBay = [&](const HorizontalHit2D& enterHit, const HorizontalHit2D& exitHit)
+		{
+			writer.AppendBase(enterHit.pt.x, zp);
+			writer.AppendBase(enterHit.pt.x, enterHit.pt.z);
+			writer.AppendBase(exitHit.pt.x, exitHit.pt.z);
+			writer.AppendBase(exitHit.pt.x, zp);
+		};
+
+		if (leftToRight)
+		{
+			for (const auto& [hLeft, hRight] : bays)
+				emitBay(hRight, hLeft);
+		}
+		else
+		{
+			for (auto it = bays.rbegin(); it != bays.rend(); ++it)
+				emitBay(it->first, it->second);
+		}
+	}
+
+	void AppendBottomPassesAndBays(
+		BaseWaypointWriter& writer,
+		const std::vector<float>& botZ,
+		const std::vector<std::pair<HorizontalHit2D, HorizontalHit2D>>& openBays,
+		bool currRight,
+		float outsideLeftX,
+		float outsideRightX,
+		float halfZ,
+		float cutterR)
+	{
+		if (!botZ.empty())
+		{
+			bool botLtr = !currRight;
+			for (size_t idxB = 0; idxB < botZ.size(); idxB++)
+			{
+				float zp = botZ[idxB];
+				float startX = botLtr ? outsideLeftX : outsideRightX;
+				float endX = botLtr ? outsideRightX : outsideLeftX;
+
+				writer.AppendBase(startX, zp);
+				if (idxB == 0)
+					AppendOpenBaysAlongLine(writer, openBays, zp, botLtr);
+				writer.AppendBase(endX, zp);
+				botLtr = !botLtr;
+			}
+
+			// If botZ had an even count, step outside the bottom edge to switch sides without backtracking
+			if (botZ.size() % 2 == 0)
+			{
+				float outsideBotZ = std::max(halfZ, botZ.back()) + cutterR + 2.0f;
+				writer.AppendBase(writer.waypoints.back().x, outsideBotZ);
+				writer.AppendBase(currRight ? outsideLeftX : outsideRightX, outsideBotZ);
+			}
+			return;
+		}
+
+		float outsideBotZ = halfZ + cutterR + 2.0f;
+		writer.AppendBase(writer.waypoints.back().x, outsideBotZ);
+		AppendOpenBaysAlongLine(writer, openBays, outsideBotZ, !currRight);
+		writer.AppendBase(currRight ? outsideLeftX : outsideRightX, outsideBotZ);
+	}
+
+	void AppendContourPass(
+		BaseWaypointWriter& writer,
+		const std::vector<Vec2f>& clContour,
+		float halfZ,
+		float cutterR,
+		float simplifyTol)
+	{
+		if (clContour.size() < 3)
+			return;
+
+		std::vector<Vec2f> closedContour = clContour;
+		closedContour.push_back(clContour.front());
+		std::vector<Vec2f> simplifiedContour = SimplifyPolyline2D(closedContour, simplifyTol);
+		if (simplifiedContour.size() < 3)
+			return;
+
+		const float3 endPt = writer.waypoints.back();
+		const Vec2f& apex = simplifiedContour.front();
+		writer.AppendBase(endPt.x, apex.z);
+		for (const auto& pt : simplifiedContour)
+			writer.AppendBase(pt.x, pt.z);
+
+		float outsideTopZ = std::min(-halfZ, apex.z) - cutterR - 2.0f;
+		writer.AppendBase(apex.x, outsideTopZ);
+	}
 }
 
-std::vector<float3> PathGenerator::GenerateBaseFinishingPath(
+std::vector<float3> PathGenerator::GenerateFlatBasePath(
 	const std::vector<std::shared_ptr<SceneObject>>& sceneObjects,
-	const BaseFinishingParameters& params)
+	const FlatBaseParameters& params)
 {
 	const float halfX = params.blockSizeX * 0.5f;
 	const float halfZ = params.blockSizeZ * 0.5f;
@@ -1430,21 +1603,10 @@ std::vector<float3> PathGenerator::GenerateBaseFinishingPath(
 
 	std::vector<float3> waypoints;
 	waypoints.reserve(1024);
-
-	auto appendWaypoint = [&](float x, float y, float z)
-		{
-			float3 pt(x, y, z);
-			if (waypoints.empty() || (pt.ToVec3f() - waypoints.back().ToVec3f()).length_sqr() > 1e-6f)
-				waypoints.push_back(pt);
-		};
-
-	auto appendBase = [&](float x, float z)
-		{
-			appendWaypoint(x, baseY, z);
-		};
-
 	if (zigContour.size() < 3)
 		return waypoints;
+
+	BaseWaypointWriter writer{ waypoints, baseY };
 
 	// 2. Plan uniform Z scanlines across the block respecting the exact requested stepover
 	const int numPasses = std::max(1, static_cast<int>(std::ceil(params.blockSizeZ / stepover)));
@@ -1453,223 +1615,73 @@ std::vector<float3> PathGenerator::GenerateBaseFinishingPath(
 		zPasses[p] = -halfZ + (params.blockSizeZ * p) / numPasses;
 
 	const float zMinObj = zigContour.front().z;
-
-	std::vector<float> topZ;
-	std::vector<float> midZ;
-	std::vector<float> botZ;
+	std::vector<float> topZ, midZ, botZ;
 	for (float zp : zPasses)
 	{
-		auto hits = IntersectHorizontalWithPolygon2D(zp, zigContour);
-		if (hits.empty())
-		{
-			if (zp < zMinObj)
-				topZ.push_back(zp);
-			else
-				botZ.push_back(zp);
-		}
-		else
-		{
+		if (!IntersectHorizontalWithPolygon2D(zp, zigContour).empty())
 			midZ.push_back(zp);
-		}
+		else if (zp < zMinObj)
+			topZ.push_back(zp);
+		else
+			botZ.push_back(zp);
 	}
 
 	// 3. Continuous non-backtracking zigzag at constant height baseY (only first and last points at safeY)
-	const float firstZ = zPasses.front();
-	appendWaypoint(outsideLeftX, safeY, firstZ);
+	writer.Append(outsideLeftX, safeY, zPasses.front());
 
 	// 3a. Top full-width passes (starts on the left: currRight == false)
 	bool currRight = false;
 	for (float zp : topZ)
 	{
-		appendBase(currRight ? outsideRightX : outsideLeftX, zp);
-		appendBase(currRight ? outsideLeftX : outsideRightX, zp);
+		writer.AppendBase(currRight ? outsideRightX : outsideLeftX, zp);
+		writer.AppendBase(currRight ? outsideLeftX : outsideRightX, zp);
 		currRight = !currRight;
 	}
 
+	const auto midOpenBays = midZ.empty()
+		? std::vector<std::pair<HorizontalHit2D, HorizontalHit2D>>{}
+		: CollectOpenBaysAtZ(zigContour, midZ.back());
+
 	// If midZ has an odd count and midZ[0] cleanly spans the top tip, bridge across midZ[0] to pair the remaining mid lines
-	std::vector<float> remMidZ = midZ;
-	if (remMidZ.size() % 2 == 1)
+	if (midZ.size() % 2 == 1)
 	{
-		auto hits0 = IntersectHorizontalWithPolygon2D(remMidZ.front(), zigContour);
+		auto hits0 = IntersectHorizontalWithPolygon2D(midZ.front(), zigContour);
 		if (hits0.size() >= 2)
 		{
-			float z0 = remMidZ.front();
-			remMidZ.erase(remMidZ.begin());
+			float z0 = midZ.front();
+			midZ.erase(midZ.begin());
 
 			const HorizontalHit2D& hStart = currRight ? hits0.back() : hits0.front();
 			const HorizontalHit2D& hEnd = currRight ? hits0.front() : hits0.back();
 
-			appendBase(currRight ? outsideRightX : outsideLeftX, z0);
-			appendBase(hStart.pt.x, hStart.pt.z);
+			writer.AppendBase(currRight ? outsideRightX : outsideLeftX, z0);
+			writer.AppendBase(hStart.pt.x, hStart.pt.z);
 
-			std::vector<Vec2f> arc = ExtractShorterArc2D(zigContour, hStart, hEnd);
-			std::vector<Vec2f> simpArc = SimplifyPolyline2D(arc, cSimplifyTol);
+			std::vector<Vec2f> simpArc = SimplifyPolyline2D(ExtractShorterArc2D(zigContour, hStart, hEnd), cSimplifyTol);
 			for (size_t m = 1; m < simpArc.size(); m++)
-				appendBase(simpArc[m].x, simpArc[m].z);
+				writer.AppendBase(simpArc[m].x, simpArc[m].z);
 
-			appendBase(currRight ? outsideLeftX : outsideRightX, z0);
+			writer.AppendBase(currRight ? outsideLeftX : outsideRightX, z0);
 			currRight = !currRight;
 		}
 	}
 
-	auto traceSideZigzag = [&](const std::vector<float>& zList, bool isRightSide)
-		{
-			float outX = isRightSide ? outsideRightX : outsideLeftX;
-			for (size_t k = 0; k + 1 < zList.size(); k += 2)
-			{
-				float zA = zList[k];
-				float zB = zList[k + 1];
-				auto hitsA = IntersectHorizontalWithPolygon2D(zA, zigContour);
-				auto hitsB = IntersectHorizontalWithPolygon2D(zB, zigContour);
-				if (hitsA.empty() || hitsB.empty())
-					continue;
-
-				const HorizontalHit2D& hitA = isRightSide ? hitsA.back() : hitsA.front();
-				const HorizontalHit2D& hitB = isRightSide ? hitsB.back() : hitsB.front();
-
-				std::vector<Vec2f> arc = ExtractShorterArc2D(zigContour, hitA, hitB);
-
-				appendBase(outX, zA);
-				appendBase(hitA.pt.x, hitA.pt.z);
-
-				std::vector<Vec2f> simpArc = SimplifyPolyline2D(arc, cSimplifyTol);
-				for (size_t m = 1; m < simpArc.size(); m++)
-					appendBase(simpArc[m].x, simpArc[m].z);
-
-				appendBase(outX, zB);
-			}
-		};
-
-	// 3b. First descending side along remMidZ (pairs keep cutter on currRight)
-	traceSideZigzag(remMidZ, currRight);
-
-	// If remMidZ remained odd (fallback when bridge wasn't taken), handle the final unpaired line cleanly
-	if (remMidZ.size() % 2 == 1)
-	{
-		float zLast = remMidZ.back();
-		auto hitsLast = IntersectHorizontalWithPolygon2D(zLast, zigContour);
-		if (!hitsLast.empty())
-		{
-			const HorizontalHit2D& hLast = currRight ? hitsLast.back() : hitsLast.front();
-			float outX = currRight ? outsideRightX : outsideLeftX;
-			appendBase(outX, zLast);
-			appendBase(hLast.pt.x, zLast);
-			appendBase(outX, zLast);
-		}
-	}
+	// 3b. First descending side along midZ
+	TraceSideZigzagPasses(writer, zigContour, midZ, currRight, currRight ? outsideRightX : outsideLeftX, cSimplifyTol);
 
 	// 3c. Bottom passes crossing from currRight to !currRight (including open bay loop under the waves)
-	std::vector<std::pair<HorizontalHit2D, HorizontalHit2D>> midOpenBays;
-	if (!midZ.empty())
-	{
-		auto lastMidHits = IntersectHorizontalWithPolygon2D(midZ.back(), zigContour);
-		if (lastMidHits.size() >= 4)
-		{
-			for (size_t m = 1; m + 1 < lastMidHits.size(); m += 2)
-				midOpenBays.emplace_back(lastMidHits[m], lastMidHits[m + 1]);
-		}
-	}
-
-	auto appendBaysAlongLine = [&](float zp, bool ltr)
-		{
-			if (midOpenBays.empty())
-				return;
-
-			if (ltr)
-			{
-				for (const auto& [hLeft, hRight] : midOpenBays)
-				{
-					appendBase(hRight.pt.x, zp);
-					appendBase(hRight.pt.x, hRight.pt.z);
-					appendBase(hLeft.pt.x, hLeft.pt.z);
-					appendBase(hLeft.pt.x, zp);
-				}
-			}
-			else
-			{
-				for (auto it = midOpenBays.rbegin(); it != midOpenBays.rend(); ++it)
-				{
-					const auto& [hLeft, hRight] = *it;
-					appendBase(hLeft.pt.x, zp);
-					appendBase(hLeft.pt.x, hLeft.pt.z);
-					appendBase(hRight.pt.x, hRight.pt.z);
-					appendBase(hRight.pt.x, zp);
-				}
-			}
-		};
-
-	if (!botZ.empty())
-	{
-		bool botLtr = !currRight;
-		for (size_t idxB = 0; idxB < botZ.size(); idxB++)
-		{
-			float zp = botZ[idxB];
-			float startX = botLtr ? outsideLeftX : outsideRightX;
-			float endX = botLtr ? outsideRightX : outsideLeftX;
-
-			appendBase(startX, zp);
-			if (idxB == 0)
-				appendBaysAlongLine(zp, botLtr);
-			appendBase(endX, zp);
-			botLtr = !botLtr;
-		}
-
-		// If botZ had an even count, step outside the bottom edge of the block to switch sides without backtracking
-		if (botZ.size() % 2 == 0)
-		{
-			float outsideBotZ = std::max(halfZ, botZ.back()) + R + 2.0f;
-			appendBase(waypoints.back().x, outsideBotZ);
-			appendBase(currRight ? outsideLeftX : outsideRightX, outsideBotZ);
-		}
-	}
-	else
-	{
-		float outsideBotZ = halfZ + R + 2.0f;
-		appendBase(waypoints.back().x, outsideBotZ);
-		appendBaysAlongLine(outsideBotZ, !currRight);
-		appendBase(currRight ? outsideLeftX : outsideRightX, outsideBotZ);
-	}
+	AppendBottomPassesAndBays(writer, botZ, midOpenBays, currRight, outsideLeftX, outsideRightX, halfZ, R);
 
 	// 3d. Opposite ascending side going bottom-to-top
-	std::vector<float> revMidZ(remMidZ.rbegin(), remMidZ.rend());
-	traceSideZigzag(revMidZ, !currRight);
-	if (remMidZ.size() % 2 == 1)
-	{
-		float zTop = revMidZ.back();
-		auto hitsTop = IntersectHorizontalWithPolygon2D(zTop, zigContour);
-		if (!hitsTop.empty())
-		{
-			const HorizontalHit2D& hTop = (!currRight) ? hitsTop.back() : hitsTop.front();
-			float outX = (!currRight) ? outsideRightX : outsideLeftX;
-			appendBase(outX, zTop);
-			appendBase(hTop.pt.x, zTop);
-			appendBase(outX, zTop);
-		}
-	}
+	std::reverse(midZ.begin(), midZ.end());
+	TraceSideZigzagPasses(writer, zigContour, midZ, !currRight, (!currRight) ? outsideRightX : outsideLeftX, cSimplifyTol);
 
 	// 4. Enter clContour at its global min-Z apex, trace full closed contour, then exit in -Z outside the block
-	if (clContour.size() >= 3)
-	{
-		std::vector<Vec2f> closedContour = clContour;
-		closedContour.push_back(clContour.front());
-		std::vector<Vec2f> simplifiedContour = SimplifyPolyline2D(closedContour, cSimplifyTol);
-
-		if (simplifiedContour.size() >= 3)
-		{
-			const float3 endPt = waypoints.back();
-			const Vec2f& apex = simplifiedContour.front();
-			appendBase(endPt.x, apex.z);
-			for (const auto& pt : simplifiedContour)
-				appendBase(pt.x, pt.z);
-
-			float outsideTopZ = std::min(-halfZ, apex.z) - R - 2.0f;
-			appendBase(apex.x, outsideTopZ);
-		}
-	}
+	AppendContourPass(writer, clContour, halfZ, R, cSimplifyTol);
 
 	// 5. Final retract in air outside the block to safe height
 	const float3& lastPt = waypoints.back();
-	appendWaypoint(lastPt.x, safeY, lastPt.z);
+	writer.Append(lastPt.x, safeY, lastPt.z);
 
 	return waypoints;
 }
