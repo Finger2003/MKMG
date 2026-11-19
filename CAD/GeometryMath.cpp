@@ -86,6 +86,96 @@ namespace
 		}
 	}
 
+	Candidate FindCursorHintCandidate(const IParametricSurface& surf1, const IParametricSurface& surf2, bool isSelfIntersection, const MathLib::Vec4f& maxDomains, float3 cursorHint)
+	{
+		float maxU1 = maxDomains.x;
+		float maxV1 = maxDomains.y;
+		float maxU2 = maxDomains.z;
+		float maxV2 = maxDomains.w;
+
+		constexpr int cursorSamples = 50;
+		Vec3f cursorPos = cursorHint.ToVec3f();
+
+		float minVal1 = std::numeric_limits<float>::max();
+		float minVal2 = std::numeric_limits<float>::max();
+		Vec4f currentParams{ 0.0f, 0.0f, 0.0f, 0.0f };
+
+		if (isSelfIntersection)
+		{
+			for (int i = 0; i <= cursorSamples; i++)
+			{
+				float u = (i / static_cast<float>(cursorSamples)) * maxU1;
+				for (int j = 0; j <= cursorSamples; j++)
+				{
+					float v = (j / static_cast<float>(cursorSamples)) * maxV1;
+					float dist = (surf1.Evaluate(u, v).p - cursorPos).length_sqr();
+
+					if (dist < minVal1)
+					{
+						float pDist = (u - currentParams.x) * (u - currentParams.x) + (v - currentParams.y) * (v - currentParams.y);
+						float domainDiagonalSqr = (maxU1 * maxU1) + (maxV1 * maxV1);
+						float dynamicThreshold = domainDiagonalSqr * 0.05f;
+						if (pDist > dynamicThreshold)
+						{
+							minVal2 = minVal1;
+							currentParams.z = currentParams.x;
+							currentParams.w = currentParams.y;
+						}
+						minVal1 = dist;
+						currentParams.x = u;
+						currentParams.y = v;
+					}
+					else if (dist < minVal2)
+					{
+						float pDist = (u - currentParams.x) * (u - currentParams.x) + (v - currentParams.y) * (v - currentParams.y);
+						float domainDiagonalSqr = (maxU1 * maxU1) + (maxV1 * maxV1);
+						float dynamicThreshold = domainDiagonalSqr * 0.05f;
+						if (pDist > dynamicThreshold)
+						{
+							minVal2 = dist;
+							currentParams.z = u;
+							currentParams.w = v;
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			for (int i = 0; i <= cursorSamples; i++)
+			{
+				float u1 = (i / static_cast<float>(cursorSamples)) * maxU1;
+				float u2 = (i / static_cast<float>(cursorSamples)) * maxU2;
+
+				for (int j = 0; j <= cursorSamples; j++)
+				{
+					float v1 = (j / static_cast<float>(cursorSamples)) * maxV1;
+					float v2 = (j / static_cast<float>(cursorSamples)) * maxV2;
+
+					float dist1 = (surf1.Evaluate(u1, v1).p - cursorPos).length_sqr();
+					if (dist1 < minVal1)
+					{
+						minVal1 = dist1;
+						currentParams.x = u1;
+						currentParams.y = v1;
+					}
+
+					float dist2 = (surf2.Evaluate(u2, v2).p - cursorPos).length_sqr();
+					if (dist2 < minVal2)
+					{
+						minVal2 = dist2;
+						currentParams.z = u2;
+						currentParams.w = v2;
+					}
+				}
+			}
+		}
+
+		auto p1 = surf1.Evaluate(currentParams.x, currentParams.y).p;
+		auto p2 = surf2.Evaluate(currentParams.z, currentParams.w).p;
+		return { currentParams, (p1 - p2).length_sqr() };
+	}
+
 	std::vector<Candidate> FindIntersectionCandidates(const IParametricSurface& surf1, const IParametricSurface& surf2, bool isSelfIntersection, const MathLib::Vec4f& maxDomains, std::optional<float3> cursorHint)
 	{
 		float maxU1 = maxDomains.x;
@@ -97,87 +187,8 @@ namespace
 
 		if (cursorHint)
 		{
-			constexpr int cursorSamples = 50;
 			Vec3f cursorPos = cursorHint->ToVec3f();
-
-			float minVal1 = std::numeric_limits<float>::max();
-			float minVal2 = std::numeric_limits<float>::max();
-			Vec4f currentParams{ 0.0f, 0.0f, 0.0f, 0.0f };
-
-			if (isSelfIntersection)
-			{
-				for (int i = 0; i <= cursorSamples; i++)
-				{
-					float u = (i / static_cast<float>(cursorSamples)) * maxU1;
-					for (int j = 0; j <= cursorSamples; j++)
-					{
-						float v = (j / static_cast<float>(cursorSamples)) * maxV1;
-						float dist = (surf1.Evaluate(u, v).p - cursorPos).length_sqr();
-
-						if (dist < minVal1)
-						{
-							float pDist = (u - currentParams.x) * (u - currentParams.x) + (v - currentParams.y) * (v - currentParams.y);
-							float domainDiagonalSqr = (maxU1 * maxU1) + (maxV1 * maxV1);
-							float dynamicThreshold = domainDiagonalSqr * 0.05f;
-							if (pDist > dynamicThreshold)
-							{
-								minVal2 = minVal1;
-								currentParams.z = currentParams.x;
-								currentParams.w = currentParams.y;
-							}
-							minVal1 = dist;
-							currentParams.x = u;
-							currentParams.y = v;
-						}
-						else if (dist < minVal2)
-						{
-							float pDist = (u - currentParams.x) * (u - currentParams.x) + (v - currentParams.y) * (v - currentParams.y);
-							float domainDiagonalSqr = (maxU1 * maxU1) + (maxV1 * maxV1);
-							float dynamicThreshold = domainDiagonalSqr * 0.05f;
-							if (pDist > dynamicThreshold)
-							{
-								minVal2 = dist;
-								currentParams.z = u;
-								currentParams.w = v;
-							}
-						}
-					}
-				}
-			}
-			else
-			{
-				for (int i = 0; i <= cursorSamples; i++)
-				{
-					float u1 = (i / static_cast<float>(cursorSamples)) * maxU1;
-					float u2 = (i / static_cast<float>(cursorSamples)) * maxU2;
-
-					for (int j = 0; j <= cursorSamples; j++)
-					{
-						float v1 = (j / static_cast<float>(cursorSamples)) * maxV1;
-						float v2 = (j / static_cast<float>(cursorSamples)) * maxV2;
-
-						float dist1 = (surf1.Evaluate(u1, v1).p - cursorPos).length_sqr();
-						if (dist1 < minVal1)
-						{
-							minVal1 = dist1;
-							currentParams.x = u1;
-							currentParams.y = v1;
-						}
-
-						float dist2 = (surf2.Evaluate(u2, v2).p - cursorPos).length_sqr();
-						if (dist2 < minVal2)
-						{
-							minVal2 = dist2;
-							currentParams.z = u2;
-							currentParams.w = v2;
-						}
-					}
-				}
-			}
-
-			auto p1 = surf1.Evaluate(currentParams.x, currentParams.y).p;
-			auto p2 = surf2.Evaluate(currentParams.z, currentParams.w).p;
-			sortedCandidates.push_back({ currentParams, (p1 - p2).length_sqr() });
+			sortedCandidates.push_back(FindCursorHintCandidate(surf1, surf2, isSelfIntersection, maxDomains, *cursorHint));
 
 			std::vector<MathLib::Vec4f> patchParams;
 			SurfacePatch root1 = { 0.0f, maxU1, 0.0f, maxV1, ComputePatchAABB(surf1, 0.0f, maxU1, 0.0f, maxV1) };
@@ -1048,6 +1059,20 @@ bool OffsetSurface::IsSeamConnected(bool inU, float otherParam) const
 #pragma region Intersection Solvers
 std::optional<IntersectionResult> GeometryMath::CalculateIntersection(const IParametricSurface& surf1, const IParametricSurface& surf2, bool isSelfIntersection, const MathLib::Vec4f& maxDomains, float step, std::optional<float3> cursorHint, bool allowOpenAtDiscontinuity)
 {
+	// Fast path: when a cursorHint is provided, try the direct hint candidate first
+	// before falling back to full AABB patch subdivision (IntersectPatches).
+	std::optional<Vec4f> fastRefined;
+	if (cursorHint)
+	{
+		Candidate hintCand = FindCursorHintCandidate(surf1, surf2, isSelfIntersection, maxDomains, *cursorHint);
+		fastRefined = RefineIntersectionPoint(surf1, surf2, hintCand.params, maxDomains, isSelfIntersection);
+		if (fastRefined)
+		{
+			if (auto result = TraceIntersectionPath(surf1, surf2, *fastRefined, step, maxDomains, isSelfIntersection, allowOpenAtDiscontinuity))
+				return result;
+		}
+	}
+
 	// =============================================================
 	// STAGE 1: FIND STARTING PARAMETERS
 	auto candidates = FindIntersectionCandidates(surf1, surf2, isSelfIntersection, maxDomains, cursorHint);
@@ -1056,6 +1081,8 @@ std::optional<IntersectionResult> GeometryMath::CalculateIntersection(const IPar
 
 	// STAGE 2 & 3: REFINE AND TRACE THE INTERSECTION CURVE
 	std::vector<Vec4f> triedRefined;
+	if (fastRefined)
+		triedRefined.push_back(*fastRefined);
 	constexpr int maxTraceAttempts = 5;
 
 	for (const auto& candidate : candidates)
