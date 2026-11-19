@@ -32,6 +32,13 @@ private:
     bool m_roughBaseAutoDetected = false;
 #pragma endregion
 
+#pragma region BaseFinishingGeneration
+    float m_baseStepover = 9.0f;
+    float m_baseContourMargin = 1.0f;
+    std::string m_baseSeedsJsonPath = "";
+    std::string m_baseSeedsJsonFile = "None";
+#pragma endregion
+
 #pragma region Material
     int m_simDivX = 600;
     int m_simDivZ = 600;

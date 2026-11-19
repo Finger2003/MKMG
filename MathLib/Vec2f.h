@@ -9,7 +9,12 @@ namespace MathLib
 			float f[2];
 			struct
 			{
-				float x, y;
+				float x;
+				union
+				{
+					float y;
+					float z;
+				};
 			};
 		};
 
@@ -80,6 +85,11 @@ namespace MathLib
 		static float dot(const Vec2f& a, const Vec2f& b)
 		{
 			return a.x * b.x + a.y * b.y;
+		}
+
+		static float cross(const Vec2f& a, const Vec2f& b)
+		{
+			return a.x * b.y - a.y * b.x;
 		}
 
 		float length_sqr() const

@@ -142,20 +142,57 @@ namespace GeometryMath
 	class OffsetSurface final : public IParametricSurface
 	{
 	public:
-		OffsetSurface(SceneObject* baseObj, float offsetWorld, bool forceUpwardNormal = true)
-			: m_baseObj(baseObj), m_offsetWorld(offsetWorld), m_forceUpwardNormal(forceUpwardNormal) {}
+		OffsetSurface(SceneObject* baseObj, float offsetWorld, bool horizontalXZ = false)
+			: m_baseObj(baseObj), m_offsetWorld(offsetWorld), m_horizontalXZ(horizontalXZ) {}
 
 		SceneObject* GetBaseObject() const { return m_baseObj; }
 		float GetOffsetWorld() const { return m_offsetWorld; }
+		bool IsHorizontalXZ() const { return m_horizontalXZ; }
 		SurfaceEvalResult Evaluate(float u, float v) const override;
 		float GetMaxU() const override;
 		float GetMaxV() const override;
 		bool IsSeamConnected(bool inU, float otherParam) const override;
+		float EstimatePatchPadding(
+			float u_min, float u_max,
+			float v_min, float v_max,
+			float maxDuLen, float maxDvLen) const override
+		{
+			return IParametricSurface::EstimatePatchPadding(u_min, u_max, v_min, v_max, maxDuLen, maxDvLen)
+				+ std::abs(m_offsetWorld);
+		}
 
 	private:
 		SceneObject* m_baseObj = nullptr;
 		float m_offsetWorld = 0.0f;
-		bool m_forceUpwardNormal = true;
+		bool m_horizontalXZ = false;
+	};
+
+	class HorizontalPlaneSurface final : public IParametricSurface
+	{
+	public:
+		HorizontalPlaneSurface(float yWorld, float minXWorld, float maxXWorld, float minZWorld, float maxZWorld)
+			: m_y(yWorld), m_minX(minXWorld), m_sizeX(maxXWorld - minXWorld), m_maxZ(maxZWorld), m_sizeZ(maxZWorld - minZWorld) {}
+
+		SurfaceEvalResult Evaluate(float u, float v) const override
+		{
+			return {
+				Vec3f(m_minX + u * m_sizeX, m_y, m_maxZ - v * m_sizeZ),
+				Vec3f(m_sizeX, 0.0f, 0.0f),
+				Vec3f(0.0f, 0.0f, -m_sizeZ)
+			};
+		}
+
+		float GetMaxU() const override { return 1.0f; }
+		float GetMaxV() const override { return 1.0f; }
+		bool IsSeamConnected(bool, float) const override { return false; }
+		float EstimatePatchPadding(float, float, float, float, float, float) const override { return 0.0f; }
+
+	private:
+		float m_y = 0.0f;
+		float m_minX = 0.0f;
+		float m_sizeX = 1.0f;
+		float m_maxZ = 1.0f;
+		float m_sizeZ = 1.0f;
 	};
 #pragma endregion
 
@@ -166,7 +203,8 @@ namespace GeometryMath
 		bool isSelfIntersection,
 		const Vec4f& maxDomains, // x: maxU1, y: maxV1, z: maxU2, w: maxV2
 		float step,
-		std::optional<float3> cursorHint);
+		std::optional<float3> cursorHint,
+		bool allowOpenAtDiscontinuity = false);
 
 	std::optional<IntersectionResult> CalculateIntersection(
 		SceneObject* obj1,
@@ -174,7 +212,8 @@ namespace GeometryMath
 		bool isSelfIntersection,
 		const Vec4f& maxDomains, // x: maxU1, y: maxV1, z: maxU2, w: maxV2
 		float step,
-		std::optional<float3> cursorHint);
+		std::optional<float3> cursorHint,
+		bool allowOpenAtDiscontinuity = false);
 
 	std::optional<Vec4f> SolveLinearSystem(Mat4f J, Vec4f F);
 	std::optional<Vec4f> FindIntersectionNextPoint(const IParametricSurface& surf1, const IParametricSurface& surf2, Vec4f startParams, Vec3f p0, Vec3f t, float d, int depth = 0);

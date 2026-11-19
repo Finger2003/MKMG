@@ -10,7 +10,12 @@
 #include <optional>
 #include <fstream>
 #include <cstdint>
+#include <atomic>
+#include <filesystem>
+#include <iomanip>
+#include <queue>
 
+#include <omp.h>
 #include <d3d11.h>
 
 #include <Windows.h>

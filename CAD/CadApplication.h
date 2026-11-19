@@ -225,6 +225,7 @@ private:
 
 	template <IsFileDialog DialogType>
 	std::wstring ShowFileDialog(
+		const GUID& clientGuid,
 		const std::vector<COMDLG_FILTERSPEC>& filters = {
 			{ L"JSON Scene Files (*.json)", L"*.json" },
 			{ L"All files (*.*)", L"*.*" }
@@ -276,6 +277,7 @@ inline void CadApplication::CreateCurveFromSelectedPoints()
 
 template<IsFileDialog DialogType>
 inline std::wstring CadApplication::ShowFileDialog(
+	const GUID& clientGuid,
 	const std::vector<COMDLG_FILTERSPEC>& filters,
 	const wchar_t* defaultExt,
 	const wchar_t* defaultFileName)
@@ -285,6 +287,8 @@ inline std::wstring CadApplication::ShowFileDialog(
 
 	if (FAILED(CoCreateInstance(DialogTraits<DialogType>::Clsid, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pDialog))))
 		return L"";
+
+	pDialog->SetClientGuid(clientGuid);
 
 	if (!filters.empty())
 		pDialog->SetFileTypes(static_cast<UINT>(filters.size()), filters.data());

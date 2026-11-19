@@ -43,7 +43,27 @@ struct uint2
 
 namespace nlohmann
 {
-	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(float3, x, y, z);
+	inline void to_json(nlohmann::json& j, const float3& v)
+	{
+		j = nlohmann::json{ {"x", v.x}, {"y", v.y}, {"z", v.z} };
+	}
+
+	inline void from_json(const nlohmann::json& j, float3& v)
+	{
+		if (j.is_array())
+		{
+			j.at(0).get_to(v.x);
+			j.at(1).get_to(v.y);
+			j.at(2).get_to(v.z);
+		}
+		else
+		{
+			j.at("x").get_to(v.x);
+			j.at("y").get_to(v.y);
+			j.at("z").get_to(v.z);
+		}
+	}
+
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(uint2, u, v);
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MathLib::Quaternion, x, y, z, w);
 }

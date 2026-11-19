@@ -2,6 +2,7 @@
 #include "CamGuiManager.h"
 #include "CadApplication.h"
 #include "PathGenerator.h"
+#include "Intersection.h"
 #include "Surface.h"
 #include "../ImGuiLib/imgui.h"
 #include "../ImGuiLib/imgui_impl_win32.h"
@@ -11,6 +12,9 @@
 
 namespace
 {
+	constexpr GUID cCamPathDialogGuid = { 0x8b4e2f1a, 0x3c7d, 0x4a91, { 0x9e, 0x12, 0x4f, 0x8a, 0x2c, 0x6b, 0x71, 0x02 } };
+	constexpr GUID cCamSeedsDialogGuid = { 0x4f91c823, 0x7b2e, 0x4d15, { 0xa3, 0x51, 0x6e, 0x9d, 0x18, 0x44, 0xc2, 0x09 } };
+
 	struct CutterConfig
 	{
 		bool isFlat = true;
@@ -119,7 +123,7 @@ void CamGuiManager::DrawGCodeSection()
 			{ L"Machine Code Files (*.k*, *.f*)", L"*.k*;*.f*" },
 			{ L"All Files (*.*)", L"*.*" }
 		};
-		std::wstring widePath = m_app.ShowFileDialog<IFileOpenDialog>(gcodeFilters, nullptr, nullptr);
+		std::wstring widePath = m_app.ShowFileDialog<IFileOpenDialog>(cCamPathDialogGuid, gcodeFilters, nullptr, nullptr);
 		if (!widePath.empty())
 		{
 			std::string tempPath(widePath.begin(), widePath.end());
@@ -253,14 +257,12 @@ void CamGuiManager::DrawPathGenerationSection()
 				{ L"K16 Ball-Nose Path (*.k16)", L"*.k16" },
 				{ L"All Files (*.*)", L"*.*" }
 			};
-			std::wstring widePath = m_app.ShowFileDialog<IFileSaveDialog>(saveFilters, L"k16", L"1.k16");
+			std::wstring widePath = m_app.ShowFileDialog<IFileSaveDialog>(cCamPathDialogGuid, saveFilters, L"k16", L"1.k16");
 			if (!widePath.empty())
 			{
 				std::string savePath(widePath.begin(), widePath.end());
 
 				RoughingParameters params{};
-				params.cutterDiameter = 16.0f;
-				params.cutterFluteHeight = 32.0f;
 				params.blockSizeX = m_simSizeX * 10.0f;
 				params.blockSizeY = m_simSizeY * 10.0f;
 				params.blockSizeZ = m_simSizeZ * 10.0f;
@@ -294,6 +296,88 @@ void CamGuiManager::DrawPathGenerationSection()
 					m_cutterFlat = false;
 					m_cutterSize = 16.0f;
 					m_cutterHeight = 32.0f;
+					m_app.getMillingSimulator().setCutterParams({ m_cutterSize, m_cutterHeight, m_cutterFlat });
+				}
+			}
+		}
+	}
+
+	if (ImGui::CollapsingHeader("Base Finishing (F10)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		auto selectedBase = m_roughBaseSurface.lock();
+
+		ImGui::InputFloat("stepover [mm]##base", &m_baseStepover, 0.5f, 1.0f, "%.2f");
+		ImGui::InputFloat("contour margin [mm]##base", &m_baseContourMargin, 0.1f, 0.5f, "%.2f");
+
+		m_baseStepover = std::clamp(m_baseStepover, 0.5f, 9.9f);
+		m_baseContourMargin = std::max(0.0f, m_baseContourMargin);
+
+		ImGui::Text("Seeds JSON: %s", m_baseSeedsJsonFile.c_str());
+		if (ImGui::Button("Load Seeds JSON...##base"))
+		{
+			std::wstring wideJson = m_app.ShowFileDialog<IFileOpenDialog>(cCamSeedsDialogGuid);
+			if (!wideJson.empty())
+			{
+				m_baseSeedsJsonPath = std::string(wideJson.begin(), wideJson.end());
+				size_t lastSlash = m_baseSeedsJsonPath.find_last_of("\\/");
+				m_baseSeedsJsonFile = (lastSlash != std::string::npos)
+					? m_baseSeedsJsonPath.substr(lastSlash + 1)
+					: m_baseSeedsJsonPath;
+			}
+		}
+		if (!m_baseSeedsJsonPath.empty())
+		{
+			ImGui::SameLine();
+			if (ImGui::Button("Clear##baseSeeds"))
+			{
+				m_baseSeedsJsonPath.clear();
+				m_baseSeedsJsonFile = "None";
+			}
+		}
+
+		ImGui::Spacing();
+		if (ImGui::Button("Generate Base Finishing (2.f10)", ImVec2(-1.0f, 0.0f)))
+		{
+			const std::vector<COMDLG_FILTERSPEC> saveFilters = {
+				{ L"F10 Flat-End Path (*.f10)", L"*.f10" },
+				{ L"All Files (*.*)", L"*.*" }
+			};
+			std::wstring widePath = m_app.ShowFileDialog<IFileSaveDialog>(cCamPathDialogGuid, saveFilters, L"f10", L"2.f10");
+			if (!widePath.empty())
+			{
+				std::string savePath(widePath.begin(), widePath.end());
+
+				BaseFinishingParameters params{};
+				params.blockSizeX = m_simSizeX * 10.0f;
+				params.blockSizeY = m_simSizeY * 10.0f;
+				params.blockSizeZ = m_simSizeZ * 10.0f;
+				params.baseHeight = m_simBaseHeight;
+				params.contourMargin = m_baseContourMargin;
+				params.stepover = m_baseStepover;
+				params.baseSurface = selectedBase.get();
+				params.seedsJsonPath = m_baseSeedsJsonPath;
+
+				auto waypoints = PathGenerator::GenerateBaseFinishingPath(m_app.getSceneObjects(), params);
+				if (!PathGenerator::ExportGCode(savePath, waypoints))
+				{
+					MessageBoxA(
+						m_app.getWindowHandle(),
+						"Failed to export the generated base finishing path to the selected file.",
+						"Export Error",
+						MB_OK | MB_ICONERROR
+					);
+				}
+				else if (m_app.getMillingSimulator().LoadGCode(savePath))
+				{
+					size_t lastSlash = savePath.find_last_of("\\/");
+					m_loadedGCodeFile = (lastSlash != std::string::npos)
+						? savePath.substr(lastSlash + 1)
+						: savePath;
+					m_loadedGCodePath = std::move(savePath);
+
+					m_cutterFlat = true;
+					m_cutterSize = 10.0f;
+					m_cutterHeight = m_cutterSize * 2.0f;
 					m_app.getMillingSimulator().setCutterParams({ m_cutterSize, m_cutterHeight, m_cutterFlat });
 				}
 			}

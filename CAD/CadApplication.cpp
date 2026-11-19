@@ -1017,6 +1017,11 @@ void CadApplication::Render()
 }
 
 
+namespace
+{
+	constexpr GUID cSceneDialogGuid = { 0x8b4e2f1a, 0x3c7d, 0x4a91, { 0x9e, 0x12, 0x4f, 0x8a, 0x2c, 0x6b, 0x71, 0x01 } };
+}
+
 void CadApplication::ActionSave()
 {
 	if (m_currentFilePath.empty())
@@ -1027,7 +1032,7 @@ void CadApplication::ActionSave()
 
 void CadApplication::ActionSaveAs()
 {
-	std::wstring path = ShowFileDialog<IFileSaveDialog>();
+	std::wstring path = ShowFileDialog<IFileSaveDialog>(cSceneDialogGuid);
 	if (!path.empty())
 	{
 		m_currentFilePath = path;
@@ -1049,7 +1054,7 @@ void CadApplication::SaveScene(const std::wstring& filePath)
 
 void CadApplication::ActionLoad()
 {
-	std::wstring path = ShowFileDialog<IFileOpenDialog>();
+	std::wstring path = ShowFileDialog<IFileOpenDialog>(cSceneDialogGuid);
 	if (!path.empty())
 		LoadScene(path);
 }

@@ -361,7 +361,7 @@ namespace
 		return std::nullopt;
 	}
 
-	std::optional<IntersectionResult> TraceIntersectionPath(const IParametricSurface& surf1, const IParametricSurface& surf2, Vec4f startParams, float step, const Vec4f& maxDomains, bool isSelfIntersection)
+	std::optional<IntersectionResult> TraceIntersectionPath(const IParametricSurface& surf1, const IParametricSurface& surf2, Vec4f startParams, float step, const Vec4f& maxDomains, bool isSelfIntersection, bool allowOpenAtDiscontinuity)
 	{
 		float maxU1 = maxDomains.x;
 		float maxV1 = maxDomains.y;
@@ -397,6 +397,7 @@ namespace
 			Vec3f prevPos = startPos;
 			bool leftStartRadius = false;
 			int stepCount = 0;
+			int tinyStepCount = 0;
 			constexpr int maxMarchSteps = 10000;
 
 			for (int iterGuard = 0; iterGuard < maxMarchSteps; iterGuard++)
@@ -606,11 +607,27 @@ namespace
 
 				prevPos = newPos;
 				stepCount++;
+
+				if (allowOpenAtDiscontinuity)
+				{
+					if (stepDistSqr < (step * 0.02f) * (step * 0.02f))
+					{
+						if (++tinyStepCount >= 2)
+							break;
+					}
+					else
+					{
+						tinyStepCount = 0;
+					}
+				}
 			}
 		}
 
 		if (!isClosedLoop && (!forwardHitEdge || !backwardHitEdge))
-			return std::nullopt;
+		{
+			if (!allowOpenAtDiscontinuity || (backwardPoints.size() + forwardPoints.size() + 1) < 2)
+				return std::nullopt;
+		}
 
 		IntersectionResult result;
 		result.isClosedLoop = isClosedLoop;
@@ -968,26 +985,47 @@ float SceneSurfaceAdapter::EstimatePatchPadding(
 SurfaceEvalResult OffsetSurface::Evaluate(float u, float v) const
 {
 	auto [p, du, dv, duu, duv, dvv] = EvaluateParametric2(m_baseObj, u, v);
-	Vec3f w = Vec3f::cross(du, dv);
+	Vec3f w = Vec3f::cross(du, dv); // unnormalized normal vector
 	float wLenSq = w.length_sqr();
 	if (wLenSq <= 1e-12f)
 		return { p, du, dv };
 
+	Vec3f wu = Vec3f::cross(duu, dv) + Vec3f::cross(du, duv); // derivative of normal w.r.t u
+	Vec3f wv = Vec3f::cross(duv, dv) + Vec3f::cross(du, dvv); // derivative of normal w.r.t v
+
+	if (m_horizontalXZ)
+	{
+		Vec3f hw(w.x, 0.0f, w.z);		 // project normal onto horizontal plane
+		float hLenSq = hw.length_sqr();
+		if (hLenSq <= 1e-6f)
+			return { p, du, dv };
+
+		float hLen = std::sqrt(hLenSq);
+		Vec3f hNorm = hw / hLen;			// normalized horizontal normal vector
+
+		Vec3f wuHoriz(wu.x, 0.0f, wu.z);	// project derivative of normal w.r.t u onto horizontal plane
+		Vec3f wvHoriz(wv.x, 0.0f, wv.z);	// project derivative of normal w.r.t v onto horizontal plane
+
+		Vec3f hu = (wuHoriz - hNorm * Vec3f::dot(hNorm, wuHoriz)) / hLen;		// derivative of horizontal normal w.r.t u
+		Vec3f hv = (wvHoriz - hNorm * Vec3f::dot(hNorm, wvHoriz)) / hLen;		// derivative of horizontal normal w.r.t v
+
+		return {
+			p + hNorm * m_offsetWorld,
+			du + hu * m_offsetWorld,
+			dv + hv * m_offsetWorld
+		};
+	}
+
 	float wLen = std::sqrt(wLenSq);
-	Vec3f nRaw = w / wLen;
-	float sign = (m_forceUpwardNormal && nRaw.y < 0.0f) ? -1.0f : 1.0f;
-	float effOffset = sign * m_offsetWorld;
+	Vec3f nNorm = w / wLen;			// normalized normal vector
 
-	Vec3f wu = Vec3f::cross(duu, dv) + Vec3f::cross(du, duv);
-	Vec3f wv = Vec3f::cross(duv, dv) + Vec3f::cross(du, dvv);
-
-	Vec3f nu = (wu - nRaw * Vec3f::dot(nRaw, wu)) / wLen;
-	Vec3f nv = (wv - nRaw * Vec3f::dot(nRaw, wv)) / wLen;
+	Vec3f nu = (wu - nNorm * Vec3f::dot(nNorm, wu)) / wLen;	// derivative of normal w.r.t u
+	Vec3f nv = (wv - nNorm * Vec3f::dot(nNorm, wv)) / wLen;	// derivative of normal w.r.t v
 
 	return {
-		p + nRaw * effOffset,
-		du + nu * effOffset,
-		dv + nv * effOffset
+		p + nNorm * m_offsetWorld,
+		du + nu * m_offsetWorld,
+		dv + nv * m_offsetWorld
 	};
 }
 
@@ -1008,7 +1046,7 @@ bool OffsetSurface::IsSeamConnected(bool inU, float otherParam) const
 #pragma endregion
 
 #pragma region Intersection Solvers
-std::optional<IntersectionResult> GeometryMath::CalculateIntersection(const IParametricSurface& surf1, const IParametricSurface& surf2, bool isSelfIntersection, const MathLib::Vec4f& maxDomains, float step, std::optional<float3> cursorHint)
+std::optional<IntersectionResult> GeometryMath::CalculateIntersection(const IParametricSurface& surf1, const IParametricSurface& surf2, bool isSelfIntersection, const MathLib::Vec4f& maxDomains, float step, std::optional<float3> cursorHint, bool allowOpenAtDiscontinuity)
 {
 	// =============================================================
 	// STAGE 1: FIND STARTING PARAMETERS
@@ -1041,7 +1079,7 @@ std::optional<IntersectionResult> GeometryMath::CalculateIntersection(const IPar
 
 		triedRefined.push_back(*refinedParams);
 
-		if (auto result = TraceIntersectionPath(surf1, surf2, *refinedParams, step, maxDomains, isSelfIntersection))
+		if (auto result = TraceIntersectionPath(surf1, surf2, *refinedParams, step, maxDomains, isSelfIntersection, allowOpenAtDiscontinuity))
 			return result;
 
 		if (static_cast<int>(triedRefined.size()) >= maxTraceAttempts)
@@ -1051,11 +1089,11 @@ std::optional<IntersectionResult> GeometryMath::CalculateIntersection(const IPar
 	return std::nullopt;
 }
 
-std::optional<IntersectionResult> GeometryMath::CalculateIntersection(SceneObject* obj1, SceneObject* obj2, bool isSelfIntersection, const MathLib::Vec4f& maxDomains, float step, std::optional<float3> cursorHint)
+std::optional<IntersectionResult> GeometryMath::CalculateIntersection(SceneObject* obj1, SceneObject* obj2, bool isSelfIntersection, const MathLib::Vec4f& maxDomains, float step, std::optional<float3> cursorHint, bool allowOpenAtDiscontinuity)
 {
 	SceneSurfaceAdapter surf1(obj1);
 	SceneSurfaceAdapter surf2(obj2);
-	return CalculateIntersection(surf1, surf2, isSelfIntersection, maxDomains, step, cursorHint);
+	return CalculateIntersection(surf1, surf2, isSelfIntersection, maxDomains, step, cursorHint, allowOpenAtDiscontinuity);
 }
 std::optional<MathLib::Vec4f> GeometryMath::SolveLinearSystem(MathLib::Mat4f J, MathLib::Vec4f F)
 {
