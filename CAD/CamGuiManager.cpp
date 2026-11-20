@@ -302,6 +302,30 @@ void CamGuiManager::DrawPathGenerationSection()
 		}
 	}
 
+	ImGui::Separator();
+	ImGui::Text("CAM Helper JSON: %s", m_camConfigJsonFile.c_str());
+	if (ImGui::Button("Load CAM JSON...##shared"))
+	{
+		std::wstring wideJson = m_app.ShowFileDialog<IFileOpenDialog>(cCamSeedsDialogGuid);
+		if (!wideJson.empty())
+		{
+			m_camConfigJsonPath = std::string(wideJson.begin(), wideJson.end());
+			size_t lastSlash = m_camConfigJsonPath.find_last_of("\\/");
+			m_camConfigJsonFile = (lastSlash != std::string::npos)
+				? m_camConfigJsonPath.substr(lastSlash + 1)
+				: m_camConfigJsonPath;
+		}
+	}
+	if (!m_camConfigJsonPath.empty())
+	{
+		ImGui::SameLine();
+		if (ImGui::Button("Clear##sharedJson"))
+		{
+			m_camConfigJsonPath.clear();
+			m_camConfigJsonFile = "None";
+		}
+	}
+
 	if (ImGui::CollapsingHeader("Flat Base (F10)", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		auto selectedBase = m_roughBaseSurface.lock();
@@ -311,29 +335,6 @@ void CamGuiManager::DrawPathGenerationSection()
 
 		m_flatBaseStepover = std::clamp(m_flatBaseStepover, 0.5f, 9.9f);
 		m_flatBaseContourMargin = std::max(0.0f, m_flatBaseContourMargin);
-
-		ImGui::Text("Seeds JSON: %s", m_flatBaseSeedsJsonFile.c_str());
-		if (ImGui::Button("Load Seeds JSON...##base"))
-		{
-			std::wstring wideJson = m_app.ShowFileDialog<IFileOpenDialog>(cCamSeedsDialogGuid);
-			if (!wideJson.empty())
-			{
-				m_flatBaseSeedsJsonPath = std::string(wideJson.begin(), wideJson.end());
-				size_t lastSlash = m_flatBaseSeedsJsonPath.find_last_of("\\/");
-				m_flatBaseSeedsJsonFile = (lastSlash != std::string::npos)
-					? m_flatBaseSeedsJsonPath.substr(lastSlash + 1)
-					: m_flatBaseSeedsJsonPath;
-			}
-		}
-		if (!m_flatBaseSeedsJsonPath.empty())
-		{
-			ImGui::SameLine();
-			if (ImGui::Button("Clear##baseSeeds"))
-			{
-				m_flatBaseSeedsJsonPath.clear();
-				m_flatBaseSeedsJsonFile = "None";
-			}
-		}
 
 		ImGui::Spacing();
 		if (ImGui::Button("Generate Flat Base (2.f10)", ImVec2(-1.0f, 0.0f)))
@@ -355,7 +356,7 @@ void CamGuiManager::DrawPathGenerationSection()
 				params.contourMargin = m_flatBaseContourMargin;
 				params.stepover = m_flatBaseStepover;
 				params.baseSurface = selectedBase.get();
-				params.seedsJsonPath = m_flatBaseSeedsJsonPath;
+				params.seedsJsonPath = m_camConfigJsonPath;
 
 				auto waypoints = PathGenerator::GenerateFlatBasePath(m_app.getSceneObjects(), params);
 				if (!PathGenerator::ExportGCode(savePath, waypoints))
@@ -377,6 +378,71 @@ void CamGuiManager::DrawPathGenerationSection()
 
 					m_cutterFlat = true;
 					m_cutterSize = 10.0f;
+					m_cutterHeight = m_cutterSize * 2.0f;
+					m_app.getMillingSimulator().setCutterParams({ m_cutterSize, m_cutterHeight, m_cutterFlat });
+				}
+			}
+		}
+	}
+
+	if (ImGui::CollapsingHeader("Finishing (K08)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		auto selectedBase = m_roughBaseSurface.lock();
+
+		ImGui::InputFloat("scallop height [mm]##finish", &m_finishingScallopHeight, 0.005f, 0.02f, "%.3f");
+		ImGui::InputFloat("min stepover [mm]##finish", &m_finishingMinStepover, 0.05f, 0.2f, "%.2f");
+		ImGui::InputFloat("max stepover [mm]##finish", &m_finishingMaxStepover, 0.1f, 0.5f, "%.2f");
+		ImGui::InputFloat("simplify tol [mm]##finish", &m_finishingSimplifyTol, 0.005f, 0.02f, "%.3f");
+
+		m_finishingScallopHeight = std::clamp(m_finishingScallopHeight, 0.002f, 0.5f);
+		m_finishingMinStepover = std::clamp(m_finishingMinStepover, 0.10f, 5.0f);
+		m_finishingMaxStepover = std::clamp(m_finishingMaxStepover, m_finishingMinStepover, 6.0f);
+		m_finishingSimplifyTol = std::clamp(m_finishingSimplifyTol, 0.005f, 0.5f);
+
+		ImGui::Spacing();
+		if (ImGui::Button("Generate Finishing Path (3.k08)", ImVec2(-1.0f, 0.0f)))
+		{
+			const std::vector<COMDLG_FILTERSPEC> saveFilters = {
+				{ L"K08 Ball-Nose Path (*.k08)", L"*.k08" },
+				{ L"All Files (*.*)", L"*.*" }
+			};
+			std::wstring widePath = m_app.ShowFileDialog<IFileSaveDialog>(cCamPathDialogGuid, saveFilters, L"k08", L"3.k08");
+			if (!widePath.empty())
+			{
+				std::string savePath(widePath.begin(), widePath.end());
+
+				FinishingParameters params{};
+				params.blockSizeX = m_simSizeX * 10.0f;
+				params.blockSizeY = m_simSizeY * 10.0f;
+				params.blockSizeZ = m_simSizeZ * 10.0f;
+				params.baseHeight = m_simBaseHeight;
+				params.scallopHeight = m_finishingScallopHeight;
+				params.minStepover = m_finishingMinStepover;
+				params.maxStepover = m_finishingMaxStepover;
+				params.simplifyTolerance = m_finishingSimplifyTol;
+				params.baseSurface = selectedBase.get();
+				params.intersectionsJsonPath = m_camConfigJsonPath;
+
+				auto waypoints = PathGenerator::GenerateFinishingPath(m_app.getSceneObjects(), params);
+				if (!PathGenerator::ExportGCode(savePath, waypoints))
+				{
+					MessageBoxA(
+						m_app.getWindowHandle(),
+						"Failed to export the generated finishing path to the selected file.",
+						"Export Error",
+						MB_OK | MB_ICONERROR
+					);
+				}
+				else if (m_app.getMillingSimulator().LoadGCode(savePath))
+				{
+					size_t lastSlash = savePath.find_last_of("\\/");
+					m_loadedGCodeFile = (lastSlash != std::string::npos)
+						? savePath.substr(lastSlash + 1)
+						: savePath;
+					m_loadedGCodePath = std::move(savePath);
+
+					m_cutterFlat = false;
+					m_cutterSize = 8.0f;
 					m_cutterHeight = m_cutterSize * 2.0f;
 					m_app.getMillingSimulator().setCutterParams({ m_cutterSize, m_cutterHeight, m_cutterFlat });
 				}

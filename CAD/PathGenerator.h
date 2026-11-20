@@ -44,6 +44,27 @@ struct FlatBaseParameters
 	std::string seedsJsonPath;          // Optional JSON file with per-surface cursorSeeds for base CL intersections
 };
 
+struct FinishingParameters
+{
+	float cutterDiameter = 8.0f;        // [mm] K08 ball-nose cutter (R = 4 mm)
+	float cutterFluteHeight = 16.0f;    // [mm] Max immersion depth = 2 * cutterDiameter
+
+	float blockSizeX = 150.0f;          // [mm]
+	float blockSizeY = 50.0f;           // [mm] Block height (Y in scene, Z in G-Code)
+	float blockSizeZ = 150.0f;          // [mm]
+	float baseHeight = 15.0f;           // [mm] Minimum base thickness
+
+	float scallopHeight = 0.05f;        // [mm] Target cusp/scallop height for adaptive pass spacing
+	float minStepover = 0.30f;          // [mm] Minimum spacing between adjacent finishing passes
+	float maxStepover = 1.50f;          // [mm] Maximum spacing between adjacent finishing passes
+	float curvatureWeight = 1.0f;       // Transverse curvature sensitivity for adaptive stepover
+	float simplifyTolerance = 0.02f;    // [mm] 3D chordal simplification tolerance along passes
+	float safeHeight = 60.0f;           // [mm] Safe Z height in air above the 50 mm block
+
+	SceneObject* baseSurface = nullptr; // Optional designated flat base plane surface (if null, uses baseHeight)
+	std::string intersectionsJsonPath;  // Optional JSON file with surface order/isoDirection, baseCursorSeeds, and intersection cursorSeeds
+};
+
 class PathGenerator
 {
 public:
@@ -56,6 +77,11 @@ public:
 	static std::vector<float3> GenerateFlatBasePath(
 		const std::vector<std::shared_ptr<SceneObject>>& sceneObjects,
 		const FlatBaseParameters& params = {});
+
+	// Generates a surface finishing + pencil milling toolpath for K08 ball-nose cutter
+	static std::vector<float3> GenerateFinishingPath(
+		const std::vector<std::shared_ptr<SceneObject>>& sceneObjects,
+		const FinishingParameters& params = {});
 
 	// Exports simulator mm scene waypoints to a G-Code file (applying X->X, -Z->Y, Y->Z mapping)
 	static bool ExportGCode(

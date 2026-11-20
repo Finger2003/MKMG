@@ -35,8 +35,15 @@ private:
 #pragma region FlatBaseGeneration
     float m_flatBaseStepover = 9.0f;
     float m_flatBaseContourMargin = 1.0f;
-    std::string m_flatBaseSeedsJsonPath = "";
-    std::string m_flatBaseSeedsJsonFile = "None";
+#pragma endregion
+
+#pragma region FinishingGeneration
+    float m_finishingScallopHeight = 0.1f;
+    float m_finishingMinStepover = 0.30f;
+    float m_finishingMaxStepover = 1.50f;
+    float m_finishingSimplifyTol = 0.02f;
+    std::string m_camConfigJsonPath = "";
+    std::string m_camConfigJsonFile = "None";
 #pragma endregion
 
 #pragma region Material
