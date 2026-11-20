@@ -1460,12 +1460,12 @@ namespace
 			return;
 
 		auto emitBay = [&](const HorizontalHit2D& enterHit, const HorizontalHit2D& exitHit)
-		{
-			writer.AppendBase(enterHit.pt.x, zp);
-			writer.AppendBase(enterHit.pt.x, enterHit.pt.z);
-			writer.AppendBase(exitHit.pt.x, exitHit.pt.z);
-			writer.AppendBase(exitHit.pt.x, zp);
-		};
+			{
+				writer.AppendBase(enterHit.pt.x, zp);
+				writer.AppendBase(enterHit.pt.x, enterHit.pt.z);
+				writer.AppendBase(exitHit.pt.x, exitHit.pt.z);
+				writer.AppendBase(exitHit.pt.x, zp);
+			};
 
 		if (leftToRight)
 		{
@@ -2169,7 +2169,7 @@ std::vector<float3> PathGenerator::GenerateFlatBasePath(
 
 	const auto midOpenBays = midZ.empty()
 		? std::vector<std::pair<HorizontalHit2D, HorizontalHit2D>>{}
-		: CollectOpenBaysAtZ(zigContour, midZ.back());
+	: CollectOpenBaysAtZ(zigContour, midZ.back());
 
 	// If midZ has an odd count and midZ[0] cleanly spans the top tip, bridge across midZ[0] to pair the remaining mid lines
 	if (midZ.size() % 2 == 1)
@@ -2985,770 +2985,903 @@ namespace
 		auto transitionSafeCl = [&](const std::vector<float3>& pts) { EmitAheadTransition(writer, pts); };
 		constexpr float cMinSafeHorizontalSlope = FinishingPathWriter::cMinSafeHorizontalSlope;
 
-	for (size_t surfIdx = 0; surfIdx < numSurf; surfIdx++)
-	{
-
-		SceneObject* obj = orderedSurfaces[surfIdx].first;
-		const bool alongV = orderedSurfaces[surfIdx].second;
-		const auto& clSelf = *offsetSurfaces.at(obj);
-		static const std::vector<SurfaceCurveAttachment> cEmptyAtts;
-		auto attIt = surfAttachments.find(obj);
-		const auto& attachments = (attIt != surfAttachments.end()) ? attIt->second : cEmptyAtts;
-
-		const float maxU = clSelf.GetMaxU();
-		const float maxV = clSelf.GetMaxV();
-		const bool wrapU = clSelf.IsSeamConnected(true, 0.5f * maxV);
-		const bool wrapV = clSelf.IsSeamConnected(false, 0.5f * maxU);
-		const float maxAlpha = alongV ? maxU : maxV;
-		const float maxBeta = alongV ? maxV : maxU;
-		const bool wrapAlpha = alongV ? wrapU : wrapV;
-		const bool wrapBeta = alongV ? wrapV : wrapU;
-
-		struct SurfSample
+		for (size_t surfIdx = 0; surfIdx < numSurf; surfIdx++)
 		{
-			Vec3f posMm{};
-			Vec3f duMm{};
-			Vec3f dvMm{};
-			Vec3f normal{};
-			Vec3f tipMm{};
-		};
 
-		auto evalAtAB = [&](float alpha, float beta) -> SurfSample
+			SceneObject* obj = orderedSurfaces[surfIdx].first;
+			const bool alongV = orderedSurfaces[surfIdx].second;
+			const auto& clSelf = *offsetSurfaces.at(obj);
+			static const std::vector<SurfaceCurveAttachment> cEmptyAtts;
+			auto attIt = surfAttachments.find(obj);
+			const auto& attachments = (attIt != surfAttachments.end()) ? attIt->second : cEmptyAtts;
+
+			const float maxU = clSelf.GetMaxU();
+			const float maxV = clSelf.GetMaxV();
+			const bool wrapU = clSelf.IsSeamConnected(true, 0.5f * maxV);
+			const bool wrapV = clSelf.IsSeamConnected(false, 0.5f * maxU);
+			const float maxAlpha = alongV ? maxU : maxV;
+			const float maxBeta = alongV ? maxV : maxU;
+			const bool wrapAlpha = alongV ? wrapU : wrapV;
+			const bool wrapBeta = alongV ? wrapV : wrapU;
+
+			struct SurfSample
 			{
-				const float a = WrapOrClampParam(alpha, maxAlpha, wrapAlpha);
-				const float b = WrapOrClampParam(beta, maxBeta, wrapBeta);
-				const float u = alongV ? a : b;
-				const float v = alongV ? b : a;
-
-				auto baseEval = GeometryMath::EvaluateParametric(obj, u, v);
-				SurfSample s{};
-				s.posMm = baseEval.p * cWorldToMm;
-				s.duMm = baseEval.du * cWorldToMm;
-				s.dvMm = baseEval.dv * cWorldToMm;
-
-				Vec3f rawN = Vec3f::cross(s.duMm, s.dvMm);
-				float nLen = rawN.length();
-				if (nLen > 1e-6f)
-				{
-					s.normal = rawN / nLen;
-					s.tipMm = s.posMm + s.normal * R - Vec3f(0.0f, R, 0.0f);
-				}
-				else
-				{
-					s.normal = Vec3f(0.0f, 1.0f, 0.0f);
-					s.tipMm = s.posMm - Vec3f(0.0f, R, 0.0f);
-				}
-				return s;
+				Vec3f posMm{};
+				Vec3f duMm{};
+				Vec3f dvMm{};
+				Vec3f normal{};
+				Vec3f tipMm{};
 			};
 
-		auto isPointValid = [&](float alpha, float beta, SurfSample* outSample = nullptr) -> bool
-			{
-				SurfSample s = evalAtAB(alpha, beta);
-				if (outSample)
-					*outSample = s;
-
-				// 1. Contact point must lie on or above the base plane
-				if (s.posMm.y < baseY - 0.02f)
-					return false;
-
-				// 2. Outward normal must point upward (excludes vertical/undercut closure walls like hull segU=2 where n.y == 0)
-				if (s.normal.y < 0.005f)
-					return false;
-
-				// 3. Cutter tip must stay above the base plane
-				if (s.tipMm.y < baseY - 0.01f)
-					return false;
-
-				// 4. Cutter tip must stay within the machinable block area
-				if (std::abs(s.tipMm.x) > halfX + R + cOutsideBlockMarginMm ||
-					std::abs(s.tipMm.z) > halfZ + R + cOutsideBlockMarginMm)
-					return false;
-
-
-				return true;
-			};
-
-		// Adaptive cross-parameter step based on surface derivative & transverse curvature
-		auto computeAdaptiveStepAlpha = [&](float alpha) -> float
-			{
-				constexpr int cProbeBeta = 36;
-				const float deltaA = std::max(1e-4f, 0.001f * maxAlpha);
-				const float patchMinA = 0.0f, patchMaxA = maxAlpha;
-				float minParamStep = maxAlpha;
-				bool anyValid = false;
-
-				for (int i = 0; i <= cProbeBeta; i++)
+			auto evalAtAB = [&](float alpha, float beta) -> SurfSample
 				{
-					const float beta = (maxBeta * i) / cProbeBeta;
-					SurfSample s0;
-					if (!isPointValid(alpha, beta, &s0))
-						continue;
+					const float a = WrapOrClampParam(alpha, maxAlpha, wrapAlpha);
+					const float b = WrapOrClampParam(beta, maxBeta, wrapBeta);
+					const float u = alongV ? a : b;
+					const float v = alongV ? b : a;
 
-					anyValid = true;
-					const Vec3f& Pb = alongV ? s0.dvMm : s0.duMm;
-					const Vec3f& Pa = alongV ? s0.duMm : s0.dvMm;
-					const float pbLen = Pb.length();
-					const float paLenSq = Pa.length_sqr();
-					const float crossLen = Vec3f::cross(Pb, Pa).length();
-					const float lPerp = (pbLen > 1e-4f) ? (crossLen / pbLen) : Pa.length();
-					if (lPerp < 1e-3f)
-						continue;
+					auto baseEval = GeometryMath::EvaluateParametric(obj, u, v);
+					SurfSample s{};
+					s.posMm = baseEval.p * cWorldToMm;
+					s.duMm = baseEval.du * cWorldToMm;
+					s.dvMm = baseEval.dv * cWorldToMm;
 
-					const bool useWrapDiff = wrapAlpha;
-					float aMinus = useWrapDiff ? WrapOrClampParam(alpha - deltaA, maxAlpha, true) : std::clamp(alpha - deltaA, patchMinA, patchMaxA);
-					float aPlus = useWrapDiff ? WrapOrClampParam(alpha + deltaA, maxAlpha, true) : std::clamp(alpha + deltaA, patchMinA, patchMaxA);
-					float actualSpan = (useWrapDiff || (alpha - deltaA >= patchMinA && alpha + deltaA <= patchMaxA)) ? (2.0f * deltaA) : (aPlus - aMinus);
-
-					float effectiveLPerp = lPerp;
-					float absKappaPerp = 0.0f;
-					if (actualSpan > 1e-5f && paLenSq > 1e-5f)
+					Vec3f rawN = Vec3f::cross(s.duMm, s.dvMm);
+					float nLen = rawN.length();
+					if (nLen > 1e-6f)
 					{
-						SurfSample sMinus = evalAtAB(aMinus, beta);
-						SurfSample sPlus = evalAtAB(aPlus, beta);
-						Vec3f dNormalDa = (sPlus.normal - sMinus.normal) * (1.0f / actualSpan);
-						absKappaPerp = std::abs(Vec3f::dot(dNormalDa, Pa)) / paLenSq;
-
-						Vec3f dCenterDa = ((sPlus.tipMm - sMinus.tipMm) * (1.0f / actualSpan));
-						float dCenterPerp = (pbLen > 1e-4f) ? (Vec3f::cross(Pb, dCenterDa).length() / pbLen) : dCenterDa.length();
-						effectiveLPerp = std::max(lPerp, 0.65f * dCenterPerp);
+						s.normal = rawN / nLen;
+						s.tipMm = s.posMm + s.normal * R - Vec3f(0.0f, R, 0.0f);
 					}
-
-					float denom = std::max(0.20f, 1.0f + curvWeight * R * absKappaPerp);
-					float localStripMm = baseFlatWidth / std::sqrt(denom);
-					localStripMm = std::clamp(localStripMm, minStepMm, maxStepMm);
-					minParamStep = std::min(minParamStep, localStripMm / effectiveLPerp);
-				}
-
-				if (!anyValid)
-				{
-					float probeA = std::clamp(alpha + 0.02f * maxAlpha, patchMinA, patchMaxA);
-					SurfSample sMid = evalAtAB(probeA, 0.5f * maxBeta);
-					const Vec3f& Pa = alongV ? sMid.duMm : sMid.dvMm;
-					float paLen = std::max(10.0f, Pa.length());
-					return std::clamp(maxStepMm / paLen, maxAlpha / 400.0f, maxAlpha / 35.0f);
-				}
-
-				return std::clamp(minParamStep, maxAlpha / 500.0f, maxAlpha / 18.0f);
-			};
-
-		std::vector<float> alphaValues;
-		alphaValues.reserve(256);
-		{
-			float currA = 0.0f;
-			while (currA < maxAlpha - 1e-5f)
-			{
-				alphaValues.push_back(currA);
-				float da = computeAdaptiveStepAlpha(currA);
-				if (currA + da >= maxAlpha)
-					break;
-				currA += da;
-			}
-			if (!wrapAlpha)
-				alphaValues.push_back(maxAlpha);
-		}
-
-		// Extract valid trimmed pass segments for any cross-parameter alpha:
-		// starts from exact offset-surface intersection intervals (surface-surface & surface-base)
-		// and validates against upward normal + non-self-blocking ITO safety.
-		auto buildPassSegmentsForAlpha = [&](float alpha) -> std::vector<FinishingIsoPassSegment>
-			{
-				auto clIntervals = ComputeValidFlowIntervals(clSelf, alongV, alpha, attachments, yCenterMinWorld);
-				if (clIntervals.empty())
-					return {};
-
-				std::vector<std::pair<float, float>> rawValidIntervals;
-				for (const auto& [segB0, segB1] : clIntervals)
-				{
-					const float spanB = segB1 - segB0;
-					if (spanB < 1e-5f)
-						continue;
-
-					SurfSample sA = evalAtAB(alpha, segB0);
-					SurfSample sB = evalAtAB(alpha, 0.5f * (segB0 + segB1));
-					SurfSample sC = evalAtAB(alpha, segB1);
-					const float maxDerivMm = std::max({
-						(alongV ? sA.dvMm : sA.duMm).length(),
-						(alongV ? sB.dvMm : sB.duMm).length(),
-						(alongV ? sC.dvMm : sC.duMm).length(),
-						1.0f
-						});
-					const int numSteps = std::clamp(static_cast<int>(std::ceil(spanB * maxDerivMm / 0.20f)), 6, 500);
-
-					bool prevValid = isPointValid(alpha, segB0);
-					float prevB = segB0;
-					float activeStartB = prevValid ? segB0 : -1.0f;
-
-					auto bisectBoundary = [&](float bValid, float bInvalid) -> float
-						{
-							float lo = bValid;
-							float hi = bInvalid;
-							for (int iter = 0; iter < 10; iter++)
-							{
-								float mid = 0.5f * (lo + hi);
-								if (isPointValid(alpha, mid))
-									lo = mid;
-								else
-									hi = mid;
-							}
-							return lo;
-						};
-
-					for (int s = 1; s <= numSteps; s++)
-					{
-						float currB = segB0 + (spanB * s) / numSteps;
-						bool currValid = isPointValid(alpha, currB);
-
-						if (!prevValid && currValid)
-						{
-							activeStartB = bisectBoundary(currB, prevB);
-						}
-						else if (prevValid && !currValid)
-						{
-							float endB = bisectBoundary(prevB, currB);
-							if (endB > activeStartB + 1e-5f)
-								rawValidIntervals.push_back({ activeStartB, endB });
-							activeStartB = -1.0f;
-						}
-
-						prevB = currB;
-						prevValid = currValid;
-					}
-
-					if (prevValid && activeStartB >= 0.0f && segB1 > activeStartB + 1e-5f)
-						rawValidIntervals.push_back({ activeStartB, segB1 });
-				}
-
-				if (rawValidIntervals.empty())
-					return {};
-
-				// Merge consecutive intervals touching at a valid C1 point
-				std::vector<std::pair<float, float>> mergedIntervals;
-				for (const auto& iv : rawValidIntervals)
-				{
-					bool canMerge = false;
-					if (!mergedIntervals.empty() && std::abs(iv.first - mergedIntervals.back().second) < 3e-4f)
-					{
-						const float bJoin = 0.5f * (iv.first + mergedIntervals.back().second);
-						if (isPointValid(alpha, bJoin))
-						{
-							SurfSample sL = evalAtAB(alpha, std::max(0.0f, mergedIntervals.back().second - 2e-4f));
-							SurfSample sR = evalAtAB(alpha, std::min(maxBeta, iv.first + 2e-4f));
-							if (Vec3f::dot(sL.normal, sR.normal) >= 0.85f &&
-								(sL.tipMm - sR.tipMm).length_sqr() < 0.25f * 0.25f)
-							{
-								canMerge = true;
-							}
-						}
-					}
-
-					if (canMerge)
-						mergedIntervals.back().second = iv.second;
 					else
-						mergedIntervals.push_back(iv);
-				}
-
-				// Merge wrapped intervals across periodic seam beta = 0 == maxBeta
-				if (wrapBeta && mergedIntervals.size() >= 2)
-				{
-					if (mergedIntervals.front().first < 1e-3f && mergedIntervals.back().second > maxBeta - 1e-3f)
 					{
-						SurfSample sZero = evalAtAB(alpha, mergedIntervals.front().first);
-						SurfSample sMax = evalAtAB(alpha, mergedIntervals.back().second);
-						if ((sZero.tipMm - sMax.tipMm).length_sqr() < 0.05f * 0.05f)
-						{
-							mergedIntervals.back().second = maxBeta + mergedIntervals.front().second;
-							mergedIntervals.erase(mergedIntervals.begin());
-						}
+						s.normal = Vec3f(0.0f, 1.0f, 0.0f);
+						s.tipMm = s.posMm - Vec3f(0.0f, R, 0.0f);
 					}
-				}
-
-				std::vector<FinishingIsoPassSegment> rowSegs;
-				for (const auto& [b0, b1] : mergedIntervals)
-				{
-					const float spanB = b1 - b0;
-					SurfSample sStart = evalAtAB(alpha, b0);
-					SurfSample sMid = evalAtAB(alpha, 0.5f * (b0 + b1));
-					SurfSample sEnd = evalAtAB(alpha, b1);
-					const float chordEstimateMm = (sEnd.tipMm - sStart.tipMm).length() + (sMid.tipMm - sStart.tipMm).length();
-					if (chordEstimateMm < 0.25f)
-						continue;
-
-					const int sampleSteps = std::clamp(static_cast<int>(std::ceil(chordEstimateMm / 0.18f)), 4, 500);
-					std::vector<float3> rawPts;
-					rawPts.reserve(sampleSteps + 1);
-					for (int s = 0; s <= sampleSteps; s++)
-					{
-						float b = b0 + (spanB * s) / sampleSteps;
-						SurfSample smp = evalAtAB(alpha, b);
-						float clampedTipY = std::max(smp.tipMm.y, minSafeTipY);
-						rawPts.emplace_back(smp.tipMm.x, clampedTipY, smp.tipMm.z);
-					}
-
-					FinishingIsoPassSegment seg;
-					seg.alpha = alpha;
-					seg.betaStart = b0;
-					seg.betaEnd = b1;
-					seg.pts = SimplifyPolyline3DGougeSafe(rawPts, simplifyTol);
-					if (seg.pts.size() >= 2)
-						rowSegs.push_back(std::move(seg));
-				}
-
-				return rowSegs;
-			};
-
-		std::vector<std::vector<FinishingIsoPassSegment>> passRows(alphaValues.size());
-#pragma omp parallel for schedule(dynamic, 1)
-		for (int j = 0; j < static_cast<int>(alphaValues.size()); j++)
-			passRows[j] = buildPassSegmentsForAlpha(alphaValues[j]);
-
-		// Refine cross-parameter boundaries where valid passes start/stop or jump sharply
-		for (int refPass = 0; refPass < 2; refPass++)
-		{
-			std::vector<float> nextAlpha;
-			std::vector<std::vector<FinishingIsoPassSegment>> nextRows;
-			nextAlpha.reserve(alphaValues.size() * 2);
-			nextRows.reserve(passRows.size() * 2);
-
-			auto totalSpanBeta = [](const std::vector<FinishingIsoPassSegment>& row) -> float
-				{
-					float sum = 0.0f;
-					for (const auto& s : row) sum += (s.betaEnd - s.betaStart);
-					return sum;
+					return s;
 				};
 
-			bool addedAny = false;
-			for (size_t j = 0; j < alphaValues.size(); j++)
-			{
-				nextAlpha.push_back(alphaValues[j]);
-				nextRows.push_back(std::move(passRows[j]));
-
-				if (j + 1 < alphaValues.size())
+			auto isPointValid = [&](float alpha, float beta, SurfSample* outSample = nullptr) -> bool
 				{
-					const bool emptyA = nextRows.back().empty();
-					const bool emptyB = passRows[j + 1].empty();
-					const float spanA = totalSpanBeta(nextRows.back());
-					const float spanB = totalSpanBeta(passRows[j + 1]);
-					const float sharpClipThreshold = std::min(0.12f * maxBeta, 0.9f);
-					const bool sharpClip = (!emptyA && !emptyB && std::abs(spanA - spanB) > sharpClipThreshold);
-					if ((emptyA != emptyB) || sharpClip)
+					SurfSample s = evalAtAB(alpha, beta);
+					if (outSample)
+						*outSample = s;
+
+					// 1. Contact point must lie on or above the base plane
+					if (s.posMm.y < baseY - 0.02f)
+						return false;
+
+					// 2. Outward normal must point upward (excludes vertical/undercut closure walls like hull segU=2 where n.y == 0)
+					if (s.normal.y < 0.005f)
+						return false;
+
+					// 3. Cutter tip must stay above the base plane
+					if (s.tipMm.y < baseY - 0.01f)
+						return false;
+
+					// 4. Cutter tip must stay within the machinable block area
+					if (std::abs(s.tipMm.x) > halfX + R + cOutsideBlockMarginMm ||
+						std::abs(s.tipMm.z) > halfZ + R + cOutsideBlockMarginMm)
+						return false;
+
+
+					return true;
+				};
+
+			// Adaptive cross-parameter step based on surface derivative & transverse curvature
+			auto computeAdaptiveStepAlpha = [&](float alpha) -> float
+				{
+					constexpr int cProbeBeta = 36;
+					const float deltaA = std::max(1e-4f, 0.001f * maxAlpha);
+					const float patchMinA = 0.0f, patchMaxA = maxAlpha;
+					float minParamStep = maxAlpha;
+					bool anyValid = false;
+
+					for (int i = 0; i <= cProbeBeta; i++)
 					{
-						const float aMid = 0.5f * (alphaValues[j] + alphaValues[j + 1]);
-						if (std::abs(alphaValues[j + 1] - alphaValues[j]) > maxAlpha / 400.0f)
-						{
-							auto midSegs = buildPassSegmentsForAlpha(aMid);
-							if (!midSegs.empty())
-							{
-								nextAlpha.push_back(aMid);
-								nextRows.push_back(std::move(midSegs));
-								addedAny = true;
-							}
-						}
-					}
-				}
-			}
-
-			alphaValues = std::move(nextAlpha);
-			passRows = std::move(nextRows);
-			if (!addedAny)
-				break;
-		}
-
-		// Rotate cyclic alpha rows past an empty gap so periodic surfaces have unbroken zigzags
-		if (wrapAlpha && passRows.size() >= 4 && !passRows.front().empty() && !passRows.back().empty())
-		{
-			std::optional<size_t> gapIdx;
-			for (size_t j = 0; j < passRows.size(); j++)
-			{
-				if (passRows[j].empty())
-				{
-					gapIdx = (j + 1) % passRows.size();
-					break;
-				}
-			}
-			if (gapIdx && *gapIdx > 0)
-				std::rotate(passRows.begin(), passRows.begin() + *gapIdx, passRows.end());
-		}
-
-		// Group pass segments across consecutive rows into continuous zigzag chains
-		struct ZigzagChain
-		{
-			std::vector<FinishingIsoPassSegment> segments;
-		};
-		std::vector<ZigzagChain> chains;
-		std::vector<size_t> prevRowChainIds;
-
-		for (size_t j = 0; j < passRows.size(); j++)
-		{
-			auto& row = passRows[j];
-			if (row.empty())
-			{
-				prevRowChainIds.clear();
-				continue;
-			}
-
-			std::vector<size_t> currRowChainIds(row.size(), std::numeric_limits<size_t>::max());
-			std::vector<bool> prevUsed(prevRowChainIds.size(), false);
-
-			for (size_t sIdx = 0; sIdx < row.size(); sIdx++)
-			{
-				const auto& seg = row[sIdx];
-				const Vec3f segStart = seg.pts.front().ToVec3f();
-				const Vec3f segEnd = seg.pts.back().ToVec3f();
-
-				float bestScore = std::numeric_limits<float>::max();
-				std::optional<size_t> bestPrevIdx;
-
-				if (j > 0 && !passRows[j - 1].empty())
-				{
-					for (size_t pIdx = 0; pIdx < passRows[j - 1].size(); pIdx++)
-					{
-						if (prevUsed[pIdx])
+						const float beta = (maxBeta * i) / cProbeBeta;
+						SurfSample s0;
+						if (!isPointValid(alpha, beta, &s0))
 							continue;
 
-						const auto& prevSeg = passRows[j - 1][pIdx];
-						const float overlapB = std::min(seg.betaEnd, prevSeg.betaEnd) - std::max(seg.betaStart, prevSeg.betaStart);
-						const float dStart = (segStart - prevSeg.pts.front().ToVec3f()).length();
-						const float dEnd = (segEnd - prevSeg.pts.back().ToVec3f()).length();
-						const float minEndDist = std::min(dStart, dEnd);
-						const float avgEndDist = 0.5f * (dStart + dEnd);
+						anyValid = true;
+						const Vec3f& Pb = alongV ? s0.dvMm : s0.duMm;
+						const Vec3f& Pa = alongV ? s0.duMm : s0.dvMm;
+						const float pbLen = Pb.length();
+						const float paLenSq = Pa.length_sqr();
+						const float crossLen = Vec3f::cross(Pb, Pa).length();
+						const float lPerp = (pbLen > 1e-4f) ? (crossLen / pbLen) : Pa.length();
+						if (lPerp < 1e-3f)
+							continue;
 
-						const bool hasParamOverlap = (overlapB > -0.06f * maxBeta);
-						if (hasParamOverlap && minEndDist <= 28.0f && avgEndDist <= 40.0f)
+						const bool useWrapDiff = wrapAlpha;
+						float aMinus = useWrapDiff ? WrapOrClampParam(alpha - deltaA, maxAlpha, true) : std::clamp(alpha - deltaA, patchMinA, patchMaxA);
+						float aPlus = useWrapDiff ? WrapOrClampParam(alpha + deltaA, maxAlpha, true) : std::clamp(alpha + deltaA, patchMinA, patchMaxA);
+						float actualSpan = (useWrapDiff || (alpha - deltaA >= patchMinA && alpha + deltaA <= patchMaxA)) ? (2.0f * deltaA) : (aPlus - aMinus);
+
+						float effectiveLPerp = lPerp;
+						float absKappaPerp = 0.0f;
+						if (actualSpan > 1e-5f && paLenSq > 1e-5f)
 						{
-							const float chainBonus = 0.35f * static_cast<float>(chains[prevRowChainIds[pIdx]].segments.size());
-							const float score = avgEndDist - 6.0f * overlapB - chainBonus;
-							if (score < bestScore)
+							SurfSample sMinus = evalAtAB(aMinus, beta);
+							SurfSample sPlus = evalAtAB(aPlus, beta);
+							Vec3f dNormalDa = (sPlus.normal - sMinus.normal) * (1.0f / actualSpan);
+							absKappaPerp = std::abs(Vec3f::dot(dNormalDa, Pa)) / paLenSq;
+
+							Vec3f dCenterDa = ((sPlus.tipMm - sMinus.tipMm) * (1.0f / actualSpan));
+							float dCenterPerp = (pbLen > 1e-4f) ? (Vec3f::cross(Pb, dCenterDa).length() / pbLen) : dCenterDa.length();
+							effectiveLPerp = std::max(lPerp, 0.65f * dCenterPerp);
+						}
+
+						float denom = std::max(0.20f, 1.0f + curvWeight * R * absKappaPerp);
+						float localStripMm = baseFlatWidth / std::sqrt(denom);
+						localStripMm = std::clamp(localStripMm, minStepMm, maxStepMm);
+						minParamStep = std::min(minParamStep, localStripMm / effectiveLPerp);
+					}
+
+					if (!anyValid)
+					{
+						float probeA = std::clamp(alpha + 0.02f * maxAlpha, patchMinA, patchMaxA);
+						SurfSample sMid = evalAtAB(probeA, 0.5f * maxBeta);
+						const Vec3f& Pa = alongV ? sMid.duMm : sMid.dvMm;
+						float paLen = std::max(10.0f, Pa.length());
+						return std::clamp(maxStepMm / paLen, maxAlpha / 400.0f, maxAlpha / 35.0f);
+					}
+
+					return std::clamp(minParamStep, maxAlpha / 500.0f, maxAlpha / 18.0f);
+				};
+
+			std::vector<float> alphaValues;
+			alphaValues.reserve(256);
+			{
+				float currA = 0.0f;
+				while (currA < maxAlpha - 1e-5f)
+				{
+					alphaValues.push_back(currA);
+					float da = computeAdaptiveStepAlpha(currA);
+					if (currA + da >= maxAlpha)
+						break;
+					currA += da;
+				}
+				if (!wrapAlpha)
+					alphaValues.push_back(maxAlpha);
+			}
+
+			// Extract valid trimmed pass segments for any cross-parameter alpha:
+			// starts from exact offset-surface intersection intervals (surface-surface & surface-base)
+			// and validates against upward normal + non-self-blocking ITO safety.
+			auto buildPassSegmentsForAlpha = [&](float alpha) -> std::vector<FinishingIsoPassSegment>
+				{
+					auto clIntervals = ComputeValidFlowIntervals(clSelf, alongV, alpha, attachments, yCenterMinWorld);
+					if (clIntervals.empty())
+						return {};
+
+					std::vector<std::pair<float, float>> rawValidIntervals;
+					for (const auto& [segB0, segB1] : clIntervals)
+					{
+						const float spanB = segB1 - segB0;
+						if (spanB < 1e-5f)
+							continue;
+
+						SurfSample sA = evalAtAB(alpha, segB0);
+						SurfSample sB = evalAtAB(alpha, 0.5f * (segB0 + segB1));
+						SurfSample sC = evalAtAB(alpha, segB1);
+						const float maxDerivMm = std::max({
+							(alongV ? sA.dvMm : sA.duMm).length(),
+							(alongV ? sB.dvMm : sB.duMm).length(),
+							(alongV ? sC.dvMm : sC.duMm).length(),
+							1.0f
+							});
+						const int numSteps = std::clamp(static_cast<int>(std::ceil(spanB * maxDerivMm / 0.20f)), 6, 500);
+
+						bool prevValid = isPointValid(alpha, segB0);
+						float prevB = segB0;
+						float activeStartB = prevValid ? segB0 : -1.0f;
+
+						auto bisectBoundary = [&](float bValid, float bInvalid) -> float
 							{
-								bestScore = score;
-								bestPrevIdx = pIdx;
+								float lo = bValid;
+								float hi = bInvalid;
+								for (int iter = 0; iter < 10; iter++)
+								{
+									float mid = 0.5f * (lo + hi);
+									if (isPointValid(alpha, mid))
+										lo = mid;
+									else
+										hi = mid;
+								}
+								return lo;
+							};
+
+						for (int s = 1; s <= numSteps; s++)
+						{
+							float currB = segB0 + (spanB * s) / numSteps;
+							bool currValid = isPointValid(alpha, currB);
+
+							if (!prevValid && currValid)
+							{
+								activeStartB = bisectBoundary(currB, prevB);
+							}
+							else if (prevValid && !currValid)
+							{
+								float endB = bisectBoundary(prevB, currB);
+								if (endB > activeStartB + 1e-5f)
+									rawValidIntervals.push_back({ activeStartB, endB });
+								activeStartB = -1.0f;
+							}
+
+							prevB = currB;
+							prevValid = currValid;
+						}
+
+						if (prevValid && activeStartB >= 0.0f && segB1 > activeStartB + 1e-5f)
+							rawValidIntervals.push_back({ activeStartB, segB1 });
+					}
+
+					if (rawValidIntervals.empty())
+						return {};
+
+					// Merge consecutive intervals touching at a valid C1 point
+					std::vector<std::pair<float, float>> mergedIntervals;
+					for (const auto& iv : rawValidIntervals)
+					{
+						bool canMerge = false;
+						if (!mergedIntervals.empty() && std::abs(iv.first - mergedIntervals.back().second) < 3e-4f)
+						{
+							const float bJoin = 0.5f * (iv.first + mergedIntervals.back().second);
+							if (isPointValid(alpha, bJoin))
+							{
+								SurfSample sL = evalAtAB(alpha, std::max(0.0f, mergedIntervals.back().second - 2e-4f));
+								SurfSample sR = evalAtAB(alpha, std::min(maxBeta, iv.first + 2e-4f));
+								if (Vec3f::dot(sL.normal, sR.normal) >= 0.85f &&
+									(sL.tipMm - sR.tipMm).length_sqr() < 0.25f * 0.25f)
+								{
+									canMerge = true;
+								}
+							}
+						}
+
+						if (canMerge)
+							mergedIntervals.back().second = iv.second;
+						else
+							mergedIntervals.push_back(iv);
+					}
+
+					// Merge wrapped intervals across periodic seam beta = 0 == maxBeta
+					if (wrapBeta && mergedIntervals.size() >= 2)
+					{
+						if (mergedIntervals.front().first < 1e-3f && mergedIntervals.back().second > maxBeta - 1e-3f)
+						{
+							SurfSample sZero = evalAtAB(alpha, mergedIntervals.front().first);
+							SurfSample sMax = evalAtAB(alpha, mergedIntervals.back().second);
+							if ((sZero.tipMm - sMax.tipMm).length_sqr() < 0.05f * 0.05f)
+							{
+								mergedIntervals.back().second = maxBeta + mergedIntervals.front().second;
+								mergedIntervals.erase(mergedIntervals.begin());
 							}
 						}
 					}
-				}
 
-				if (bestPrevIdx)
-				{
-					prevUsed[*bestPrevIdx] = true;
-					size_t chainId = prevRowChainIds[*bestPrevIdx];
-					currRowChainIds[sIdx] = chainId;
-					chains[chainId].segments.push_back(seg);
-				}
-				else
-				{
-					size_t newChainId = chains.size();
-					currRowChainIds[sIdx] = newChainId;
-					chains.push_back({ { seg } });
-				}
-			}
-
-			prevRowChainIds = std::move(currRowChainIds);
-		}
-
-		// Filter out tiny narrow sliver chains (e.g. narrow crease pockets already swept by Step 8 pencil milling)
-		std::vector<ZigzagChain> validChains;
-		validChains.reserve(chains.size());
-		std::vector<float> chainLengths;
-		chainLengths.reserve(chains.size());
-		for (auto& c : chains)
-		{
-			if (c.segments.empty())
-				continue;
-			float totalLen = 0.0f;
-			float maxSegLen = 0.0f;
-			for (const auto& sg : c.segments)
-			{
-				float segLen = 0.0f;
-				for (size_t k = 1; k < sg.pts.size(); k++)
-					segLen += (sg.pts[k].ToVec3f() - sg.pts[k - 1].ToVec3f()).length();
-				totalLen += segLen;
-				maxSegLen = std::max(maxSegLen, segLen);
-			}
-			if ((totalLen < 12.0f && c.segments.size() <= 4) ||
-				(c.segments.size() <= 2 && maxSegLen < 8.0f))
-				continue;
-			chainLengths.push_back(totalLen);
-			validChains.push_back(std::move(c));
-		}
-
-		// Compute globally optimal chain visit order & entry orientation (exact Held-Karp DP for N <= 8)
-		// to eliminate back-and-forth air flights across split cylinders (e.g. wave2) and between surfaces.
-		struct ChainPlanItem
-		{
-			size_t chainIdx = 0;
-			bool reverseRowOrder = false;
-			bool initForwardDir = true;
-		};
-		std::vector<ChainPlanItem> chainPlan;
-		const size_t numValidChains = validChains.size();
-		if (numValidChains > 0)
-		{
-			auto getChainEndpoints = [&](size_t cIdx, int orient, Vec3f& outEntry, Vec3f& outExit)
-				{
-					const auto& segs = validChains[cIdx].segments;
-					const bool rev = (orient >= 2);
-					const bool initFwd = ((orient % 2) == 0);
-					const auto& firstSeg = rev ? segs.back() : segs.front();
-					const auto& lastSeg = rev ? segs.front() : segs.back();
-					const bool lastFwd = ((segs.size() % 2) == 1) ? initFwd : !initFwd;
-					outEntry = (initFwd ? firstSeg.pts.front() : firstSeg.pts.back()).ToVec3f();
-					outExit = (lastFwd ? lastSeg.pts.back() : lastSeg.pts.front()).ToVec3f();
-				};
-
-			auto chainTransferCost = [&](const Vec3f& fromPt, const Vec3f& toPt, float liftPenalty) -> float
-				{
-					const float dist = (toPt - fromPt).length();
-					if (liftPenalty > 50.0f && dist <= 15.0f)
-						return dist;
-					if (dist <= 1.5f)
-						return dist;
-
-					return dist + liftPenalty;
-				};
-
-			if (numValidChains <= 8)
-			{
-				const size_t N = numValidChains;
-				std::vector<std::array<Vec3f, 4>> entryPts(N), exitPts(N);
-				for (size_t c = 0; c < N; c++)
-				{
-					for (int o = 0; o < 4; o++)
-						getChainEndpoints(c, o, entryPts[c][o], exitPts[c][o]);
-				}
-
-				const size_t numStates = (static_cast<size_t>(1) << N) * N * 4;
-				constexpr float cInf = std::numeric_limits<float>::max() * 0.25f;
-				std::vector<float> dp(numStates, cInf);
-				std::vector<int> parent(numStates, -1);
-
-				auto stateIdx = [&](size_t mask, size_t c, int o) -> size_t
+					std::vector<FinishingIsoPassSegment> rowSegs;
+					for (const auto& [b0, b1] : mergedIntervals)
 					{
-						return (mask * N + c) * 4 + static_cast<size_t>(o);
+						const float spanB = b1 - b0;
+						SurfSample sStart = evalAtAB(alpha, b0);
+						SurfSample sMid = evalAtAB(alpha, 0.5f * (b0 + b1));
+						SurfSample sEnd = evalAtAB(alpha, b1);
+						const float chordEstimateMm = (sEnd.tipMm - sStart.tipMm).length() + (sMid.tipMm - sStart.tipMm).length();
+						if (chordEstimateMm < 0.25f)
+							continue;
+
+						const int sampleSteps = std::clamp(static_cast<int>(std::ceil(chordEstimateMm / 0.18f)), 4, 500);
+						std::vector<float3> rawPts;
+						rawPts.reserve(sampleSteps + 1);
+						for (int s = 0; s <= sampleSteps; s++)
+						{
+							float b = b0 + (spanB * s) / sampleSteps;
+							SurfSample smp = evalAtAB(alpha, b);
+							float clampedTipY = std::max(smp.tipMm.y, minSafeTipY);
+							rawPts.emplace_back(smp.tipMm.x, clampedTipY, smp.tipMm.z);
+						}
+
+						FinishingIsoPassSegment seg;
+						seg.alpha = alpha;
+						seg.betaStart = b0;
+						seg.betaEnd = b1;
+						seg.pts = SimplifyPolyline3DGougeSafe(rawPts, simplifyTol);
+						if (seg.pts.size() >= 2)
+							rowSegs.push_back(std::move(seg));
+					}
+
+					return rowSegs;
+				};
+
+			std::vector<std::vector<FinishingIsoPassSegment>> passRows(alphaValues.size());
+#pragma omp parallel for schedule(dynamic, 1)
+			for (int j = 0; j < static_cast<int>(alphaValues.size()); j++)
+				passRows[j] = buildPassSegmentsForAlpha(alphaValues[j]);
+
+			// Refine cross-parameter boundaries where valid passes start/stop or jump sharply
+			for (int refPass = 0; refPass < 2; refPass++)
+			{
+				std::vector<float> nextAlpha;
+				std::vector<std::vector<FinishingIsoPassSegment>> nextRows;
+				nextAlpha.reserve(alphaValues.size() * 2);
+				nextRows.reserve(passRows.size() * 2);
+
+				auto totalSpanBeta = [](const std::vector<FinishingIsoPassSegment>& row) -> float
+					{
+						float sum = 0.0f;
+						for (const auto& s : row) sum += (s.betaEnd - s.betaStart);
+						return sum;
 					};
 
-				for (size_t c = 0; c < N; c++)
+				bool addedAny = false;
+				for (size_t j = 0; j < alphaValues.size(); j++)
 				{
-					const size_t m = static_cast<size_t>(1) << c;
-					for (int o = 0; o < 4; o++)
-					{
-						if (waypoints.empty())
-							dp[stateIdx(m, c, o)] = evaluateExteriorAccess(entryPts[c][o]).score;
-						else
-							dp[stateIdx(m, c, o)] = chainTransferCost(waypoints.back().ToVec3f(), entryPts[c][o], 8.0f);
-					}
-				}
+					nextAlpha.push_back(alphaValues[j]);
+					nextRows.push_back(std::move(passRows[j]));
 
-				const size_t fullMask = (static_cast<size_t>(1) << N) - 1;
-				for (size_t mask = 1; mask <= fullMask; mask++)
-				{
-					for (size_t c = 0; c < N; c++)
+					if (j + 1 < alphaValues.size())
 					{
-						if (!(mask & (static_cast<size_t>(1) << c)))
-							continue;
-						for (int o = 0; o < 4; o++)
+						const bool emptyA = nextRows.back().empty();
+						const bool emptyB = passRows[j + 1].empty();
+						const float spanA = totalSpanBeta(nextRows.back());
+						const float spanB = totalSpanBeta(passRows[j + 1]);
+						const float sharpClipThreshold = std::min(0.12f * maxBeta, 0.9f);
+						const bool sharpClip = (!emptyA && !emptyB && std::abs(spanA - spanB) > sharpClipThreshold);
+						if ((emptyA != emptyB) || sharpClip)
 						{
-							const float curCost = dp[stateIdx(mask, c, o)];
-							if (curCost >= cInf * 0.5f)
-								continue;
-							for (size_t nc = 0; nc < N; nc++)
+							const float aMid = 0.5f * (alphaValues[j] + alphaValues[j + 1]);
+							if (std::abs(alphaValues[j + 1] - alphaValues[j]) > maxAlpha / 400.0f)
 							{
-								if (mask & (static_cast<size_t>(1) << nc))
-									continue;
-								const size_t nMask = mask | (static_cast<size_t>(1) << nc);
-								for (int no = 0; no < 4; no++)
+								auto midSegs = buildPassSegmentsForAlpha(aMid);
+								if (!midSegs.empty())
 								{
-									const float candCost = curCost + chainTransferCost(exitPts[c][o], entryPts[nc][no], 100.0f);
-									const size_t ns = stateIdx(nMask, nc, no);
-									if (candCost < dp[ns])
-									{
-										dp[ns] = candCost;
-										parent[ns] = static_cast<int>(c * 4 + static_cast<size_t>(o));
-									}
+									nextAlpha.push_back(aMid);
+									nextRows.push_back(std::move(midSegs));
+									addedAny = true;
 								}
 							}
 						}
 					}
 				}
 
-				float bestTotal = cInf;
-				size_t bestC = 0;
-				int bestO = 0;
-				for (size_t c = 0; c < N; c++)
+				alphaValues = std::move(nextAlpha);
+				passRows = std::move(nextRows);
+				if (!addedAny)
+					break;
+			}
+
+			// Rotate cyclic alpha rows past an empty gap so periodic surfaces have unbroken zigzags
+			if (wrapAlpha && passRows.size() >= 4 && !passRows.front().empty() && !passRows.back().empty())
+			{
+				std::optional<size_t> gapIdx;
+				for (size_t j = 0; j < passRows.size(); j++)
 				{
-					for (int o = 0; o < 4; o++)
+					if (passRows[j].empty())
 					{
-						const float val = dp[stateIdx(fullMask, c, o)];
-						if (val < bestTotal)
-						{
-							bestTotal = val;
-							bestC = c;
-							bestO = o;
-						}
+						gapIdx = (j + 1) % passRows.size();
+						break;
 					}
+				}
+				if (gapIdx && *gapIdx > 0)
+					std::rotate(passRows.begin(), passRows.begin() + *gapIdx, passRows.end());
+			}
+
+			// Group pass segments across consecutive rows into continuous zigzag chains
+			struct ZigzagChain
+			{
+				std::vector<FinishingIsoPassSegment> segments;
+			};
+			std::vector<ZigzagChain> chains;
+			std::vector<size_t> prevRowChainIds;
+
+			for (size_t j = 0; j < passRows.size(); j++)
+			{
+				auto& row = passRows[j];
+				if (row.empty())
+				{
+					prevRowChainIds.clear();
+					continue;
 				}
 
-				chainPlan.resize(N);
-				size_t curMask = fullMask;
-				size_t curC = bestC;
-				int curO = bestO;
-				for (size_t step = N; step > 0; step--)
+				std::vector<size_t> currRowChainIds(row.size(), std::numeric_limits<size_t>::max());
+				std::vector<bool> prevUsed(prevRowChainIds.size(), false);
+
+				for (size_t sIdx = 0; sIdx < row.size(); sIdx++)
 				{
-					chainPlan[step - 1] = { curC, (curO >= 2), ((curO % 2) == 0) };
-					const int prevPacked = parent[stateIdx(curMask, curC, curO)];
-					curMask ^= (static_cast<size_t>(1) << curC);
-					if (prevPacked >= 0)
+					const auto& seg = row[sIdx];
+					const Vec3f segStart = seg.pts.front().ToVec3f();
+					const Vec3f segEnd = seg.pts.back().ToVec3f();
+
+					float bestScore = std::numeric_limits<float>::max();
+					std::optional<size_t> bestPrevIdx;
+
+					if (j > 0 && !passRows[j - 1].empty())
 					{
-						curC = static_cast<size_t>(prevPacked / 4);
-						curO = prevPacked % 4;
-					}
-				}
-			}
-			else
-			{
-				std::vector<bool> chainVisited(numValidChains, false);
-				Vec3f curPos = waypoints.empty() ? Vec3f(0.0f, safeY, 0.0f) : waypoints.back().ToVec3f();
-				for (size_t visitedCount = 0; visitedCount < numValidChains; visitedCount++)
-				{
-					size_t bestC = 0;
-					int bestO = 0;
-					float bestCost = std::numeric_limits<float>::max();
-					Vec3f bestExit{};
-					for (size_t c = 0; c < numValidChains; c++)
-					{
-						if (chainVisited[c])
-							continue;
-						for (int o = 0; o < 4; o++)
+						for (size_t pIdx = 0; pIdx < passRows[j - 1].size(); pIdx++)
 						{
-							Vec3f en{}, ex{};
-							getChainEndpoints(c, o, en, ex);
-							const float cost = (visitedCount == 0 && waypoints.empty())
-								? evaluateExteriorAccess(en).score
-								: chainTransferCost(curPos, en, visitedCount == 0 ? 35.0f : 100.0f);
-							if (cost < bestCost)
+							if (prevUsed[pIdx])
+								continue;
+
+							const auto& prevSeg = passRows[j - 1][pIdx];
+							const float overlapB = std::min(seg.betaEnd, prevSeg.betaEnd) - std::max(seg.betaStart, prevSeg.betaStart);
+							const float dStart = (segStart - prevSeg.pts.front().ToVec3f()).length();
+							const float dEnd = (segEnd - prevSeg.pts.back().ToVec3f()).length();
+							const float minEndDist = std::min(dStart, dEnd);
+							const float avgEndDist = 0.5f * (dStart + dEnd);
+
+							const bool hasParamOverlap = (overlapB > -0.06f * maxBeta);
+							if (hasParamOverlap && minEndDist <= 28.0f && avgEndDist <= 40.0f)
 							{
-								bestCost = cost;
-								bestC = c;
-								bestO = o;
-								bestExit = ex;
+								const float chainBonus = 0.35f * static_cast<float>(chains[prevRowChainIds[pIdx]].segments.size());
+								const float score = avgEndDist - 6.0f * overlapB - chainBonus;
+								if (score < bestScore)
+								{
+									bestScore = score;
+									bestPrevIdx = pIdx;
+								}
 							}
 						}
 					}
-					chainVisited[bestC] = true;
-					chainPlan.push_back({ bestC, (bestO >= 2), ((bestO % 2) == 0) });
-					curPos = bestExit;
-				}
-			}
-		}
 
-		for (const auto& planItem : chainPlan)
-		{
-			auto& chain = validChains[planItem.chainIdx];
-			if (planItem.reverseRowOrder)
-				std::reverse(chain.segments.begin(), chain.segments.end());
-
-			bool forwardDir = planItem.initForwardDir;
-			float actualPrevEndBeta = 0.0f;
-			float actualPrevAlpha = 0.0f;
-
-			for (size_t sIdx = 0; sIdx < chain.segments.size(); sIdx++)
-			{
-				const auto& seg = chain.segments[sIdx];
-				std::vector<float3> segPts = seg.pts;
-				if (!forwardDir)
-					std::reverse(segPts.begin(), segPts.end());
-
-				const float actualCurrStartBeta = forwardDir ? seg.betaStart : seg.betaEnd;
-				const float actualCurrEndBeta = forwardDir ? seg.betaEnd : seg.betaStart;
-				const float actualCurrAlpha = seg.alpha;
-
-				if (sIdx == 0)
-				{
-					const Vec3f nextStart = segPts.front().ToVec3f();
-					const float chainGap = waypoints.empty() ? 1e9f : (nextStart - waypoints.back().ToVec3f()).length();
-					if (!waypoints.empty() && chainGap <= 1.5f)
+					if (bestPrevIdx)
 					{
-						appendSafePoint(segPts.front());
+						prevUsed[*bestPrevIdx] = true;
+						size_t chainId = prevRowChainIds[*bestPrevIdx];
+						currRowChainIds[sIdx] = chainId;
+						chains[chainId].segments.push_back(seg);
 					}
-
 					else
 					{
-						transitionSafeCl(segPts);
+						size_t newChainId = chains.size();
+						currRowChainIds[sIdx] = newChainId;
+						chains.push_back({ { seg } });
+					}
+				}
+
+				prevRowChainIds = std::move(currRowChainIds);
+			}
+
+			// Filter out tiny narrow sliver chains (e.g. narrow crease pockets already swept by Step 8 pencil milling)
+			std::vector<ZigzagChain> validChains;
+			validChains.reserve(chains.size());
+			std::vector<float> chainLengths;
+			chainLengths.reserve(chains.size());
+			for (auto& c : chains)
+			{
+				if (c.segments.empty())
+					continue;
+				float totalLen = 0.0f;
+				float maxSegLen = 0.0f;
+				for (const auto& sg : c.segments)
+				{
+					float segLen = 0.0f;
+					for (size_t k = 1; k < sg.pts.size(); k++)
+						segLen += (sg.pts[k].ToVec3f() - sg.pts[k - 1].ToVec3f()).length();
+					totalLen += segLen;
+					maxSegLen = std::max(maxSegLen, segLen);
+				}
+				if ((totalLen < 12.0f && c.segments.size() <= 4) ||
+					(c.segments.size() <= 2 && maxSegLen < 8.0f))
+					continue;
+				chainLengths.push_back(totalLen);
+				validChains.push_back(std::move(c));
+			}
+
+			// Compute globally optimal chain visit order & entry orientation (exact Held-Karp DP for N <= 8)
+			// to eliminate back-and-forth air flights across split cylinders (e.g. wave2) and between surfaces.
+			struct ChainPlanItem
+			{
+				size_t chainIdx = 0;
+				bool reverseRowOrder = false;
+				bool initForwardDir = true;
+			};
+			std::vector<ChainPlanItem> chainPlan;
+			const size_t numValidChains = validChains.size();
+			if (numValidChains > 0)
+			{
+				auto getChainEndpoints = [&](size_t cIdx, int orient, Vec3f& outEntry, Vec3f& outExit)
+					{
+						const auto& segs = validChains[cIdx].segments;
+						const bool rev = (orient >= 2);
+						const bool initFwd = ((orient % 2) == 0);
+						const auto& firstSeg = rev ? segs.back() : segs.front();
+						const auto& lastSeg = rev ? segs.front() : segs.back();
+						const bool lastFwd = ((segs.size() % 2) == 1) ? initFwd : !initFwd;
+						outEntry = (initFwd ? firstSeg.pts.front() : firstSeg.pts.back()).ToVec3f();
+						outExit = (lastFwd ? lastSeg.pts.back() : lastSeg.pts.front()).ToVec3f();
+					};
+
+				auto chainTransferCost = [&](const Vec3f& fromPt, const Vec3f& toPt, float liftPenalty) -> float
+					{
+						const float dist = (toPt - fromPt).length();
+						if (liftPenalty > 50.0f && dist <= 15.0f)
+							return dist;
+						if (dist <= 1.5f)
+							return dist;
+
+						return dist + liftPenalty;
+					};
+
+				if (numValidChains <= 8)
+				{
+					const size_t N = numValidChains;
+					std::vector<std::array<Vec3f, 4>> entryPts(N), exitPts(N);
+					for (size_t c = 0; c < N; c++)
+					{
+						for (int o = 0; o < 4; o++)
+							getChainEndpoints(c, o, entryPts[c][o], exitPts[c][o]);
+					}
+
+					const size_t numStates = (static_cast<size_t>(1) << N) * N * 4;
+					constexpr float cInf = std::numeric_limits<float>::max() * 0.25f;
+					std::vector<float> dp(numStates, cInf);
+					std::vector<int> parent(numStates, -1);
+
+					auto stateIdx = [&](size_t mask, size_t c, int o) -> size_t
+						{
+							return (mask * N + c) * 4 + static_cast<size_t>(o);
+						};
+
+					for (size_t c = 0; c < N; c++)
+					{
+						const size_t m = static_cast<size_t>(1) << c;
+						for (int o = 0; o < 4; o++)
+						{
+							if (waypoints.empty())
+								dp[stateIdx(m, c, o)] = evaluateExteriorAccess(entryPts[c][o]).score;
+							else
+								dp[stateIdx(m, c, o)] = chainTransferCost(waypoints.back().ToVec3f(), entryPts[c][o], 8.0f);
+						}
+					}
+
+					const size_t fullMask = (static_cast<size_t>(1) << N) - 1;
+					for (size_t mask = 1; mask <= fullMask; mask++)
+					{
+						for (size_t c = 0; c < N; c++)
+						{
+							if (!(mask & (static_cast<size_t>(1) << c)))
+								continue;
+							for (int o = 0; o < 4; o++)
+							{
+								const float curCost = dp[stateIdx(mask, c, o)];
+								if (curCost >= cInf * 0.5f)
+									continue;
+								for (size_t nc = 0; nc < N; nc++)
+								{
+									if (mask & (static_cast<size_t>(1) << nc))
+										continue;
+									const size_t nMask = mask | (static_cast<size_t>(1) << nc);
+									for (int no = 0; no < 4; no++)
+									{
+										const float candCost = curCost + chainTransferCost(exitPts[c][o], entryPts[nc][no], 100.0f);
+										const size_t ns = stateIdx(nMask, nc, no);
+										if (candCost < dp[ns])
+										{
+											dp[ns] = candCost;
+											parent[ns] = static_cast<int>(c * 4 + static_cast<size_t>(o));
+										}
+									}
+								}
+							}
+						}
+					}
+
+					float bestTotal = cInf;
+					size_t bestC = 0;
+					int bestO = 0;
+					for (size_t c = 0; c < N; c++)
+					{
+						for (int o = 0; o < 4; o++)
+						{
+							const float val = dp[stateIdx(fullMask, c, o)];
+							if (val < bestTotal)
+							{
+								bestTotal = val;
+								bestC = c;
+								bestO = o;
+							}
+						}
+					}
+
+					chainPlan.resize(N);
+					size_t curMask = fullMask;
+					size_t curC = bestC;
+					int curO = bestO;
+					for (size_t step = N; step > 0; step--)
+					{
+						chainPlan[step - 1] = { curC, (curO >= 2), ((curO % 2) == 0) };
+						const int prevPacked = parent[stateIdx(curMask, curC, curO)];
+						curMask ^= (static_cast<size_t>(1) << curC);
+						if (prevPacked >= 0)
+						{
+							curC = static_cast<size_t>(prevPacked / 4);
+							curO = prevPacked % 4;
+						}
 					}
 				}
 				else
 				{
-					const Vec3f prevEnd = waypoints.back().ToVec3f();
-					const Vec3f nextStart = segPts.front().ToVec3f();
-					const float linkDist = (nextStart - prevEnd).length();
-
-					// Pure intersection-based turnaround linking:
-					// only connect straight across tiny <= 0.70 mm gaps; larger links hug the boundary or lift cleanly.
-					const bool straightLineSafe = (linkDist <= 0.70f);
-
-					const bool canTryBoundaryTrace =
-						(linkDist > 0.70f && linkDist <= 45.0f) &&
-						std::abs(actualCurrStartBeta - actualPrevEndBeta) < 0.55f * maxBeta &&
-						std::abs(actualCurrAlpha - actualPrevAlpha) < 0.25f * maxAlpha;
-
-					if (linkDist <= 0.70f)
+					std::vector<bool> chainVisited(numValidChains, false);
+					Vec3f curPos = waypoints.empty() ? Vec3f(0.0f, safeY, 0.0f) : waypoints.back().ToVec3f();
+					for (size_t visitedCount = 0; visitedCount < numValidChains; visitedCount++)
 					{
-						appendSafePoint(segPts.front());
-					}
-					else if (canTryBoundaryTrace)
-					{
-						bool boundaryTraceSafe = true;
-						std::vector<float3> linkPts;
-						const int linkSteps = std::clamp(static_cast<int>(std::ceil(linkDist / 0.50f)), 2, 90);
-						const bool bothOnBase =
-							(prevEnd.y <= baseY + 0.65f) && (nextStart.y <= baseY + 0.65f);
-						const float betaDelta = std::abs(actualCurrStartBeta - actualPrevEndBeta);
-						const float maxBetaSnap = bothOnBase
-							? std::max(0.18f * maxBeta, betaDelta * 0.75f)
-							: std::max(0.05f * maxBeta, betaDelta * 0.85f);
-						const float maxAllowedLinkY = std::max(prevEnd.y, nextStart.y) + (bothOnBase ? 0.65f : 2.5f);
-						for (int ls = 1; ls < linkSteps; ls++)
+						size_t bestC = 0;
+						int bestO = 0;
+						float bestCost = std::numeric_limits<float>::max();
+						Vec3f bestExit{};
+						for (size_t c = 0; c < numValidChains; c++)
 						{
-							const float t = static_cast<float>(ls) / linkSteps;
-							const float bLinear = std::lerp(actualPrevEndBeta, actualCurrStartBeta, t);
-							float bInterp = bLinear;
-							const float aInterp = std::lerp(actualPrevAlpha, actualCurrAlpha, t);
+							if (chainVisited[c])
+								continue;
+							for (int o = 0; o < 4; o++)
 							{
-								// Snap turnaround to the exact trim boundary (base plane OR surface-surface intersection)
-								// so the cutter rolls smoothly along the intersection instead of lifting or cutting across the surface.
-								auto ivs = ComputeValidFlowIntervals(clSelf, alongV, aInterp, attachments, yCenterMinWorld);
-								float bestSnapDist = maxBetaSnap;
-								float bestSnapBeta = bInterp;
-								for (const auto& [b0, b1] : ivs)
+								Vec3f en{}, ex{};
+								getChainEndpoints(c, o, en, ex);
+								const float cost = (visitedCount == 0 && waypoints.empty())
+									? evaluateExteriorAccess(en).score
+									: chainTransferCost(curPos, en, visitedCount == 0 ? 35.0f : 100.0f);
+								if (cost < bestCost)
 								{
-									const float d0 = std::abs(b0 - bLinear);
-									if (d0 < bestSnapDist && evalAtAB(aInterp, b0).tipMm.y <= maxAllowedLinkY)
-									{
-										bestSnapDist = d0;
-										bestSnapBeta = b0;
-									}
-									const float d1 = std::abs(b1 - bLinear);
-									if (d1 < bestSnapDist && evalAtAB(aInterp, b1).tipMm.y <= maxAllowedLinkY)
-									{
-										bestSnapDist = d1;
-										bestSnapBeta = b1;
-									}
+									bestCost = cost;
+									bestC = c;
+									bestO = o;
+									bestExit = ex;
 								}
-								bInterp = bestSnapBeta;
 							}
-							SurfSample smp = evalAtAB(aInterp, bInterp);
-							const float safeLinkY = std::max(smp.tipMm.y, minSafeTipY);
-							if (safeLinkY > maxAllowedLinkY)
-							{
-								boundaryTraceSafe = false;
-								break;
-							}
-							linkPts.emplace_back(smp.tipMm.x, safeLinkY, smp.tipMm.z);
+						}
+						chainVisited[bestC] = true;
+						chainPlan.push_back({ bestC, (bestO >= 2), ((bestO % 2) == 0) });
+						curPos = bestExit;
+					}
+				}
+			}
+
+			for (const auto& planItem : chainPlan)
+			{
+				auto& chain = validChains[planItem.chainIdx];
+				if (planItem.reverseRowOrder)
+					std::reverse(chain.segments.begin(), chain.segments.end());
+
+				bool forwardDir = planItem.initForwardDir;
+				float actualPrevEndBeta = 0.0f;
+				float actualPrevAlpha = 0.0f;
+
+				for (size_t sIdx = 0; sIdx < chain.segments.size(); sIdx++)
+				{
+					const auto& seg = chain.segments[sIdx];
+					std::vector<float3> segPts = seg.pts;
+					if (!forwardDir)
+						std::reverse(segPts.begin(), segPts.end());
+
+					const float actualCurrStartBeta = forwardDir ? seg.betaStart : seg.betaEnd;
+					const float actualCurrEndBeta = forwardDir ? seg.betaEnd : seg.betaStart;
+					const float actualCurrAlpha = seg.alpha;
+
+					if (sIdx == 0)
+					{
+						const Vec3f nextStart = segPts.front().ToVec3f();
+						const float chainGap = waypoints.empty() ? 1e9f : (nextStart - waypoints.back().ToVec3f()).length();
+						if (!waypoints.empty() && chainGap <= 1.5f)
+						{
+							appendSafePoint(segPts.front());
 						}
 
-						if (boundaryTraceSafe)
+						else
 						{
-							for (const auto& lp : linkPts)
-								appendSafePoint(lp);
+							transitionSafeCl(segPts);
+						}
+					}
+					else
+					{
+						const Vec3f prevEnd = waypoints.back().ToVec3f();
+						const Vec3f nextStart = segPts.front().ToVec3f();
+						const float linkDist = (nextStart - prevEnd).length();
+
+						// Pure intersection-based turnaround linking:
+						// only connect straight across tiny <= 0.70 mm gaps; larger links hug the boundary or lift cleanly.
+						const bool straightLineSafe = (linkDist <= 0.70f);
+
+						const bool canTryBoundaryTrace =
+							(linkDist > 0.70f && linkDist <= 45.0f) &&
+							std::abs(actualCurrStartBeta - actualPrevEndBeta) < 0.55f * maxBeta &&
+							std::abs(actualCurrAlpha - actualPrevAlpha) < 0.25f * maxAlpha;
+
+						if (linkDist <= 0.70f)
+						{
 							appendSafePoint(segPts.front());
+						}
+						else if (canTryBoundaryTrace)
+						{
+							bool boundaryTraceSafe = true;
+							std::vector<float3> linkPts;
+							const int linkSteps = std::clamp(static_cast<int>(std::ceil(linkDist / 0.50f)), 2, 90);
+							const bool bothOnBase =
+								(prevEnd.y <= baseY + 0.65f) && (nextStart.y <= baseY + 0.65f);
+							const float betaDelta = std::abs(actualCurrStartBeta - actualPrevEndBeta);
+							const float maxBetaSnap = bothOnBase
+								? std::max(0.18f * maxBeta, betaDelta * 0.75f)
+								: std::max(0.05f * maxBeta, betaDelta * 0.85f);
+							const float maxAllowedLinkY = std::max(prevEnd.y, nextStart.y) + (bothOnBase ? 0.65f : 2.5f);
+
+							const float maxStep3DMm = 3.0f;
+							const float subdivTriggerMm = 2.2f;
+							const float maxChordUndercutMm = 0.15f;
+							const float stepBetaSnap = bothOnBase
+								? std::max(0.10f * maxBeta, betaDelta * 0.75f)
+								: std::max(0.06f * maxBeta, betaDelta * 0.85f);
+
+							auto trySnapBoundary = [&](float aVal, float refBeta, float linBeta, float& outBeta, Vec3f& outPt) -> bool
+								{
+									auto ivs = ComputeValidFlowIntervals(clSelf, alongV, aVal, attachments, yCenterMinWorld);
+									float bestScore = std::numeric_limits<float>::max();
+									float bestBeta = refBeta;
+									bool found = false;
+
+									for (const auto& [b0, b1] : ivs)
+									{
+										for (float bCand : { b0, b1 })
+										{
+											float bTest = bCand;
+											SurfSample smpCand = evalAtAB(aVal, bTest);
+											if (smpCand.tipMm.y < baseY - 0.25f || smpCand.normal.y < 0.005f)
+											{
+												float bIn = std::clamp(refBeta, b0, b1);
+												if (!isPointValid(aVal, bIn))
+												{
+													float bMidIv = 0.5f * (b0 + b1);
+													if (isPointValid(aVal, bMidIv))
+														bIn = bMidIv;
+												}
+												if (isPointValid(aVal, bIn))
+												{
+													float lo = bIn;
+													float hi = bCand;
+													for (int it = 0; it < 10; it++)
+													{
+														float mid = 0.5f * (lo + hi);
+														if (isPointValid(aVal, mid))
+															lo = mid;
+														else
+															hi = mid;
+													}
+													bTest = lo;
+													smpCand = evalAtAB(aVal, bTest);
+												}
+											}
+
+											const float dRef = std::abs(bTest - refBeta);
+											const float dLin = std::abs(bTest - linBeta);
+											if (dRef > stepBetaSnap && dLin > maxBetaSnap)
+												continue;
+											if (smpCand.tipMm.y > maxAllowedLinkY || smpCand.tipMm.y < baseY - 0.25f)
+												continue;
+											if (std::abs(smpCand.tipMm.x) > halfX + R + cOutsideBlockMarginMm ||
+												std::abs(smpCand.tipMm.z) > halfZ + R + cOutsideBlockMarginMm)
+												continue;
+											const float score = std::min(dRef, dLin);
+											if (score < bestScore)
+											{
+												bestScore = score;
+												bestBeta = bTest;
+												found = true;
+											}
+										}
+									}
+
+									if (!found)
+										return false;
+
+									SurfSample smp = evalAtAB(aVal, bestBeta);
+									const float safeLinkY = std::max(smp.tipMm.y, minSafeTipY);
+									if (safeLinkY > maxAllowedLinkY || smp.tipMm.y < baseY - 0.25f)
+										return false;
+
+									outBeta = bestBeta;
+									outPt = Vec3f(smp.tipMm.x, safeLinkY, smp.tipMm.z);
+									return true;
+								};
+
+							auto isChordSafe = [&](float a0, float b0, const Vec3f& p0, float a1, float b1, const Vec3f& p1) -> bool
+								{
+									SurfSample midSmp = evalAtAB(0.5f * (a0 + a1), 0.5f * (b0 + b1));
+									const float midSurfY = std::max(midSmp.tipMm.y, minSafeTipY);
+									const float chordMidY = 0.5f * (p0.y + p1.y);
+									return chordMidY >= midSurfY - maxChordUndercutMm;
+								};
+
+							Vec3f prevLinkPt = prevEnd;
+							float prevLinkAlpha = actualPrevAlpha;
+							float prevLinkBeta = actualPrevEndBeta;
+
+							for (int ls = 1; ls < linkSteps; ls++)
+							{
+								const float t = static_cast<float>(ls) / linkSteps;
+								const float bLinear = std::lerp(actualPrevEndBeta, actualCurrStartBeta, t);
+								const float aInterp = std::lerp(actualPrevAlpha, actualCurrAlpha, t);
+
+								float bestSnapBeta = prevLinkBeta;
+								Vec3f currLinkPt{};
+								if (!trySnapBoundary(aInterp, prevLinkBeta, bLinear, bestSnapBeta, currLinkPt))
+								{
+									boundaryTraceSafe = false;
+									break;
+								}
+
+								if ((currLinkPt - prevLinkPt).length() > subdivTriggerMm)
+								{
+									const float aMid = 0.5f * (prevLinkAlpha + aInterp);
+									const float bMidLin = 0.5f * (prevLinkBeta + bestSnapBeta);
+									float bMid = bMidLin;
+									Vec3f midPt{};
+									if (trySnapBoundary(aMid, bMidLin, bMidLin, bMid, midPt) &&
+										(midPt - prevLinkPt).length() <= maxStep3DMm &&
+										(currLinkPt - midPt).length() <= maxStep3DMm &&
+										isChordSafe(prevLinkAlpha, prevLinkBeta, prevLinkPt, aMid, bMid, midPt) &&
+										isChordSafe(aMid, bMid, midPt, aInterp, bestSnapBeta, currLinkPt))
+									{
+										linkPts.emplace_back(midPt.x, midPt.y, midPt.z);
+										prevLinkPt = midPt;
+										prevLinkAlpha = aMid;
+										prevLinkBeta = bMid;
+									}
+								}
+
+								if ((currLinkPt - prevLinkPt).length() > maxStep3DMm ||
+									!isChordSafe(prevLinkAlpha, prevLinkBeta, prevLinkPt, aInterp, bestSnapBeta, currLinkPt))
+								{
+									boundaryTraceSafe = false;
+									break;
+								}
+
+								linkPts.emplace_back(currLinkPt.x, currLinkPt.y, currLinkPt.z);
+								prevLinkPt = currLinkPt;
+								prevLinkAlpha = aInterp;
+								prevLinkBeta = bestSnapBeta;
+							}
+
+							if (boundaryTraceSafe && (nextStart - prevLinkPt).length() > subdivTriggerMm)
+							{
+								const float aMid = 0.5f * (prevLinkAlpha + actualCurrAlpha);
+								const float bMidLin = 0.5f * (prevLinkBeta + actualCurrStartBeta);
+								float bMid = bMidLin;
+								Vec3f midPt{};
+								if (trySnapBoundary(aMid, bMidLin, bMidLin, bMid, midPt) &&
+									(midPt - prevLinkPt).length() <= maxStep3DMm &&
+									(nextStart - midPt).length() <= maxStep3DMm &&
+									isChordSafe(prevLinkAlpha, prevLinkBeta, prevLinkPt, aMid, bMid, midPt) &&
+									isChordSafe(aMid, bMid, midPt, actualCurrAlpha, actualCurrStartBeta, nextStart))
+								{
+									linkPts.emplace_back(midPt.x, midPt.y, midPt.z);
+									prevLinkPt = midPt;
+									prevLinkAlpha = aMid;
+									prevLinkBeta = bMid;
+								}
+							}
+
+							if (boundaryTraceSafe &&
+								((nextStart - prevLinkPt).length() > maxStep3DMm ||
+								 !isChordSafe(prevLinkAlpha, prevLinkBeta, prevLinkPt, actualCurrAlpha, actualCurrStartBeta, nextStart)))
+							{
+								boundaryTraceSafe = false;
+							}
+
+							if (boundaryTraceSafe)
+							{
+								for (const auto& lp : linkPts)
+									appendSafePoint(lp);
+								appendSafePoint(segPts.front());
+							}
+							else if (straightLineSafe)
+							{
+								appendSafePoint(segPts.front());
+							}
+							else
+							{
+								transitionSafeCl(segPts);
+							}
 						}
 						else if (straightLineSafe)
 						{
@@ -3759,26 +3892,17 @@ namespace
 							transitionSafeCl(segPts);
 						}
 					}
-					else if (straightLineSafe)
-					{
-						appendSafePoint(segPts.front());
-					}
-					else
-					{
-						transitionSafeCl(segPts);
-					}
+
+					for (size_t k = 1; k < segPts.size(); k++)
+						appendSafePoint(segPts[k]);
+
+					actualPrevEndBeta = actualCurrEndBeta;
+					actualPrevAlpha = actualCurrAlpha;
+					forwardDir = !forwardDir;
 				}
-
-				for (size_t k = 1; k < segPts.size(); k++)
-					appendSafePoint(segPts[k]);
-
-				actualPrevEndBeta = actualCurrEndBeta;
-				actualPrevAlpha = actualCurrAlpha;
-				forwardDir = !forwardDir;
 			}
-		}
 
-	}
+		}
 
 	}
 
@@ -3802,117 +3926,117 @@ namespace
 		auto appendSafePoint = [&](const float3& pt) { writer.AppendSafePoint(pt); };
 		auto transitionSafeClPoint = [&](const float3& pt) { writer.TransitionSafeCl(pt); };
 
-	// 7. Clear enclosed flat base lakes purely from trimmed OffsetSurface x HorizontalPlaneSurface contours
-	{
-		std::vector<PureIntersectionLake> pureLakes = ExtractPureIntersectionLakes(
-			orderedSurfaces, offsetSurfaces, surfAttachments, yCenterMinWorld, halfX, halfZ, minSafeTipY);
-
-		const float flatStep = std::clamp(
-			2.0f * std::sqrt(std::max(0.01f, 2.0f * R * scallopH - scallopH * scallopH)),
-			minStepMm,
-			maxStepMm);
-
-		auto resampleArcUniform = [](const std::vector<float3>& arc, int numSamples) -> std::vector<Vec3f>
-			{
-				std::vector<float> cumLen(arc.size(), 0.0f);
-				for (size_t i = 1; i < arc.size(); i++)
-					cumLen[i] = cumLen[i - 1] + (arc[i].ToVec3f() - arc[i - 1].ToVec3f()).length();
-				const float totalLen = std::max(1e-5f, cumLen.back());
-
-				std::vector<Vec3f> out(numSamples + 1);
-				size_t segIdx = 0;
-				for (int s = 0; s <= numSamples; s++)
-				{
-					const float target = (totalLen * s) / numSamples;
-					while (segIdx + 1 < arc.size() && cumLen[segIdx + 1] < target)
-						segIdx++;
-					if (segIdx + 1 >= arc.size())
-					{
-						out[s] = arc.back().ToVec3f();
-					}
-					else
-					{
-						const float segLen = cumLen[segIdx + 1] - cumLen[segIdx];
-						const float t = (segLen > 1e-6f) ? std::clamp((target - cumLen[segIdx]) / segLen, 0.0f, 1.0f) : 0.0f;
-						out[s] = Vec3f::lerp(arc[segIdx].ToVec3f(), arc[segIdx + 1].ToVec3f(), t);
-					}
-				}
-				return out;
-			};
-
-		auto polylineLen = [](const std::vector<float3>& pts) -> float
-			{
-				float s = 0.0f;
-				for (size_t k = 1; k < pts.size(); k++)
-					s += (pts[k].ToVec3f() - pts[k - 1].ToVec3f()).length();
-				return s;
-			};
-
-		std::vector<bool> lakeVisited(pureLakes.size(), false);
-		for (size_t lakeStep = 0; lakeStep < pureLakes.size(); lakeStep++)
+		// 7. Clear enclosed flat base lakes purely from trimmed OffsetSurface x HorizontalPlaneSurface contours
 		{
-			size_t lIdx = 0;
-			if (waypoints.empty())
-			{
-				while (lIdx < pureLakes.size() && lakeVisited[lIdx]) lIdx++;
-			}
-			else
-			{
-				const Vec3f refPos = waypoints.back().ToVec3f();
-				float bestLakeDistSq = std::numeric_limits<float>::max();
-				for (size_t cand = 0; cand < pureLakes.size(); cand++)
+			std::vector<PureIntersectionLake> pureLakes = ExtractPureIntersectionLakes(
+				orderedSurfaces, offsetSurfaces, surfAttachments, yCenterMinWorld, halfX, halfZ, minSafeTipY);
+
+			const float flatStep = std::clamp(
+				2.0f * std::sqrt(std::max(0.01f, 2.0f * R * scallopH - scallopH * scallopH)),
+				minStepMm,
+				maxStepMm);
+
+			auto resampleArcUniform = [](const std::vector<float3>& arc, int numSamples) -> std::vector<Vec3f>
 				{
-					if (lakeVisited[cand]) continue;
-					const float dSq = std::min(
-						(pureLakes[cand].arcA.front().ToVec3f() - refPos).length_sqr(),
-						(pureLakes[cand].arcA.back().ToVec3f() - refPos).length_sqr());
-					if (dSq < bestLakeDistSq) { bestLakeDistSq = dSq; lIdx = cand; }
-				}
-			}
-			lakeVisited[lIdx] = true;
+					std::vector<float> cumLen(arc.size(), 0.0f);
+					for (size_t i = 1; i < arc.size(); i++)
+						cumLen[i] = cumLen[i - 1] + (arc[i].ToVec3f() - arc[i - 1].ToVec3f()).length();
+					const float totalLen = std::max(1e-5f, cumLen.back());
 
-			std::vector<float3> arcA = pureLakes[lIdx].arcA;
-			std::vector<float3> arcB = pureLakes[lIdx].arcB;
+					std::vector<Vec3f> out(numSamples + 1);
+					size_t segIdx = 0;
+					for (int s = 0; s <= numSamples; s++)
+					{
+						const float target = (totalLen * s) / numSamples;
+						while (segIdx + 1 < arc.size() && cumLen[segIdx + 1] < target)
+							segIdx++;
+						if (segIdx + 1 >= arc.size())
+						{
+							out[s] = arc.back().ToVec3f();
+						}
+						else
+						{
+							const float segLen = cumLen[segIdx + 1] - cumLen[segIdx];
+							const float t = (segLen > 1e-6f) ? std::clamp((target - cumLen[segIdx]) / segLen, 0.0f, 1.0f) : 0.0f;
+							out[s] = Vec3f::lerp(arc[segIdx].ToVec3f(), arc[segIdx + 1].ToVec3f(), t);
+						}
+					}
+					return out;
+				};
 
-			if (!waypoints.empty())
-			{
-				const Vec3f refPos = waypoints.back().ToVec3f();
-				if ((arcA.back().ToVec3f() - refPos).length_sqr() < (arcA.front().ToVec3f() - refPos).length_sqr())
+			auto polylineLen = [](const std::vector<float3>& pts) -> float
 				{
-					std::reverse(arcA.begin(), arcA.end());
-					std::reverse(arcB.begin(), arcB.end());
-				}
-			}
+					float s = 0.0f;
+					for (size_t k = 1; k < pts.size(); k++)
+						s += (pts[k].ToVec3f() - pts[k - 1].ToVec3f()).length();
+					return s;
+				};
 
-			constexpr int cSamplesAlongLake = 80;
-			const auto sampA = resampleArcUniform(arcA, cSamplesAlongLake);
-			const auto sampB = resampleArcUniform(arcB, cSamplesAlongLake);
-
-			const float avgArcLen = std::max(1.0f, 0.5f * (polylineLen(arcA) + polylineLen(arcB)));
-			const float maxLakeWidthMm = std::max(1.0f, 1.5f * pureLakes[lIdx].areaMm2 / avgArcLen);
-			const float targetCrossStep = std::clamp(flatStep, minStepMm, maxStepMm);
-			const int numCrossPasses = std::clamp(static_cast<int>(std::ceil(maxLakeWidthMm / targetCrossStep)), 2, 12);
-
-			transitionSafeClPoint(arcA.front());
-
-			for (int p = 0; p <= numCrossPasses; p++)
+			std::vector<bool> lakeVisited(pureLakes.size(), false);
+			for (size_t lakeStep = 0; lakeStep < pureLakes.size(); lakeStep++)
 			{
-				const float tau = static_cast<float>(p) / numCrossPasses;
-				const bool forwardS = ((p % 2) == 0);
-				std::vector<float3> passPts;
-				passPts.reserve(cSamplesAlongLake + 1);
-				for (int idx = 0; idx <= cSamplesAlongLake; idx++)
+				size_t lIdx = 0;
+				if (waypoints.empty())
 				{
-					const int s = forwardS ? idx : (cSamplesAlongLake - idx);
-					const Vec3f pt = Vec3f::lerp(sampA[s], sampB[s], tau);
-					passPts.emplace_back(pt.x, minSafeTipY, pt.z);
+					while (lIdx < pureLakes.size() && lakeVisited[lIdx]) lIdx++;
 				}
-				for (const auto& sp : SimplifyPolyline3DGougeSafe(passPts, simplifyTol))
-					appendSafePoint(sp);
-			}
+				else
+				{
+					const Vec3f refPos = waypoints.back().ToVec3f();
+					float bestLakeDistSq = std::numeric_limits<float>::max();
+					for (size_t cand = 0; cand < pureLakes.size(); cand++)
+					{
+						if (lakeVisited[cand]) continue;
+						const float dSq = std::min(
+							(pureLakes[cand].arcA.front().ToVec3f() - refPos).length_sqr(),
+							(pureLakes[cand].arcA.back().ToVec3f() - refPos).length_sqr());
+						if (dSq < bestLakeDistSq) { bestLakeDistSq = dSq; lIdx = cand; }
+					}
+				}
+				lakeVisited[lIdx] = true;
 
+				std::vector<float3> arcA = pureLakes[lIdx].arcA;
+				std::vector<float3> arcB = pureLakes[lIdx].arcB;
+
+				if (!waypoints.empty())
+				{
+					const Vec3f refPos = waypoints.back().ToVec3f();
+					if ((arcA.back().ToVec3f() - refPos).length_sqr() < (arcA.front().ToVec3f() - refPos).length_sqr())
+					{
+						std::reverse(arcA.begin(), arcA.end());
+						std::reverse(arcB.begin(), arcB.end());
+					}
+				}
+
+				constexpr int cSamplesAlongLake = 80;
+				const auto sampA = resampleArcUniform(arcA, cSamplesAlongLake);
+				const auto sampB = resampleArcUniform(arcB, cSamplesAlongLake);
+
+				const float avgArcLen = std::max(1.0f, 0.5f * (polylineLen(arcA) + polylineLen(arcB)));
+				const float maxLakeWidthMm = std::max(1.0f, 1.5f * pureLakes[lIdx].areaMm2 / avgArcLen);
+				const float targetCrossStep = std::clamp(flatStep, minStepMm, maxStepMm);
+				const int numCrossPasses = std::clamp(static_cast<int>(std::ceil(maxLakeWidthMm / targetCrossStep)), 2, 12);
+
+				transitionSafeClPoint(arcA.front());
+
+				for (int p = 0; p <= numCrossPasses; p++)
+				{
+					const float tau = static_cast<float>(p) / numCrossPasses;
+					const bool forwardS = ((p % 2) == 0);
+					std::vector<float3> passPts;
+					passPts.reserve(cSamplesAlongLake + 1);
+					for (int idx = 0; idx <= cSamplesAlongLake; idx++)
+					{
+						const int s = forwardS ? idx : (cSamplesAlongLake - idx);
+						const Vec3f pt = Vec3f::lerp(sampA[s], sampB[s], tau);
+						passPts.emplace_back(pt.x, minSafeTipY, pt.z);
+					}
+					for (const auto& sp : SimplifyPolyline3DGougeSafe(passPts, simplifyTol))
+						appendSafePoint(sp);
+				}
+
+			}
 		}
-	}
 
 	}
 
@@ -3937,78 +4061,78 @@ namespace
 		auto transitionSafeCl = [&](const std::vector<float3>& pts) { EmitAheadTransition(writer, pts); };
 		constexpr float cMinSafeHorizontalSlope = FinishingPathWriter::cMinSafeHorizontalSlope;
 
-	// 8. Pencil milling passes along exact offset-surface intersections in greedy nearest-neighbor order
-	{
-		std::vector<std::vector<float3>> activeGrooveChains = BuildPencilMillingChains(
-			tracedIntersections, orderedSurfaces, offsetSurfaces, objToSurfIdx, surfAttachments,
-			yCenterMinWorld, R, halfX, halfZ, baseY, minSafeTipY, simplifyTol);
-
-		std::vector<bool> grooveUsed(activeGrooveChains.size(), false);
-		for (size_t step = 0; step < activeGrooveChains.size(); step++)
+		// 8. Pencil milling passes along exact offset-surface intersections in greedy nearest-neighbor order
 		{
-			Vec3f refPos = waypoints.empty() ? Vec3f(0.0f, safeY, 0.0f) : waypoints.back().ToVec3f();
-			float bestCost = std::numeric_limits<float>::max();
-			std::optional<size_t> bestIdx;
-			bool reverseBest = false;
+			std::vector<std::vector<float3>> activeGrooveChains = BuildPencilMillingChains(
+				tracedIntersections, orderedSurfaces, offsetSurfaces, objToSurfIdx, surfAttachments,
+				yCenterMinWorld, R, halfX, halfZ, baseY, minSafeTipY, simplifyTol);
 
-			for (size_t cIdx = 0; cIdx < activeGrooveChains.size(); cIdx++)
+			std::vector<bool> grooveUsed(activeGrooveChains.size(), false);
+			for (size_t step = 0; step < activeGrooveChains.size(); step++)
 			{
-				if (grooveUsed[cIdx] || activeGrooveChains[cIdx].size() < 2)
-					continue;
-				const auto& ch = activeGrooveChains[cIdx];
-				for (int side = 0; side < 2; side++)
-				{
-					const Vec3f cand = (side == 0) ? ch.front().ToVec3f() : ch.back().ToVec3f();
-					const float dist = (cand - refPos).length();
-					const bool directShort = !waypoints.empty() && dist <= 2.0f;
-					const float cost = directShort ? dist : (dist + 40.0f);
+				Vec3f refPos = waypoints.empty() ? Vec3f(0.0f, safeY, 0.0f) : waypoints.back().ToVec3f();
+				float bestCost = std::numeric_limits<float>::max();
+				std::optional<size_t> bestIdx;
+				bool reverseBest = false;
 
-					if (cost < bestCost)
+				for (size_t cIdx = 0; cIdx < activeGrooveChains.size(); cIdx++)
+				{
+					if (grooveUsed[cIdx] || activeGrooveChains[cIdx].size() < 2)
+						continue;
+					const auto& ch = activeGrooveChains[cIdx];
+					for (int side = 0; side < 2; side++)
 					{
-						bestCost = cost;
-						bestIdx = cIdx;
-						reverseBest = (side == 1);
+						const Vec3f cand = (side == 0) ? ch.front().ToVec3f() : ch.back().ToVec3f();
+						const float dist = (cand - refPos).length();
+						const bool directShort = !waypoints.empty() && dist <= 2.0f;
+						const float cost = directShort ? dist : (dist + 40.0f);
+
+						if (cost < bestCost)
+						{
+							bestCost = cost;
+							bestIdx = cIdx;
+							reverseBest = (side == 1);
+						}
 					}
 				}
-			}
 
-			if (!bestIdx)
-				break;
+				if (!bestIdx)
+					break;
 
-			grooveUsed[*bestIdx] = true;
-			std::vector<float3> ch = activeGrooveChains[*bestIdx];
-			if (reverseBest)
-				std::reverse(ch.begin(), ch.end());
-
-			{
-				const Vec3f p0 = ch.front().ToVec3f();
-				const Vec3f p1 = ch.back().ToVec3f();
-				const float dy = p1.y - p0.y;
-				const float lenXZ = std::hypot(p1.x - p0.x, p1.z - p0.z);
-				if (dy < -0.5f && lenXZ < (-dy) * cMinSafeHorizontalSlope * 1.25f)
+				grooveUsed[*bestIdx] = true;
+				std::vector<float3> ch = activeGrooveChains[*bestIdx];
+				if (reverseBest)
 					std::reverse(ch.begin(), ch.end());
-			}
 
-			const Vec3f startPt = ch.front().ToVec3f();
-			const float grooveGap = waypoints.empty() ? 1e9f : (startPt - waypoints.back().ToVec3f()).length();
-			if (!waypoints.empty() && grooveGap <= 0.15f)
-			{
-				// Already at startPt
-			}
-			else if (!waypoints.empty() && grooveGap <= 2.0f)
-			{
-				appendSafePoint(ch.front());
-			}
+				{
+					const Vec3f p0 = ch.front().ToVec3f();
+					const Vec3f p1 = ch.back().ToVec3f();
+					const float dy = p1.y - p0.y;
+					const float lenXZ = std::hypot(p1.x - p0.x, p1.z - p0.z);
+					if (dy < -0.5f && lenXZ < (-dy) * cMinSafeHorizontalSlope * 1.25f)
+						std::reverse(ch.begin(), ch.end());
+				}
 
-			else
-			{
-				transitionSafeCl(ch);
-			}
+				const Vec3f startPt = ch.front().ToVec3f();
+				const float grooveGap = waypoints.empty() ? 1e9f : (startPt - waypoints.back().ToVec3f()).length();
+				if (!waypoints.empty() && grooveGap <= 0.15f)
+				{
+					// Already at startPt
+				}
+				else if (!waypoints.empty() && grooveGap <= 2.0f)
+				{
+					appendSafePoint(ch.front());
+				}
 
-			for (size_t k = 1; k < ch.size(); k++)
-				appendSafePoint(ch[k]);
+				else
+				{
+					transitionSafeCl(ch);
+				}
+
+				for (size_t k = 1; k < ch.size(); k++)
+					appendSafePoint(ch[k]);
+			}
 		}
-	}
 
 	}
 }
